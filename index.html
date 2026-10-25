@@ -1,0 +1,1512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a09">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wing">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Wing Console</title>
+<style>
+/* Layout: fixed 1180-wide console, scaled to fill the device in landscape; height stretches to the screen so faders and the EQ graph grow on taller devices. */
+:root{
+  --ground:#121110; --panel:#1a1815; --ink:#f1e7d2; --ink-dim:#b8a78a;
+  --brass:#c9a25a; --brass-hi:#f3c27a; --line:#2c2721;
+  --display:'Barlow Condensed','Arial Narrow',sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:#0b0a09;color:var(--ink);overflow:hidden;overscroll-behavior:none}
+*{box-sizing:border-box}
+button{font-family:var(--display);-webkit-tap-highlight-color:transparent;color:inherit}
+button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
+#stage{position:fixed;top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background:#0b0a09}
+.console{position:absolute;top:0;width:1180px;transform-origin:0 0;display:flex;flex-direction:column;overflow:hidden;background:var(--ground);font-family:var(--display);color:var(--ink)}
+.wood{background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 2px,transparent 2px 7px),linear-gradient(90deg,#3a2213,#6e4527 45%,#55331b 70%,#2e1b0f)}
+.topbar{flex:none;display:flex;align-items:center;gap:12px;padding-right:14px;background:linear-gradient(180deg,#2b2723,#1a1815);border-bottom:1px solid #8a6a3a}
+.navbtn{width:60px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:transparent;border:1px solid transparent;border-radius:8px;color:#e9dcc2;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.navbtn.hot{background:#2a2014;border-color:#8a6a3a;color:var(--brass-hi);width:66px}
+.strip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px;padding:6px;background:linear-gradient(180deg,#27241f,#1a1815 60%,#161412);border:1px solid #302b25;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.cname{height:26px;flex:none;border:none;border-radius:3px;padding:0 6px;color:#121110;font-weight:700;font-size:15px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.panmini{position:relative;height:30px;flex:none;padding:0;border:1px solid #34302a;border-radius:15px;background:#100f0d;cursor:ew-resize;touch-action:none}
+.knob{position:absolute;top:50%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e3b4,#c9a25a 55%,#7a5a26);box-shadow:0 2px 3px rgba(0,0,0,.6)}
+.ms{display:flex;gap:4px;height:32px;flex:none}
+.ms button{flex:1;min-width:0;padding:0;border-radius:4px;font-weight:700;font-size:13px;letter-spacing:.08em;cursor:pointer}
+.dbr{height:14px;flex:none;text-align:center;font-family:var(--mono);font-size:11px;line-height:14px;color:#d9cdb3}
+.fader{position:relative;width:100%;flex:none;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none}
+.mk{position:absolute;left:0;width:22px;text-align:right;font-family:var(--mono);font-size:9px;line-height:14px;color:#9b927f}
+.tk{position:absolute;left:30px;width:28px;height:1px;background:#3a342c}
+.slot{position:absolute;left:41px;width:6px;top:20px;bottom:20px;border-radius:3px;background:#070606;box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 0 0 1px #2c2721}
+.meter{position:absolute;left:68px;width:9px;top:22px;display:flex;flex-direction:column;gap:2px}
+.meter span{flex:1;border-radius:1px}
+.cap{position:absolute;left:24px;width:40px;height:44px;border-radius:5px;background:linear-gradient(180deg,#f4ecda 0%,#ddd3bc 40%,#b9ad93 50%,#d6ccb4 60%,#ece4d0 100%);border:1px solid #6f6656;box-shadow:0 6px 8px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.7)}
+.cap::after{content:"";position:absolute;left:3px;right:3px;top:20px;height:2px;background:#1b1915}
+.layer{height:52px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px;border:1px solid #302b25;background:#1a1815;color:#e9dcc2;font-weight:600;font-size:19px;letter-spacing:.03em;cursor:pointer}
+.layer i{width:4px;height:26px;border-radius:2px;background:#4a4339}
+.layer.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.layer.on i{background:#e8a33d}
+.scrim{position:absolute;inset:0;border:none;padding:0;background:rgba(8,7,6,.72);cursor:default}
+.pop{position:absolute;display:flex;flex-direction:column;background:linear-gradient(180deg,#2a2622,#1a1815);border:1px solid #5a4630;border-radius:12px;box-shadow:0 30px 60px rgba(0,0,0,.7)}
+.tag{height:26px;padding:0 12px;display:flex;align-items:center;border-radius:3px;color:#121110;font-weight:700;font-size:16px;letter-spacing:.05em;text-transform:uppercase}
+.pill{height:44px;border-radius:8px;border:1px solid #3a342c;background:#1a1815;color:#e9dcc2;font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.pill.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.box{position:relative;padding:0 10px;display:flex;align-items:center;justify-content:space-between;border-radius:6px;border:1px solid var(--line);background:#141210;cursor:ew-resize;touch-action:none;overflow:hidden;height:44px}
+.box b{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9b927f}
+.box em{font-style:normal;font-family:var(--mono);font-size:15px;color:var(--ink)}
+.box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
+.sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
+.tab{height:36px;display:flex;align-items:center;gap:5px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
+.gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 30%,#2a2420,#0b0a09 75%);z-index:20;padding:24px}
+.card{max-width:520px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;font-family:'Heebo',var(--display)}
+.card h1{margin:0;font-family:var(--display);font-size:44px;letter-spacing:.12em;color:var(--brass-hi);font-weight:700}
+.card p{margin:0;color:#d9cdb3;font-size:17px;line-height:1.5}
+.cta{min-height:56px;padding:0 34px;border-radius:12px;border:1px solid var(--brass);background:#2a2014;color:var(--brass-hi);font-family:'Heebo',var(--display);font-size:20px;font-weight:700;cursor:pointer}
+.ghost{min-height:44px;padding:0 20px;border-radius:10px;border:1px solid #3a342c;background:transparent;color:#cbbd9f;font-family:'Heebo',var(--display);font-size:16px;cursor:pointer}
+.toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 20px;border-radius:10px;background:#2a2014;border:1px solid #8a6a3a;color:var(--brass-hi);font-family:'Heebo',var(--display);font-size:16px;z-index:30;direction:rtl;max-width:90%;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Heebo:wght@400;700&display=swap">
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js';
+
+const DW = 1180;
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const IC = {
+  player: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><circle cx="15.5" cy="11" r="2"/><path d="M8.5 11h7M6 19l1.5-3h9L18 19"/></svg>`,
+  fx: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/></svg>`,
+  route: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
+  scenes: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+  full: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+  back: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
+  grip: html`<svg width="8" height="14" viewBox="0 0 8 14" fill="#7d7363" aria-hidden="true"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="7" r="1.2"/><circle cx="6" cy="7" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="6" cy="12" r="1.2"/></svg>`
+};
+
+function dbOf(v) {
+  if (v <= 0.001) return -Infinity;
+  if (v >= 0.5) return v * 40 - 30;
+  if (v >= 0.25) return v * 80 - 50;
+  if (v >= 0.0625) return v * 160 - 70;
+  return v * 480 - 90;
+}
+const dbText = v => { const d = dbOf(v); return d === -Infinity ? '-∞' : (d > 0 ? '+' : '') + d.toFixed(1); };
+const panText = p => Math.abs(p) < 0.01 ? 'C' : (p < 0 ? 'L' : 'R') + Math.round(Math.abs(p) * 100);
+const fmtF = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2) + ' kHz' : Math.round(f) + ' Hz';
+const fmtDb = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + ' dB';
+const capture = e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} };
+
+/* Input groups. hasPre = the source has an analog preamp (gain + 48V). Counts and the gain range are placeholders until checked against the protocol document. */
+const GROUPS = [
+  { id: 'LCL', name: 'Local', short: 'LCL', n: 8 }, { id: 'AUX', name: 'Aux in', short: 'AUX', n: 8 },
+  { id: 'A', name: 'AES50 A', short: 'A', n: 48 }, { id: 'B', name: 'AES50 B', short: 'B', n: 48 }, { id: 'C', name: 'AES50 C', short: 'C', n: 48 },
+  { id: 'SC', name: 'StageConnect', short: 'SC', n: 32 }, { id: 'USB', name: 'USB', short: 'USB', n: 48 },
+  { id: 'CRD', name: 'Card · Dante', short: 'DANTE', n: 64 }, { id: 'MOD', name: 'Module', short: 'MOD', n: 48 }, { id: 'PLY', name: 'Player', short: 'PLY', n: 2 }
+];
+const GMAP = Object.fromEntries(GROUPS.map(g => [g.id, g]));
+const PRE = new Set(['LCL', 'A', 'B', 'C']);
+const GMIN = -2.5, GSTEP = 2.5, GSTEPS = 19;
+const MODES = [['M', 'Mono'], ['ST', 'Stereo'], ['MS', 'M/S']];
+const STAGE = ['Kick In','Snare','Hi-Hat','Tom 1','OH L','OH R','Bass DI','Gtr Amp','Keys L','Keys R','Vox 1','Vox 2'];
+const DCAS = ['Drums','Bass','Gtrs','Keys','Vox','FX'];
+const pad2 = n => String(n).padStart(2, '0');
+const srcKey = s => s.grp + '-' + s.n;
+const arcPath = (a0, a1, r, c) => {
+  const P = a => { const t = (a - 90) * Math.PI / 180; return [(c + r * Math.cos(t)).toFixed(1), (c + r * Math.sin(t)).toFixed(1)]; };
+  const [x0, y0] = P(a0), [x1, y1] = P(a1);
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${Math.abs(a1 - a0) > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+};
+
+function makeChannels() {
+  const names = [['Kick','#e07a6e'],['Snare','#e0a35e'],['Hi-Hat','#d9c86a'],['Toms','#e0a35e'],['OH L','#d9c86a'],['OH R','#d9c86a'],['Bass','#8cc47e'],['Gtr','#6cc0b8'],['Keys L','#7aa7e0'],['Keys R','#7aa7e0'],['Vox 1','#e58fb5'],['Vox 2','#e58fb5']];
+  const vs = [0.72,0.7,0.6,0.66,0.62,0.62,0.75,0.68,0.64,0.64,0.78,0.7];
+  const ps = [0,0,0.3,-0.2,-0.6,0.6,0,-0.35,-0.8,0.8,0,0.15];
+  const out = [];
+  for (let i = 0; i < 48; i++) {
+    const n = names[i];
+    const sends = [];
+    for (let k = 0; k < 24; k++) sends.push(n && k < 4 ? 0.5 + ((i * 7 + k * 3) % 5) * 0.05 : 0);
+    out.push({ name: n ? n[0] : (i < 40 ? 'Ch ' + (i + 1) : 'Aux ' + (i - 39)), color: n ? n[1] : (i < 40 ? '#8c9bb0' : '#a993d9'),
+      v: n ? vs[i] : 0, pan: n ? ps[i] : 0, width: 1, swap: false, mute: false, solo: false, sends, base: 0.55 + ((i * 37) % 30) / 100 });
+  }
+  return out;
+}
+function makeEq() {
+  const spec = []; let seed = 7;
+  const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let k = 0; k < 120; k++) {
+    const f = 20 * Math.pow(10, 3 * k / 119);
+    const base = f < 120 ? 0.12 : f < 400 ? 0.12 + (f - 120) / 280 * 0.5 : f < 6000 ? 0.62 - (f - 400) / 5600 * 0.12 : 0.5 - (f - 6000) / 14000 * 0.2;
+    spec.push(Math.max(0.03, base + (rnd() - 0.5) * 0.28));
+  }
+  return {
+    bands: [
+      { id: 'L', type: 'losh', f: 90, g: 0, q: 0.7, on: true, dyn: false, thr: -30, range: -6, att: 5, rel: 120, color: '#7aa7e0' },
+      { id: '1', type: 'bell', f: 2050, g: -3.7, q: 2.12, on: true, dyn: false, thr: -20, range: -6, att: 3, rel: 80, color: '#ef6f5a' },
+      { id: '2', type: 'bell', f: 1250, g: -2.2, q: 3.2, on: true, dyn: false, thr: -24, range: -4, att: 5, rel: 120, color: '#f0a24a' },
+      { id: '3', type: 'bell', f: 920, g: -3.5, q: 7, on: true, dyn: false, thr: -24, range: -4, att: 5, rel: 120, color: '#d6d860' },
+      { id: '4', type: 'bell', f: 165, g: -3.2, q: 1.4, on: true, dyn: false, thr: -24, range: -4, att: 10, rel: 150, color: '#4fc9b7' },
+      { id: 'H', type: 'hish', f: 9000, g: 1.5, q: 0.7, on: true, dyn: false, thr: -30, range: 4, att: 5, rel: 120, color: '#a993d9' }
+    ],
+    sel: 1, fs: false, R: 12, bypass: false, listen: false, pre: true,
+    lc: { on: true, f: 60 }, hc: { on: false, f: 16000 }, tilt: 0,
+    spec, base: spec.slice(), bl: [-40,-40,-40,-40,-40,-40], mIn: 60, mOut: 55
+  };
+}
+
+/* Dynamics-slot models. Names taken from published firmware notes; the full list and each model's parameters get checked against the protocol document. */
+const DEQ = 'Dual Dynamic EQ';
+const RATIO_N = { '1:1.5': 1.5, '1:2': 2, '1:3': 3, '1:4': 4, 'GATE': Infinity };
+const GATE_DEF = { thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, 'sc.f': 1000, 'sc.q': 1 };
+const KEYT = { LC6: 'Lo-Cut 6dB', LC12: 'Lo-Cut 12dB', HC6: 'Hi-Cut 6dB', HC12: 'Hi-Cut 12dB', BP: 'Band Q' };
+const MODELS = [
+  { name: 'Wing Gate', kind: 'Gate' }, { name: 'Wing Expander', kind: 'Expander' }, { name: 'Wing Comp', kind: 'Compressor' },
+  { name: 'BDX 160', kind: 'Compressor' }, { name: 'LA Leveler', kind: 'Leveler' }, { name: 'Even 88 Comp', kind: 'Compressor' },
+  { name: 'One Knob Comp', kind: 'Compressor' }, { name: 'LMT Comp', kind: 'Compressor' }, { name: DEQ, kind: 'Dynamic EQ' }
+];
+function makeDeq() {
+  const e = makeEq();
+  return { ...e, sel: 0, lc: { on: false, f: 60 }, hc: { on: false, f: 16000 },
+    bands: [
+      { id: '1', type: 'bell', f: 2800, g: 0, q: 2.5, on: true, dyn: true, thr: -22, range: -5, att: 3, rel: 80, color: '#ef6f5a' },
+      { id: '2', type: 'bell', f: 320, g: 0, q: 1.6, on: true, dyn: true, thr: -28, range: -4, att: 10, rel: 150, color: '#4fc9b7' }
+    ] };
+}
+
+class App extends Component {
+  constructor() {
+    super();
+    this.state = { cw: innerWidth, ch: innerHeight, started: matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true, isFs: false, toast: '', screen: 'main', eqCh: 1,
+      chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, lv: [0,0,0,0,0,0,0,0,0],
+      panPop: null, sendPop: null, eq: makeEq(),
+      lastTab: 'config', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
+      deq: makeDeq(), slots: { gate: 'Wing Gate', comp: 'Wing Comp' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
+      gate: { on: true, thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, ratio: '1:3', fs: false,
+        sc: { on: false, type: 'BP', f: 1000, q: 1, src: 'SELF', tap: 'IN' },
+        sim: { t: 0, next: 0.3, env: -62, hold: 0, gr: 40, hist: [], trail: [], lin: -62 } } };
+    this.ek = 'eq';
+    this.ptrs = {}; this.taps = {};
+  }
+  componentDidMount() {
+    const ro = new ResizeObserver(() => { const r = this.stage.getBoundingClientRect(); this.setState({ cw: r.width, ch: r.height }); });
+    ro.observe(this.stage);
+    const fsc = () => this.setState({ isFs: !!(document.fullscreenElement || document.webkitFullscreenElement) });
+    document.addEventListener('fullscreenchange', fsc); document.addEventListener('webkitfullscreenchange', fsc);
+    ['gesturestart','gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    this.iv = setInterval(() => this.tick(), 110);
+    this.gv = setInterval(() => this.gateSim(), 50);
+  }
+  tick() {
+    this.setState(st => {
+      const lv = st.lv.map((old, j) => {
+        let t;
+        if (j < 8) { const c = st.chans[st.bank * 8 + j]; t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35)); }
+        else t = st.main.mute ? 0 : Math.min(1, 0.68 * Math.sqrt(st.main.v / 0.75) * (0.85 + Math.random() * 0.2));
+        return t > old ? t : old * 0.82;
+      });
+      if (st.screen === 'config') {
+        const c = st.chans[st.eqCh], cf = this.cfgOf(st.eqCh);
+        const lvl = s => { if (!s) return 0; const sv = this.srcOf(s); const g = PRE.has(s.grp) ? sv.gain : 30; return Math.min(1, (0.18 + g / 60) * (0.75 + Math.random() * 0.35)); };
+        const tg = [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
+        return { lv, cfgLv: st.cfgLv.map((o, k) => tg[k] > o ? tg[k] : o * 0.82) };
+      }
+      const key = st.screen === 'eq' ? 'eq' : st.screen === 'dyn' && st.slots[st.dynSlot] === DEQ ? 'deq' : null;
+      if (!key) return { lv };
+      const q = st[key];
+      const spec = q.base.map((b, k) => q.spec[k] * 0.5 + Math.max(0.03, b + (Math.random() - 0.5) * 0.22) * 0.5);
+      const bl = q.bl.map(o => o * 0.55 + (-32 + Math.random() * 24) * 0.45);
+      return { lv, [key]: { ...q, spec, bl, mIn: 55 + Math.random() * 25, mOut: 50 + Math.random() * 22 } };
+    });
+  }
+  dims() {
+    const { cw, ch } = this.state;
+    const s = Math.min(cw / DW, ch / 500);
+    return { s, Hd: ch / s, offX: (cw - DW * s) / 2 };
+  }
+  dbl(key) { const now = Date.now(); const hit = this.taps[key] && now - this.taps[key] < 320; this.taps[key] = hit ? 0 : now; return hit; }
+  toast(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2600); }
+
+  goFullscreen() {
+    this.setState({ started: true });
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (_) {}
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const fail = () => this.toast('הדפדפן הזה לא מאפשר מסך מלא מכאן. אפשר להמשיך כרגיל.');
+    if (!req) { fail(); return; }
+    try {
+      const p = req.call(el, { navigationUI: 'hide' });
+      const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (_) {} };
+      if (p && p.then) p.then(lock).catch(fail); else lock();
+    } catch (_) { fail(); }
+  }
+  toggleFullscreen() {
+    if (this.state.isFs) { const x = document.exitFullscreen || document.webkitExitFullscreen; x && x.call(document); }
+    else this.goFullscreen();
+  }
+
+  /* ---------- main mixer ---------- */
+  get(i) { return i === -1 ? this.state.main : this.state.chans[i]; }
+  upd(i, patch) {
+    this.setState(st => {
+      if (i === -1) return { main: { ...st.main, ...patch } };
+      const chans = st.chans.slice(); chans[i] = { ...chans[i], ...patch }; return { chans };
+    });
+  }
+  faderDown(i, e, T, FH, noLong) {
+    capture(e);
+    if (this.dbl('f' + i)) { this.upd(i, { v: 0.75 }); this.fd = null; return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    this.fd = { i, y: e.clientY, start: this.get(i).v, px: r.height * T / FH, moved: false };
+    clearTimeout(this.ft);
+    if (i !== -1 && !noLong) this.ft = setTimeout(() => { if (this.fd && !this.fd.moved) { this.fd = null; this.setState({ sendPop: { i, bank: 0 } }); } }, 500);
+  }
+  faderMove(e) {
+    const f = this.fd; if (!f) return;
+    const dy = e.clientY - f.y;
+    if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
+    if (f.moved) this.upd(f.i, { v: clamp(f.start - dy / f.px, 0, 1) });
+  }
+  faderUp() { clearTimeout(this.ft); this.fd = null; }
+  panDown(i, e) {
+    capture(e);
+    const r = e.currentTarget.getBoundingClientRect();
+    this.pd = { i, x: e.clientX, start: this.get(i).pan, w: r.width, moved: false };
+    clearTimeout(this.pt);
+    this.pt = setTimeout(() => { if (this.pd && !this.pd.moved) { this.pd = null; this.setState({ panPop: { i, pinned: true } }); } }, 450);
+  }
+  panMove(e) {
+    const p = this.pd; if (!p) return;
+    const dx = e.clientX - p.x;
+    if (!p.moved && Math.abs(dx) > 4) { p.moved = true; clearTimeout(this.pt); this.setState({ panPop: { i: p.i, pinned: false } }); }
+    if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6) * 2, -1, 1); if (Math.abs(v) < 0.03) v = 0; this.upd(p.i, { pan: v }); }
+  }
+  panUp() { clearTimeout(this.pt); if (this.pd && this.pd.moved) this.setState({ panPop: null }); this.pd = null; }
+  bigSet(x) {
+    const pp = this.state.panPop; if (!pp || !this.bp) return;
+    const k = this.bp.width / 636, inner = this.bp.width - 56 * k, left = this.bp.left + 28 * k;
+    let v = clamp((x - left) / inner * 2 - 1, -1, 1); if (Math.abs(v) < 0.04) v = 0;
+    this.upd(pp.i, { pan: v });
+  }
+  wSet(x) {
+    const pp = this.state.panPop; if (!pp || !this.wr) return;
+    const pad = 20 * this.wr.width / 374;
+    let w = clamp((x - this.wr.left - pad) / (this.wr.width - 2 * pad), 0, 1) * 2; if (Math.abs(w - 1) < 0.04) w = 1;
+    this.upd(pp.i, { width: w });
+  }
+  sendSet(k, y) {
+    const sp = this.state.sendPop; if (!sp || !this.sr) return;
+    const v = clamp(1 - ((y - this.sr.top) / this.sr.height * 200 - 26) / 148, 0, 1);
+    const idx = sp.bank * 8 + k, i = sp.i;
+    this.setState(st => { const chans = st.chans.slice(); const s = chans[i].sends.slice(); s[idx] = v; chans[i] = { ...chans[i], sends: s }; return { chans }; });
+  }
+
+  renderMain(Hd) {
+    const st = this.state, b = st.bank;
+    const FH = Math.round(Hd - 216), T = FH - 44;
+    const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']]
+      .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
+    const segs = lv => { const o = []; for (let s = 17; s >= 0; s--) { const lit = lv > s / 18; o.push(s >= 16 ? (lit ? '#e0513f' : '#2f1714') : s >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); } return o; };
+    const strip = (i, c, j, isMain) => html`
+      <div class="strip" style=${isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
+        <button class="cname" style=${'background:' + (isMain ? '#d9b56a' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
+          onClick=${() => { if (!isMain) this.setState({ screen: this.state.lastTab, eqCh: i }); }}>${isMain ? 'Main LR' : c.name}</button>
+        <button class="panmini" aria-label=${'Pan ' + panText(c.pan)}
+          onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
+          <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
+          <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">
+            <span class="knob" style=${`left:${(c.pan + 1) / 2 * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>
+          </span>
+        </button>
+        <div class="ms">
+          <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)}
+            style=${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>
+          ${!isMain && html`<button onClick=${() => this.upd(i, { solo: !c.solo })} aria-pressed=${String(c.solo)}
+            style=${c.solo ? 'background:#e8b93a;color:#1a1405;border:1px solid #4a3d1a;box-shadow:0 0 12px rgba(232,185,58,.5)' : 'background:#2a2410;color:#d9bd6a;border:1px solid #4a3d1a'}>SOLO</button>`}
+        </div>
+        <div class="dbr">${dbText(c.v)}</div>
+        <button class="fader" style=${'height:' + FH + 'px'} aria-label=${'Fader ' + dbText(c.v) + ' dB'}
+          onPointerDown=${e => this.faderDown(i, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          ${marks.map(m => html`<span class="mk" style=${'top:' + m.top + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.tick + 'px'}></span>`)}
+          <span class="slot"></span>
+          <span class="meter" style=${'height:' + T + 'px'}>${segs(st.lv[j]).map(bg => html`<span style=${'background:' + bg}></span>`)}</span>
+          <span class="cap" style=${'top:' + Math.round((1 - c.v) * T) + 'px'}></span>
+        </button>
+      </div>`;
+    const strips = [];
+    for (let j = 0; j < 8; j++) strips.push(strip(b * 8 + j, st.chans[b * 8 + j], j, false));
+    strips.push(strip(-1, st.main, 8, true));
+    const banks = ['Ch 1–8','Ch 9–16','Ch 17–24','Ch 25–32','Ch 33–40','Aux 1–8'];
+
+    return html`
+      <header class="topbar" style="height:56px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <div style="display:flex;flex-direction:column;line-height:1;gap:2px">
+          <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
+          <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
+        </div>
+        <div style="flex:1;display:flex;justify-content:center">
+          <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
+        </div>
+        <nav style="display:flex;gap:6px">
+          <button class="navbtn hot" onClick=${() => this.toast('מסך הנגן וההקלטה הוא השלב הבא')}>${IC.player}<span>Player</span></button>
+          <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.fx}<span>FX</span></button>
+          <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.route}<span>Routing</span></button>
+          <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.scenes}<span>Scenes</span></button>
+          <button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>
+        </nav>
+      </header>
+      <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 0">
+        <div class="wood" style="width:18px;flex:none;box-shadow:inset -2px 0 4px rgba(0,0,0,.5)"></div>
+        <div style="flex:1;min-width:0;display:flex;gap:6px">${strips}</div>
+        <div style="width:140px;flex:none;display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase;padding:2px 4px">Layers</span>
+          ${banks.map((l, n) => html`<button class=${'layer' + (n === b ? ' on' : '')} onClick=${() => this.setState({ bank: n, lv: [0,0,0,0,0,0,0,0,0] })}><i></i>${l}</button>`)}
+        </div>
+        <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
+      </div>
+      ${st.sendPop && this.renderSends(Hd)}
+      ${st.panPop && this.renderPan(Hd)}`;
+  }
+
+  renderSends(Hd) {
+    const st = this.state, sp = st.sendPop, sc = st.chans[sp.i], sb = sp.bank;
+    const lbls = [['Mon Vox','Mon Gtr','Mon Keys','Mon Drums','IEM 1','IEM 2','Reverb','Delay'],
+      ['Bus 9','Bus 10','Bus 11','Bus 12','Bus 13','Bus 14','Bus 15','Bus 16'],['Mtx 1','Mtx 2','Mtx 3','Mtx 4','Mtx 5','Mtx 6','Mtx 7','Mtx 8']];
+    const bl = ['Bus 1–8','Bus 9–16','Matrix 1–8'];
+    const close = () => this.setState({ sendPop: null });
+    return html`
+      <button class="scrim" aria-label="Close sends" onClick=${close}></button>
+      <div class="pop" style=${`left:150px;top:${Math.round((Hd - 440) / 2)}px;width:880px;height:440px;padding:18px 20px;gap:14px`}>
+        <div style="height:32px;display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + sc.color}>${sc.name}</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Sends · ${bl[sb]}</span>
+          <span style="flex:1"></span>
+          <button class="small" style="border-color:#5a4630" onClick=${close}>DONE</button>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;gap:10px">
+          ${lbls[sb].map((l, k) => { const v = sc.sends[sb * 8 + k]; return html`
+            <div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:8px;background:#161412;border:1px solid #2c2721">
+              <span style="max-width:100%;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</span>
+              <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(v)}</span>
+              <button class="fader" style="width:60px;height:200px" aria-label=${l + ' send ' + dbText(v)}
+                onPointerDown=${e => { capture(e); this.sr = e.currentTarget.getBoundingClientRect(); this.sendSet(k, e.clientY); }}
+                onPointerMove=${e => this.sendSet(k, e.clientY)} onPointerUp=${() => { this.sr = null; }} onPointerCancel=${() => { this.sr = null; }}>
+                <span style="position:absolute;left:27px;width:6px;top:12px;bottom:12px;border-radius:3px;background:#070606;box-shadow:0 0 0 1px #2c2721"></span>
+                <span style=${`position:absolute;left:27px;width:6px;bottom:12px;height:${Math.round(v * 148 + 2)}px;border-radius:3px;background:#c9a25a;opacity:.55`}></span>
+                <span class="cap" style=${`left:12px;width:36px;height:28px;top:${Math.round((1 - v) * 148 + 12)}px`}></span>
+              </button>
+            </div>`; })}
+        </div>
+        <div style="height:48px;display:flex;gap:10px">
+          ${bl.map((l, n) => html`<button class=${'pill' + (n === sb ? ' on' : '')} style="flex:1;height:48px;font-size:18px" onClick=${() => this.setState({ sendPop: { i: sp.i, bank: n } })}>${l}</button>`)}
+        </div>
+      </div>`;
+  }
+
+  renderPan(Hd) {
+    const st = this.state, pp = st.panPop, pi = pp.i, c = this.get(pi);
+    const name = pi === -1 ? 'Main LR' : c.name, color = pi === -1 ? '#d9b56a' : c.color;
+    const R = 90, CX = 110, CY = 112, ang = c.pan * 80, spread = Math.min(80, c.width * 38);
+    const P = a => { const r = a * Math.PI / 180; return { x: +(CX + R * Math.sin(r)).toFixed(1), y: +(CY - R * Math.cos(r)).toFixed(1) }; };
+    const p1 = P(clamp(ang - spread, -88, 88)), p2 = P(clamp(ang + spread, -88, 88)), pc = P(ang);
+    const close = () => this.setState({ panPop: null });
+    const ticks = []; for (let t = 0; t <= 20; t++) { const h = t === 10 ? 34 : t % 5 === 0 ? 22 : 10; ticks.push(html`<span style=${`position:absolute;left:${t * 5}%;top:50%;width:1px;height:${h}px;margin-top:${-h / 2}px;background:${t === 10 ? '#c9a25a' : '#4a4339'}`}></span>`); }
+    return html`
+      ${pp.pinned && html`<button class="scrim" aria-label="Close pan" onClick=${close}></button>`}
+      <div class="pop" style=${`left:250px;top:${Math.max(62, Math.round((Hd - (pp.pinned ? 330 : 160)) / 2))}px;width:680px;padding:18px 22px;gap:14px;border-color:#8a6a3a;pointer-events:${pp.pinned ? 'auto' : 'none'}`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + color}>${name}</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Pan</span>
+          <span style="flex:1"></span>
+          <span style="font-family:var(--mono);font-size:30px;color:var(--brass-hi)">${panText(c.pan)}</span>
+        </div>
+        <button class="panmini" style="height:64px;width:100%;border-radius:32px;border-color:#3a342c" aria-label=${'Pan ' + panText(c.pan)}
+          onPointerDown=${e => { capture(e); if (this.dbl('bp')) { this.upd(pi, { pan: 0 }); return; } this.bp = e.currentTarget.getBoundingClientRect(); this.bigSet(e.clientX); }}
+          onPointerMove=${e => this.bigSet(e.clientX)} onPointerUp=${() => { this.bp = null; }} onPointerCancel=${() => { this.bp = null; }}>
+          <span style="position:absolute;left:28px;right:28px;top:0;bottom:0">${ticks}
+            <span class="knob" style=${`left:${(c.pan + 1) / 2 * 100}%;width:40px;height:40px;margin:-20px 0 0 -20px`}></span></span>
+          <span style="position:absolute;left:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">L</span>
+          <span style="position:absolute;right:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">R</span>
+        </button>
+        ${!pp.pinned && html`<span style="font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b8a78a;text-align:center">Lift finger to close</span>`}
+        ${pp.pinned && html`
+          <div style="display:flex;gap:22px;align-items:center">
+            <svg width="240" height="140" viewBox="0 0 220 128" role="img" aria-label="Stereo image">
+              <path d="M 20 112 A 90 90 0 0 1 200 112" fill="none" stroke="#2c2721" stroke-width="12" stroke-linecap="round"/>
+              <path d=${`M ${p1.x} ${p1.y} A 90 90 0 0 1 ${p2.x} ${p2.y}`} fill="none" stroke="#c9a25a" stroke-width="12" stroke-linecap="round" opacity=".75"/>
+              <line x1="110" y1="112" x2=${pc.x} y2=${pc.y} stroke="#f3c27a" stroke-width="2"/>
+              <circle cx="110" cy="112" r="5" fill="#f3c27a"/>
+              <circle cx=${p1.x} cy=${p1.y} r="11" fill="#7aa7e0"/>
+              <text x=${p1.x} y=${p1.y + 4.5} text-anchor="middle" font-size="13" font-weight="700" fill="#121110">${c.swap ? 'R' : 'L'}</text>
+              <circle cx=${p2.x} cy=${p2.y} r="11" fill="#e0a35e"/>
+              <text x=${p2.x} y=${p2.y + 4.5} text-anchor="middle" font-size="13" font-weight="700" fill="#121110">${c.swap ? 'L' : 'R'}</text>
+            </svg>
+            <div style="flex:1;display:flex;flex-direction:column;gap:12px">
+              <div style="display:flex;justify-content:space-between;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#e9dcc2"><span>Stereo width</span><span style="font-family:var(--mono);color:var(--brass-hi)">${Math.round(c.width * 100)}%</span></div>
+              <button class="panmini" style="height:40px;width:100%;border-radius:20px" aria-label=${'Stereo width ' + Math.round(c.width * 100) + '%'}
+                onPointerDown=${e => { capture(e); this.wr = e.currentTarget.getBoundingClientRect(); this.wSet(e.clientX); }}
+                onPointerMove=${e => this.wSet(e.clientX)} onPointerUp=${() => { this.wr = null; }} onPointerCancel=${() => { this.wr = null; }}>
+                <span style="position:absolute;left:20px;right:20px;top:0;bottom:0">
+                  <span style=${`position:absolute;left:0;top:50%;height:4px;margin-top:-2px;width:${c.width / 2 * 100}%;border-radius:2px;background:#c9a25a;opacity:.6`}></span>
+                  <span style="position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:#4a4339"></span>
+                  <span class="knob" style=${`left:${c.width / 2 * 100}%;width:26px;height:26px;margin:-13px 0 0 -13px`}></span>
+                </span>
+              </button>
+              <div style="display:flex;gap:10px">
+                <button class=${'pill' + (c.swap ? ' on' : '')} style="flex:1" onClick=${() => this.upd(pi, { swap: !c.swap })}>Swap L ⇄ R</button>
+                <button class="pill" style="flex:1" onClick=${() => this.upd(pi, { pan: 0 })}>Center</button>
+                <button class="pill on" style="flex:1" onClick=${close}>Done</button>
+              </div>
+            </div>
+          </div>`}
+      </div>`;
+  }
+
+  /* ---------- EQ ---------- */
+  eqGeo(Hd) { const fs = this.state[this.ek].fs; return { W: 1102, H: Math.round(fs ? Hd - 114 : Hd - 244), pad: 16 }; }
+  X(f) { return this.g.W * Math.log10(f / 20) / 3; }
+  F(x) { return 20 * Math.pow(10, 3 * clamp(x, 0, this.g.W) / this.g.W); }
+  Y(db) { const g = this.g; return g.H / 2 - db / this.state[this.ek].R * (g.H / 2 - g.pad); }
+  G(y) { const g = this.g; return (g.H / 2 - y) / (g.H / 2 - g.pad) * this.state[this.ek].R; }
+  liveG(i) { const q = this.state[this.ek], b = q.bands[i]; return b.dyn ? b.g + b.range * Math.min(1, Math.max(0, q.bl[i] - b.thr) / 12) : b.g; }
+  resp(b, f, g) {
+    if (!b.on) return 0;
+    const r = f / b.f;
+    if (b.type === 'bell') return g / (1 + Math.pow(b.q * (r - 1 / r), 2));
+    if (b.type === 'losh') return g / (1 + r * r);
+    if (b.type === 'hish') return g / (1 + 1 / (r * r));
+    return -30 / (1 + Math.pow(b.q * 2 * (r - 1 / r), 2));
+  }
+  filt(f) {
+    const q = this.state[this.ek]; let d = 0;
+    if (q.lc.on) d += -10 * Math.log10(1 + Math.pow(q.lc.f / f, 4));
+    if (q.hc.on) d += -10 * Math.log10(1 + Math.pow(f / q.hc.f, 4));
+    return d + q.tilt * Math.log10(f / 1000) / Math.log10(20);
+  }
+  path(fn) {
+    const g = this.g, N = 220; let s = '';
+    for (let k = 0; k <= N; k++) { const f = 20 * Math.pow(10, 3 * k / N); s += (k ? ' L ' : 'M ') + (g.W * k / N).toFixed(1) + ' ' + clamp(this.Y(fn(f)), 2, g.H - 2).toFixed(1); }
+    return s;
+  }
+  updEq(patch) { const k = this.ek; this.setState(st => ({ [k]: { ...st[k], ...(typeof patch === 'function' ? patch(st[k]) : patch) } })); }
+  updBand(i, patch) { this.updEq(q => { const bands = q.bands.slice(); bands[i] = { ...bands[i], ...patch }; return { bands }; }); }
+  ptrDown(e) {
+    this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    const ids = Object.keys(this.ptrs);
+    if (ids.length === 2) { const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: this.state[this.ek].bands[this.state[this.ek].sel].q }; this.drag = null; }
+  }
+  gMove(e) {
+    if (this.ptrs[e.pointerId]) this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    if (this.pinch) {
+      const ids = Object.keys(this.ptrs); if (ids.length < 2) return;
+      const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]];
+      this.updBand(this.state[this.ek].sel, { q: +clamp(this.pinch.q0 * this.pinch.d0 / Math.hypot(a.x - b.x, a.y - b.y), 0.3, 16).toFixed(2) });
+      return;
+    }
+    const dr = this.drag; if (!dr) return;
+    const dx = (e.clientX - dr.sx) / dr.scale, dy = (e.clientY - dr.sy) / dr.scale;
+    if (dr.kind === 'band') {
+      const p = { f: Math.round(this.F(dr.x0 + dx)) };
+      if (this.ek === 'deq') p.range = Math.round(clamp(this.G(dr.y0 + dy), -15, 15) * 10) / 10;
+      else if (this.state[this.ek].bands[dr.i].type !== 'notch') p.g = Math.round(clamp(this.G(dr.y0 + dy), -15, 15) * 10) / 10;
+      this.updBand(dr.i, p);
+    } else if (dr.kind === 'thr') {
+      this.updBand(this.state[this.ek].sel, { thr: Math.round(-60 * clamp((e.clientY - dr.top) / dr.h, 0, 1) * 10) / 10 });
+    } else {
+      const nf = Math.round(this.F(dr.x0 + dx)), q = this.state[this.ek];
+      this.updEq({ [dr.kind]: { ...q[dr.kind], f: dr.kind === 'lc' ? clamp(nf, 20, 600) : clamp(nf, 1500, 20000) } });
+    }
+  }
+  gUp(e) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; if (!Object.keys(this.ptrs).length) this.drag = null; }
+  bandDown(i, e) {
+    capture(e); this.ptrDown(e);
+    if (this.state[this.ek].sel !== i) this.updEq({ sel: i });
+    if (this.pinch) return;
+    const D = this.ek === 'deq';
+    if (this.dbl('b' + i)) { this.updBand(i, D ? { range: 0 } : { g: 0 }); return; }
+    const r = e.currentTarget.parentElement.getBoundingClientRect(), b = this.state[this.ek].bands[i];
+    this.drag = { kind: 'band', i, sx: e.clientX, sy: e.clientY, x0: this.X(b.f), y0: this.Y(D ? b.range : b.g), scale: r.width / this.g.W };
+  }
+  eqBgDown(e) {
+    capture(e); this.ptrDown(e);
+    if (this.pinch) return;
+    const q = this.state[this.ek], D = this.ek === 'deq', g = this.g, R = q.R;
+    const r = e.currentTarget.getBoundingClientRect(), s = r.width / g.W;
+    const mx = (e.clientX - r.left) / s, my = (e.clientY - r.top) / s;
+    let best = -1, bd = 1e9;
+    q.bands.forEach((b, i) => {
+      const y = clamp(D ? this.Y(b.range) : b.type === 'notch' ? this.Y(-R * 0.55) : this.Y(b.g), 18, g.H - 18);
+      const d = Math.hypot(this.X(b.f) - mx, (y - my) * 0.6);
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best < 0 || bd > 150) return;
+    if (q.sel !== best) this.updEq({ sel: best });
+    const b = q.bands[best];
+    this.drag = { kind: 'band', i: best, sx: e.clientX, sy: e.clientY, x0: this.X(b.f), y0: this.Y(D ? b.range : b.g), scale: s };
+  }
+  filtDown(kind, e) {
+    capture(e); this.ptrDown(e);
+    const r = e.currentTarget.parentElement.getBoundingClientRect();
+    this.drag = { kind, sx: e.clientX, sy: e.clientY, x0: this.X(this.state[this.ek][kind].f), y0: 0, scale: r.width / this.g.W };
+  }
+  thrDown(e) {
+    capture(e); this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    const r = e.currentTarget.getBoundingClientRect();
+    this.drag = { kind: 'thr', top: r.top, h: r.height, sx: e.clientX, sy: e.clientY, scale: 1 };
+    this.gMove(e);
+  }
+  NS = { f: [20, 20000, 1], g: [-15, 15], q: [0.3, 16, 1], thr: [-60, 0], range: [-18, 18], att: [0.5, 100, 1], rel: [10, 2000, 1], lc: [20, 600, 1], hc: [1500, 20000, 1], tilt: [-6, 6] };
+  norm(k, v) { const [a, b, lg] = this.NS[k]; return lg ? Math.log(v / a) / Math.log(b / a) : (v - a) / (b - a); }
+  denorm(k, n) { const [a, b, lg] = this.NS[k]; n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); }
+  getVal(k) { const q = this.state[this.ek]; if (k === 'lc' || k === 'hc') return q[k].f; if (k === 'tilt') return q.tilt; return q.bands[q.sel][k]; }
+  setVal(k, v) {
+    const q = this.state[this.ek];
+    if (k === 'lc' || k === 'hc') return this.updEq({ [k]: { ...q[k], f: Math.round(v) } });
+    if (k === 'tilt') return this.updEq({ tilt: Math.round(v * 10) / 10 });
+    this.updBand(q.sel, { [k]: k === 'f' || k === 'rel' ? Math.round(v) : k === 'q' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10 });
+  }
+  box(k, label, value, color, op, extraStyle) {
+    return html`<button class="box" style=${`opacity:${op};${extraStyle || ''}`} aria-label=${label + ' ' + value + ', drag sideways'}
+      onPointerDown=${e => { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.nd = { k, sx: e.clientX, n0: this.norm(k, this.getVal(k)), w: r.width }; }}
+      onPointerMove=${e => { const d = this.nd; if (d) this.setVal(d.k, this.denorm(d.k, d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
+      onPointerUp=${() => { this.nd = null; }} onPointerCancel=${() => { this.nd = null; }}>
+      <b>${label}</b><em>${value}</em><s style=${`width:${Math.round(this.norm(k, this.getVal(k)) * 100)}%;background:${color}`}></s></button>`;
+  }
+
+  renderEQ(Hd) {
+    const st = this.state, D = this.ek === 'deq', q = st[this.ek], ch = st.chans[st.eqCh];
+    const activeTab = D ? (st.dynSlot === 'gate' ? 'Gate' : 'Comp') : 'EQ';
+    this.g = this.eqGeo(Hd);
+    const { W, H, pad } = this.g, R = q.R, si = q.sel, sb = q.bands[si];
+    const majors = [50,100,200,500,1000,2000,5000,10000], minors = [30,40,60,70,80,90,300,400,600,700,800,900,3000,4000,6000,7000,8000,9000];
+    const gm = majors.map(f => `M ${this.X(f).toFixed(1)} 0 V ${H}`).join(' ') + ` M 0 ${this.Y(R / 2).toFixed(1)} H ${W} M 0 ${this.Y(-R / 2).toFixed(1)} H ${W}`;
+    const gn = minors.map(f => `M ${this.X(f).toFixed(1)} 0 V ${H}`).join(' ');
+    let sp = `M 0 ${H}`; q.spec.forEach((v, k) => { sp += ` L ${(W * k / 119).toFixed(1)} ${(H - v * H * 0.72).toFixed(1)}`; }); sp += ` L ${W} ${H} Z`;
+    const live = this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, this.liveG(i)), 0));
+    const stat = this.path(f => this.filt(f) + q.bands.reduce((a, b) => a + this.resp(b, f, b.g), 0));
+    const showDyn = sb.dyn && sb.on;
+    const rangeCurve = showDyn ? this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, i === si ? b.g + b.range : b.g), 0)) : 'M 0 0';
+    const y0 = this.Y(0).toFixed(1);
+    const selFill = sb.on ? this.path(f => this.resp(sb, f, this.liveG(si))) + ` L ${W} ${y0} L 0 ${y0} Z` : 'M 0 0';
+    const bx = this.X(sb.f), tx = bx + 78 > W - 24 ? bx - 78 : bx + 78;
+    const railTop = pad + 8, railH = H - pad * 2 - 30, thrY = Math.round(-sb.thr / 60 * railH);
+    const lvH = Math.round(clamp((q.bl[si] + 60) / 60, 0, 1) * railH);
+    const tname = { bell: 'BELL', losh: 'LOW SHELF', hish: 'HIGH SHELF', notch: 'NOTCH' }[sb.type];
+    const summary = D ? `${sb.id} ${tname} · ${fmtF(sb.f)} · RANGE ${fmtDb(sb.range)} · Q ${sb.q.toFixed(2)} · THR ${sb.thr.toFixed(1)}`
+      : `${sb.id} ${tname} · ${fmtF(sb.f)}${sb.type === 'notch' ? '' : ' · ' + fmtDb(sb.g)} · Q ${sb.q.toFixed(2)}`;
+    const gEv = { onPointerMove: e => this.gMove(e), onPointerUp: e => this.gUp(e), onPointerCancel: e => this.gUp(e) };
+    const wheel = e => { const b = this.state[this.ek].bands[this.state[this.ek].sel]; this.updBand(this.state[this.ek].sel, { q: +clamp(b.q * Math.exp(-e.deltaY * 0.0015), 0.3, 16).toFixed(2) }); };
+    const chips = (h, fs) => q.bands.map((b, i) => html`<button aria-label=${'Band ' + b.id} onClick=${() => this.updEq({ sel: i })}
+      style=${`${fs ? 'width:40px;height:32px;border-radius:16px' : 'flex:1;min-width:0;border-radius:6px'};border:2px solid ${b.color};background:${i === si ? b.color : '#141210'};color:${i === si ? '#121110' : b.color};opacity:${b.on ? 1 : 0.45};font-weight:700;font-size:${fs ? 15 : 17}px;cursor:pointer`}>${b.id}</button>`);
+    const tgl = (on, label, onClick, w) => html`<button aria-pressed=${String(on)} onClick=${onClick} class="pill" style=${`${w};${on ? 'background:#f0a24a;color:#1a1405;border-color:#f0a24a' : 'background:#141210'}`}>${label}</button>`;
+    const lisBtn = w => html`<button aria-pressed=${String(q.listen)} onClick=${() => this.updEq({ listen: !q.listen })} class="pill" style=${`${w};${q.listen ? 'background:#1b272b;color:#cfe0e5;border-color:#8fa3aa' : 'background:#141210'}`}>LISTEN</button>`;
+    const bypBtn = (w, cls) => html`<button aria-pressed=${String(q.bypass)} onClick=${() => this.updEq({ bypass: !q.bypass })} class=${cls} style=${`${w};${q.bypass ? 'background:#3a1714;color:#ffb4a8;border-color:#d0392b' : ''}`}>BYPASS</button>`;
+    const rangeBtn = h => html`<button class="small" style=${`height:${h}px;font-family:var(--mono);font-size:13px;color:#cbbd9f`} onClick=${() => { const rs = [6, 12, 18]; this.updEq({ R: rs[(rs.indexOf(q.R) + 1) % 3] }); }}>±${R} dB</button>`;
+    const rtaBtn = h => html`<button class="small" style=${`height:${h}px;border-color:${q.pre ? '#7fa6b4' : '#3a342c'}`} onClick=${() => this.updEq({ pre: !q.pre })}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`;
+    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    const dop = sb.dyn ? 1 : 0.4;
+    const frow = (k, short, label, value, hasT) => {
+      const on = hasT ? q[k].on : true;
+      return html`<div style="display:flex;gap:6px">
+        ${hasT && html`<button aria-pressed=${String(on)} onClick=${() => this.updEq({ [k]: { ...q[k], on: !on } })} class="pill" style=${`width:64px;height:44px;font-size:15px;border-radius:6px;${on ? 'background:#1b272b;color:#cfe0e5;border-color:#8fa3aa' : 'background:#141210;color:#8a8170'}`}>${short}</button>`}
+        ${this.box(k, label, value, '#8fa3aa', on ? 1 : 0.4, 'flex:1;min-width:0')}
+      </div>`;
+    };
+
+    return html`
+      ${!q.fs ? html`
+        <header class="topbar" style="height:52px;gap:10px">
+          <div class="wood" style="width:18px;align-self:stretch"></div>
+          <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
+          <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
+          <nav style="display:flex;gap:4px;margin-left:6px">
+            ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+          </nav>
+          <span style="flex:1"></span>
+          ${D && this.modelBtn()}
+          ${rangeBtn(36)}${!D && rtaBtn(36)}${bypBtn('', 'small')}
+          <button class="small" aria-label="Full screen" onClick=${() => this.updEq({ fs: true })} style="display:flex;align-items:center;gap:6px;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>
+        </header>` : html`
+        <header style="height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
+          <span style=${'font-size:15px;font-weight:700;letter-spacing:.08em;color:' + ch.color}>${ch.name.toUpperCase()} · ${D ? 'DYNAMIC EQ' : 'EQ'}</span>
+          <span style="width:12px"></span>${chips(32, true)}<span style="flex:1"></span>${rangeBtn(32)}${rtaBtn(32)}
+        </header>`}
+
+      <div style="flex:none;display:flex;gap:10px;padding:10px 14px 0">
+        <div style=${`position:relative;width:${W}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#142024,#0c1214 70%);border:1px solid #22302f`}>
+          <button aria-label="EQ graph. Drag near a band to move it" onPointerDown=${e => this.eqBgDown(e)} ...${gEv} onWheel=${wheel}
+            style="position:absolute;inset:0;padding:0;border:none;background:transparent;touch-action:none;cursor:default">
+            <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
+              <path d=${gn} stroke="#16232a" stroke-width="1" fill="none"/>
+              <path d=${gm} stroke="#223239" stroke-width="1" fill="none"/>
+              <path d=${`M 0 ${y0} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
+              ${q.pre && html`<path d=${sp} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".55" stroke-width="1"/>`}
+              <path d=${selFill} fill=${sb.color} fill-opacity=".16"/>
+              <path d=${rangeCurve} fill="none" stroke=${sb.color} stroke-width="1.5" stroke-dasharray="4 4" opacity=".8"/>
+              <path d=${stat} fill="none" stroke="#d9cdb3" stroke-width="1.5" opacity=".35"/>
+              <path d=${live} fill="none" stroke="#f0a24a" stroke-width="9" stroke-linecap="round" opacity=${q.bypass ? 0.05 : 0.22}/>
+              <path d=${live} fill="none" stroke="#f6b45e" stroke-width="2.5" stroke-linecap="round" opacity=${q.bypass ? 0.3 : 1}/>
+            </svg>
+          </button>
+          ${majors.map(f => html`<span class="gl" style=${`left:${Math.round(this.X(f)) - 20}px;bottom:4px;width:40px;text-align:center`}>${f >= 1000 ? f / 1000 + 'k' : f}</span>`)}
+          <span class="gl" style=${`left:8px;top:${Math.round(this.Y(R / 2) - 16)}px`}>+${R / 2}</span>
+          <span class="gl" style=${`left:8px;top:${Math.round(this.Y(-R / 2) + 2)}px`}>−${R / 2}</span>
+          ${showDyn && !D && html`
+            <span style=${`position:absolute;left:${Math.round(bx)}px;top:${Math.round(clamp(this.Y(sb.g + sb.range), 8, H - 8))}px;width:12px;height:12px;margin:-6px 0 0 -6px;transform:rotate(45deg);background:${sb.color};pointer-events:none`}></span>
+            <span style=${`position:absolute;left:${Math.round(bx + 12)}px;top:${Math.round(clamp(this.Y(sb.g + sb.range), 8, H - 8)) - 8}px;font-size:13px;font-weight:700;letter-spacing:.06em;color:${sb.color};pointer-events:none`}>RANGE ${(sb.range > 0 ? '+' : '') + sb.range.toFixed(1)}</span>`}
+          ${['lc', 'hc'].filter(k => q[k].on).map(k => html`
+            <button aria-label=${k.toUpperCase() + ' frequency'} onPointerDown=${e => this.filtDown(k, e)} ...${gEv}
+              style=${`position:absolute;left:${Math.round(this.X(q[k].f))}px;top:${Math.round(clamp(this.Y(-3), 14, H - 14))}px;width:34px;height:24px;margin:-12px 0 0 -17px;padding:0;border-radius:6px;border:1px solid #8fa3aa;background:#1b272b;color:#cfe0e5;font-weight:700;font-size:12px;letter-spacing:.06em;cursor:ew-resize;touch-action:none`}>${k.toUpperCase()}</button>`)}
+          ${q.bands.map((b, i) => { const y = D ? this.Y(b.range) : b.type === 'notch' ? this.Y(-R * 0.55) : this.Y(b.g); return html`
+            <button aria-label=${`Band ${b.id}, ${fmtF(b.f)}`} onPointerDown=${e => this.bandDown(i, e)} ...${gEv} onWheel=${wheel}
+              style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(clamp(y, 18, H - 18))}px;width:36px;height:36px;margin:-18px 0 0 -18px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.35);background:${b.color};color:#121110;opacity:${b.on ? 1 : 0.35};box-shadow:${i === si ? `0 0 0 5px rgba(0,0,0,.35),0 0 0 9px ${b.color}55,0 0 22px ${b.color}` : '0 2px 6px rgba(0,0,0,.6)'};font-weight:700;font-size:17px;cursor:grab;touch-action:none`}>${b.id}</button>`; })}
+          ${showDyn && html`
+            <button aria-label=${'Threshold ' + sb.thr.toFixed(1)} onPointerDown=${e => this.thrDown(e)} ...${gEv}
+              style=${`position:absolute;left:${Math.round(tx)}px;top:${railTop}px;width:36px;height:${railH}px;margin-left:-18px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none`}>
+              <span style="position:absolute;left:13px;width:10px;top:0;bottom:0;border-radius:3px;background:#0a0f11;box-shadow:0 0 0 1px #2c3c42"></span>
+              <span style=${`position:absolute;left:13px;width:10px;bottom:0;height:${lvH}px;border-radius:3px;background:linear-gradient(0deg,${sb.color},rgba(240,162,74,.35));opacity:.8`}></span>
+              <span style=${`position:absolute;left:4px;width:28px;top:${thrY}px;height:3px;margin-top:-1px;border-radius:2px;background:#f3c27a;box-shadow:0 0 6px rgba(243,194,122,.7)`}></span>
+              <span style=${`position:absolute;left:30px;top:${thrY}px;margin-top:-7px;width:0;height:0;border-top:7px solid transparent;border-bottom:7px solid transparent;border-right:10px solid #f3c27a`}></span>
+            </button>
+            <span style=${`position:absolute;left:${Math.round(tx > bx ? tx + 22 : tx - 112)}px;top:${railTop + thrY - 22}px;font-family:var(--mono);font-size:13px;color:#f3c27a;white-space:nowrap;pointer-events:none`}>THR ${sb.thr.toFixed(1)}</span>`}
+        </div>
+        <div style=${`width:40px;height:${H}px;flex:none;display:flex;gap:6px;padding:4px 6px;border-radius:8px;background:#0c0b0a;border:1px solid #2c2721`}>
+          ${[q.mIn, q.bypass ? q.mIn : q.mOut].map(m => html`<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;background:#161412;border-radius:2px"><span style=${`height:${Math.round(m)}%;border-radius:2px;background:linear-gradient(0deg,#4fc9b7,#d6d860 70%,#f0a24a)`}></span></span>`)}
+        </div>
+      </div>
+
+      ${!q.fs ? html`
+        <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 14px">
+          <section class="sec" style="flex:480 1 0">
+            <div style="display:flex;gap:6px;height:44px">${chips(44, false)}
+              <button class="pill" style=${`width:64px;border-radius:6px;font-size:14px;background:#141210;color:${sb.on ? '#8cc47e' : '#8a8170'}`} onClick=${() => this.updBand(si, { on: !sb.on })}>${sb.on ? 'ON' : 'OFF'}</button>
+            </div>
+            <div style="display:flex;gap:4px;height:44px">
+              ${(D ? [['bell','Bell'],['losh','Low shelf'],['hish','High shelf']] : [['bell','Bell'],['losh','Low shelf'],['hish','High shelf'],['notch','Notch']]).map(t => html`<button class=${'pill' + (sb.type === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:15px;font-weight:600" onClick=${() => this.updBand(si, { type: t[0] })}>${t[1]}</button>`)}
+            </div>
+            <div style="display:flex;gap:6px">
+              ${this.box('f', 'Freq', fmtF(sb.f), sb.color, 1, 'flex:1;min-width:0')}
+              ${D ? this.box('range', 'Range', fmtDb(sb.range), sb.color, 1, 'flex:1;min-width:0')
+                  : this.box('g', 'Gain', sb.type === 'notch' ? '—' : fmtDb(sb.g), sb.color, sb.type === 'notch' ? 0.4 : 1, 'flex:1;min-width:0')}
+              ${this.box('q', 'Q', sb.q.toFixed(2), sb.color, sb.type === 'bell' || sb.type === 'notch' ? 1 : 0.4, 'flex:1;min-width:0')}
+            </div>
+          </section>
+          ${D ? html`
+          <section class="sec" style="flex:420 1 0">
+            <div style="display:flex;gap:6px">${lisBtn('flex:1;border-radius:6px')}</div>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
+              ${this.box('thr', 'Threshold', sb.thr.toFixed(1) + ' dB', '#f3c27a', 1, 'grid-column:span 2')}
+              ${this.box('att', 'Attack', sb.att.toFixed(1) + ' ms', '#f3c27a', 1)}
+              ${this.box('rel', 'Release', Math.round(sb.rel) + ' ms', '#f3c27a', 1)}
+            </div>
+          </section>` : html`
+          <section class="sec" style="flex:360 1 0">
+            ${frow('lc', 'LC', 'Low cut', fmtF(q.lc.f), true)}
+            ${frow('hc', 'HC', 'High cut', fmtF(q.hc.f), true)}
+            ${frow('tilt', '', 'Tilt', fmtDb(q.tilt), false)}
+          </section>`}
+        </div>` : html`
+        <div style="flex:1;min-height:0;display:flex;align-items:center;gap:8px;padding:8px 14px">
+          <div style="flex:1;min-width:0;height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:8px;background:#0c1214;border:1px solid #22302f">
+            <span style=${`width:12px;height:12px;border-radius:50%;background:${sb.color};box-shadow:0 0 8px ${sb.color}`}></span>
+            <span style="font-family:var(--mono);font-size:16px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summary}</span>
+          </div>
+          ${D && lisBtn('width:110px')}${bypBtn('width:110px', 'pill')}
+          <button class="pill on" style="width:110px" onClick=${() => this.updEq({ fs: false })}>EXIT</button>
+        </div>`}`;
+  }
+
+  /* ---------- gate / comp slots ---------- */
+  modelBtn() {
+    const m = this.state.slots[this.state.dynSlot];
+    return html`<button class="small" onClick=${() => this.setState({ modelPop: true })} style="display:flex;align-items:center;gap:8px;border-color:#8a6a3a">
+      <span style="font-size:11px;letter-spacing:.14em;color:#b8a78a">MODEL</span>${m}<span style="color:#b8a78a">▾</span></button>`;
+  }
+  renderModelPop(Hd) {
+    const st = this.state, cur = st.slots[st.dynSlot], close = () => this.setState({ modelPop: false });
+    return html`
+      <button class="scrim" aria-label="Close model list" onClick=${close}></button>
+      <div class="pop" style=${`left:190px;top:${Math.max(30, Math.round((Hd - 380) / 2))}px;width:800px;padding:18px 20px;gap:14px;border-color:#8a6a3a`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">${st.dynSlot === 'gate' ? 'Gate' : 'Comp'} slot model</span>
+          <span style="flex:1"></span>
+          <button class="small" onClick=${close}>CLOSE</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          ${MODELS.map(m => { const on = m.name === cur; return html`
+            <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [s.dynSlot]: m.name }, modelPop: false }))} aria-pressed=${String(on)}
+              style=${`height:70px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:8px;cursor:pointer;text-align:left;
+                ${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : m.name === DEQ ? 'background:#121c1f;border:1px solid #3b5258;color:#cfe0e5' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
+              <span style="font-size:20px;font-weight:700;letter-spacing:.03em">${m.name}</span>
+              <span style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75">${m.kind}</span>
+            </button>`; })}
+        </div>
+        <span style="font-size:13px;color:#9b927f">Runs inside the channel's ${st.dynSlot === 'gate' ? 'Gate' : 'Comp'} slot. It does not use any of the 16 FX rack slots.</span>
+      </div>`;
+  }
+  /* ---------- Wing Gate ---------- */
+  chanHeader(activeTab, right) {
+    const st = this.state, ch = st.chans[st.eqCh], tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    return html`
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
+        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
+        <nav style="display:flex;gap:4px;margin-left:6px">
+          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+        </nav>
+        <span style="flex:1"></span>${right}
+      </header>`;
+  }
+  updGate(p) { this.setState(st => ({ gate: { ...st.gate, ...(typeof p === 'function' ? p(st.gate) : p) } })); }
+  gateSim() {
+    const st = this.state;
+    if (st.screen !== 'dyn' || st.slots[st.dynSlot] !== 'Wing Gate') return;
+    const G = st.gate, s = { ...G.sim }, dt = 0.05;
+    s.t += dt;
+    if (s.t >= s.next) { s.env = Math.max(s.env, -8 - Math.random() * 10); s.next = s.t + 0.42 + Math.random() * 0.45; }
+    if (Math.random() < 0.05) s.env = Math.max(s.env, -52 + Math.random() * 10);
+    s.env = Math.max(-64 + Math.random() * 3, s.env - 75 * dt);
+    const L = s.env, r = RATIO_N[G.ratio], over = L >= G.thr;
+    s.hold = over ? G.hld / 1000 : Math.max(0, s.hold - dt);
+    const target = !G.on || over || s.hold > 0 ? 0 : Math.min(G.range, r === Infinity ? G.range : (G.thr - L) * (r - 1));
+    if (target < s.gr) s.gr = Math.max(target, s.gr - dt * 1000 * G.range / Math.max(G.att, 0.5));
+    else s.gr = Math.min(target, s.gr + dt * 1000 * G.range / Math.max(G.rel, 4));
+    s.lin = L;
+    s.hist = [...s.hist.slice(-119), [L, L - s.gr, s.gr < 3]];
+    s.trail = [...s.trail.slice(-9), [L, L - s.gr]];
+    this.updGate({ sim: s });
+  }
+  gateOut(x, G) {
+    const r = RATIO_N[G.ratio];
+    if (x >= G.thr) return x;
+    return x - Math.min(G.range, r === Infinity ? G.range : (G.thr - x) * (r - 1));
+  }
+  gbox(key, label, text, lim, color, extra, op) {
+    const sc = key.startsWith('sc.'), k = sc ? key.slice(3) : key;
+    const get = () => sc ? this.state.gate.sc[k] : this.state.gate[k];
+    const [a, b, lg] = lim;
+    const nrm = v => clamp(lg ? Math.log(v / a) / Math.log(b / a) : (v - a) / (b - a), 0, 1);
+    const dn = n => { n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); };
+    const rnd = v => k === 'q' ? Math.round(v * 100) / 100 : (k === 'thr' || k === 'range' || (k === 'att' && v < 10)) ? Math.round(v * 10) / 10 : Math.round(v);
+    const set = v => sc ? this.updGate(g => ({ sc: { ...g.sc, [k]: rnd(v) } })) : this.updGate({ [k]: rnd(v) });
+    return html`<button class="box" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
+      onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width }; }}
+      onPointerMove=${e => { const d = this.gnd; if (d) set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
+      onPointerUp=${() => { this.gnd = null; }} onPointerCancel=${() => { this.gnd = null; }}>
+      <b>${label}</b><em>${text}</em><s style=${`width:${Math.round(nrm(get()) * 100)}%;background:${color}`}></s></button>`;
+  }
+  shapeIcon(r) {
+    const n = RATIO_N[r], x0 = n === Infinity ? 12 : 12 - 12 / n;
+    return html`<svg width="30" height="22" viewBox="0 0 22 22" aria-hidden="true" style="flex:none">
+      <path d="M 1 21 L 21 1" stroke="currentColor" stroke-width="1" opacity=".25" fill="none"/>
+      <path d=${`M ${x0.toFixed(1)} 21 L 12 9 L 21 0`} stroke="currentColor" stroke-width="2.2" fill="none" stroke-linejoin="round"/>
+      <circle cx="12" cy="9" r="2.2" fill="currentColor"/></svg>`;
+  }
+
+  renderGate(Hd) {
+    const st = this.state, G = st.gate, S = G.sim, ch = st.chans[st.eqCh];
+    const H = Math.round(G.fs ? Hd - 114 : Hd - 244), P = H;
+    const pl = 32, pt = 10, pw = P - 44, ph = P - 32;
+    const X = db => pl + (clamp(db, -80, 0) + 80) / 80 * pw, Y = db => pt + (-clamp(db, -80, 0)) / 80 * ph;
+    const HW = 1152 - P - 96 - 20;
+    const isOpen = S.gr < 3, lc = isOpen ? '#62b85c' : '#e0513f';
+    let curve = '';
+    for (let k = 0; k <= 160; k++) { const x = -80 + k * 0.5; curve += (k ? ' L ' : 'M ') + X(x).toFixed(1) + ' ' + Y(this.gateOut(x, G)).toFixed(1); if (RATIO_N[G.ratio] === Infinity && Math.abs(x - G.thr) < 0.26) curve += ' L ' + X(G.thr).toFixed(1) + ' ' + Y(G.thr).toFixed(1); }
+    const floor = `M ${X(-80 + G.range)} ${Y(-80)} L ${X(0)} ${Y(-G.range)}`;
+    const ticks = [-80, -60, -40, -20, 0];
+    const gridP = ticks.map(t => `M ${X(t)} ${pt} V ${pt + ph} M ${pl} ${Y(t)} H ${pl + pw}`).join(' ');
+    const hy = db => 8 + (-clamp(db, -80, 0)) / 80 * (H - 34);
+    const N = 120, hist = S.hist, hx = k => (k + N - hist.length) / (N - 1) * HW;
+    let inA = '', outL = '';
+    hist.forEach((h, k) => { inA += (k ? ' L ' : 'M ') + hx(k).toFixed(1) + ' ' + hy(h[0]).toFixed(1); outL += (k ? ' L ' : 'M ') + hx(k).toFixed(1) + ' ' + hy(h[1]).toFixed(1); });
+    if (hist.length) inA += ` L ${hx(hist.length - 1).toFixed(1)} ${H - 26} L ${hx(0).toFixed(1)} ${H - 26} Z`;
+    const segs = []; let run = null;
+    hist.forEach((h, k) => { if (!run || run.o !== h[2]) { run = { o: h[2], a: k, b: k }; segs.push(run); } else run.b = k; });
+    const ratios = ['1:1.5', '1:2', '1:3', '1:4', 'GATE'];
+    const gEnd = () => { this.gtd = null; };
+    const thrDrag = (e, mode) => {
+      capture(e);
+      if (this.dbl('gthr')) { this.updGate({ thr: -40 }); return; }
+      this.gtd = { mode, sx: e.clientX, sy: e.clientY, start: G.thr };
+    };
+    const thrMove = e => {
+      const d = this.gtd; if (!d) return;
+      const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+      const px = d.mode === 'graph' ? (Math.abs(dx) > Math.abs(dy) ? dx : -dy) : -dy;
+      this.updGate({ thr: Math.round(clamp(d.start + px / 5, -80, 0) * 10) / 10 });
+    };
+    const thrLx = clamp(X(G.thr) + (G.thr > -30 ? -164 : 24), 6, P - 150), thrLy = clamp(Y(G.thr) - 58, 6, H - 56);
+    const meter = (label, v, color, fromTop) => html`
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style=${`flex:1;width:14px;display:flex;flex-direction:column;justify-content:${fromTop ? 'flex-start' : 'flex-end'};border-radius:3px;background:#0c0b0a;box-shadow:0 0 0 1px #2c2721`}>
+          <span style=${`height:${Math.round(clamp(v, 0, 1) * 100)}%;border-radius:3px;background:${color}`}></span></span>
+        <span style="font-size:11px;font-weight:700;letter-spacing:.1em;color:#b8a78a">${label}</span>
+      </div>`;
+    const lvlN = db => (db + 80) / 80;
+    const summary = `${G.ratio === 'GATE' ? 'GATE' : 'EXP ' + G.ratio} · THR ${G.thr.toFixed(1)} · RANGE ${G.range.toFixed(1)} · A ${G.att} · H ${G.hld} · R ${G.rel} ms`;
+    const onBtn = w => html`<button class="pill" aria-pressed=${String(G.on)} onClick=${() => this.updGate({ on: !G.on })}
+      style=${`${w};${G.on ? 'background:#1d2a19;color:#a6e39c;border-color:#62b85c' : 'background:#141210;color:#8a8170'}`}>${G.on ? 'ON' : 'OFF'}</button>`;
+    const kOff = G.sc.type === 'OFF';
+    const cyc = (arr, v) => arr[(arr.indexOf(v) + 1) % arr.length];
+    const srcs = ['SELF', ...st.chans.slice(0, 12).map(c => c.name.toUpperCase())];
+
+    return html`
+      ${!G.fs ? this.chanHeader(st.dynSlot === 'gate' ? 'Gate' : 'Comp', html`
+        ${this.modelBtn()}
+        <button class="small" aria-label="Full screen" onClick=${() => this.updGate({ fs: true })} style="display:flex;align-items:center;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>`)
+      : html`<header style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
+          <span style=${'font-size:15px;font-weight:700;letter-spacing:.08em;color:' + ch.color}>${ch.name.toUpperCase()} · GATE</span>
+          <span style="flex:1"></span>
+          <div style="display:flex;gap:4px">${ratios.map(r => html`<button onClick=${() => this.updGate({ ratio: r })} aria-pressed=${String(G.ratio === r)}
+            style=${`height:32px;display:flex;align-items:center;gap:4px;padding:0 10px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;${G.ratio === r ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#cbbd9f'}`}>${this.shapeIcon(r)}${r}</button>`)}</div>
+        </header>`}
+
+      <div style="flex:none;display:flex;gap:10px;padding:10px 14px 0">
+        <div style=${`position:relative;width:${P}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:radial-gradient(ellipse at 70% 20%,#1d1a16,#0e0d0b 75%);border:1px solid #2c2721`}>
+          <svg width=${P} height=${H} viewBox=${`0 0 ${P} ${H}`} aria-hidden="true" style="position:absolute;inset:0">
+            <path d=${gridP} stroke="#24201b" stroke-width="1" fill="none"/>
+            <path d=${`M ${X(-80)} ${Y(-80)} L ${X(0)} ${Y(0)}`} stroke="#3a342c" stroke-width="1" stroke-dasharray="3 5" fill="none"/>
+            <path d=${floor} stroke="#e0513f" stroke-width="1" stroke-dasharray="4 4" opacity=".55" fill="none"/>
+            <rect x=${pl} y=${pt} width=${Math.max(0, X(G.thr) - pl)} height=${ph} fill="#e0513f" opacity=".05"/>
+            <path d=${curve} stroke="#f0a24a" stroke-width="9" opacity=${G.on ? 0.18 : 0.05} fill="none" stroke-linejoin="round"/>
+            <path d=${curve} stroke="#f6b45e" stroke-width="2.5" opacity=${G.on ? 1 : 0.35} fill="none" stroke-linejoin="round"/>
+            ${S.trail.map((p, k) => html`<circle cx=${X(p[0]).toFixed(1)} cy=${Y(p[1]).toFixed(1)} r=${3 + k * 0.6} fill=${lc} opacity=${(k + 1) / S.trail.length * 0.28}/>`)}
+            <line x1=${X(S.lin).toFixed(1)} y1=${pt + ph} x2=${X(S.lin).toFixed(1)} y2=${Y(S.lin - S.gr).toFixed(1)} stroke=${lc} stroke-width="1" opacity=".35"/>
+            <circle cx=${X(S.lin).toFixed(1)} cy=${Y(S.lin - S.gr).toFixed(1)} r="16" fill=${lc} opacity=".18"/>
+            <circle cx=${X(S.lin).toFixed(1)} cy=${Y(S.lin - S.gr).toFixed(1)} r="9" fill=${lc} stroke="#0e0d0b" stroke-width="2"/>
+          </svg>
+          ${ticks.map(t => html`<span class="gl" style=${`left:${X(t) - 14}px;bottom:3px;width:28px;text-align:center;color:#9b927f`}>${t}</span>`)}
+          ${ticks.slice(0, 4).map(t => html`<span class="gl" style=${`left:2px;top:${Y(t) - 7}px;width:26px;text-align:right;color:#9b927f`}>${t}</span>`)}
+          <span style=${`position:absolute;right:10px;top:10px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.14em;border:1px solid ${lc};color:${lc};background:rgba(0,0,0,.4)`}>${G.on ? (isOpen ? 'OPEN' : 'CLOSED') : 'BYPASS'}</span>
+          <span style=${`position:absolute;left:${X(G.thr)}px;top:${Y(G.thr)}px;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid #f3c27a;background:rgba(243,194,122,.12);box-shadow:0 0 14px rgba(243,194,122,.45);pointer-events:none`}></span>
+          <span style=${`position:absolute;left:${X(G.thr) + (G.thr > -20 ? -104 : 20)}px;top:${Y(G.thr) - 30}px;font-family:var(--mono);font-size:13px;color:#f3c27a;white-space:nowrap;pointer-events:none`}>THR ${G.thr.toFixed(1)}</span>
+          <span style=${`position:absolute;left:${X(-80 + G.range) + 8}px;top:${Y(-80) - 22}px;font-size:12px;font-weight:700;letter-spacing:.08em;color:#e0513f;opacity:.8;pointer-events:none`}>RANGE ${G.range.toFixed(0)}</span>
+        </div>
+
+        <div style=${`position:relative;width:${HW}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:#0e0d0b;border:1px solid #2c2721`}>
+          <svg width=${HW} height=${H} viewBox=${`0 0 ${HW} ${H}`} aria-hidden="true" style="position:absolute;inset:0">
+            ${[-20, -40, -60].map(t => html`<path d=${`M 0 ${hy(t)} H ${HW}`} stroke="#1f1c18" stroke-width="1"/>`)}
+            ${hist.length > 1 && html`<path d=${inA} fill="#7aa7e0" fill-opacity=".14" stroke="#7aa7e0" stroke-opacity=".5" stroke-width="1"/>`}
+            ${hist.length > 1 && html`<path d=${outL} fill="none" stroke="#f6b45e" stroke-width="2"/>`}
+            <path d=${`M 0 ${hy(G.thr)} H ${HW}`} stroke="#f3c27a" stroke-width="1.5" stroke-dasharray="6 4"/>
+            ${segs.map(sg => html`<rect x=${hx(sg.a)} y=${H - 18} width=${Math.max(2, hx(sg.b) - hx(sg.a) + HW / N)} height="10" rx="2" fill=${sg.o ? '#62b85c' : '#5a1e18'} opacity=${sg.o ? 0.8 : 1}/>`)}
+          </svg>
+          <span style="position:absolute;left:10px;top:8px;font-size:12px;letter-spacing:.12em;color:#9b927f">IN <span style="color:#7aa7e0">━</span>  OUT <span style="color:#f6b45e">━</span>  · last 6 s</span>
+          <button aria-label=${'Threshold ' + G.thr.toFixed(1) + ' dB, drag up or down'} onPointerDown=${e => thrDrag(e, 'hist')} onPointerMove=${thrMove} onPointerUp=${gEnd} onPointerCancel=${gEnd}
+            style=${`position:absolute;right:12px;top:${clamp(hy(G.thr) - 26, 4, H - 76)}px;width:156px;height:52px;display:flex;align-items:center;justify-content:center;gap:10px;padding:0;border-radius:10px;border:1px solid #c9a25a;background:rgba(42,32,20,.94);color:#f3c27a;box-shadow:0 6px 14px rgba(0,0,0,.5);cursor:ns-resize;touch-action:none`}>
+            <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#b8a78a">THRESHOLD</span>
+              <span style="font-family:var(--mono);font-size:22px">${G.thr.toFixed(1)}</span>
+            </span>
+            <span style="font-size:22px;opacity:.85">⇕</span>
+          </button>
+        </div>
+
+        <div style=${`width:96px;height:${H}px;flex:none;display:flex;gap:4px;padding:8px 6px;border-radius:10px;background:#0c0b0a;border:1px solid #2c2721`}>
+          ${meter('IN', lvlN(S.lin), 'linear-gradient(0deg,#62b85c,#62b85c 70%,#e8a33d)')}
+          ${meter('GR', S.gr / 60, 'linear-gradient(180deg,#e8a33d,#e0513f)', true)}
+          ${meter('OUT', lvlN(S.lin - S.gr), 'linear-gradient(0deg,#62b85c,#62b85c 70%,#e8a33d)')}
+        </div>
+      </div>
+
+      ${!G.fs ? html`
+        <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 14px">
+          <section class="sec" style="flex:470 1 0">
+            <div style="display:flex;gap:4px;height:44px">
+              ${onBtn('width:64px;height:44px;border-radius:6px;font-size:15px')}
+              ${ratios.map(r => html`<button onClick=${() => this.updGate({ ratio: r })} aria-pressed=${String(G.ratio === r)} aria-label=${'Shape ' + r}
+                style=${`flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:2px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;${G.ratio === r ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#cbbd9f'}`}>${this.shapeIcon(r)}${r}</button>`)}
+            </div>
+            <div style="display:flex;gap:6px">
+              ${this.gbox('thr', 'Threshold', G.thr.toFixed(1) + ' dB', [-80, 0], '#f3c27a', 'flex:1;min-width:0')}
+              ${this.gbox('range', 'Range', G.range.toFixed(1) + ' dB', [3, 60], '#e0513f', 'flex:1;min-width:0')}
+            </div>
+            ${this.gbox('acc', 'Accent', String(G.acc), [0, 100], '#c9a25a')}
+          </section>
+          <section class="sec" style="flex:300 1 0">
+            ${this.gbox('att', 'Attack', G.att + ' ms', [0, 120], '#8cc47e')}
+            ${this.gbox('hld', 'Hold', G.hld + ' ms', [0, 200], '#8cc47e')}
+            ${this.gbox('rel', 'Release', G.rel + ' ms', [4, 4000, 1], '#8cc47e')}
+          </section>
+          <section class="sec" style="flex:360 1 0">
+            <button aria-label="Key filter. Open large view" onClick=${() => this.setState({ keyPop: true })}
+              style="position:relative;height:94px;padding:0;border-radius:6px;border:1px solid #22302f;background:#0c1214;overflow:hidden;cursor:pointer">
+              ${this.keyGraph(340, 94, false)}
+              <span style="position:absolute;left:8px;top:6px;font-size:12px;font-weight:700;letter-spacing:.14em;color:#cfe0e5">KEY · ${!G.sc.on ? 'FILTER OFF' : KEYT[G.sc.type] + ' · ' + fmtF(G.sc.f)}</span>
+              <span style="position:absolute;right:6px;top:6px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(0,0,0,.5);color:#cfe0e5">${IC.full}</span>
+            </button>
+            <button class="box" style="cursor:pointer" onClick=${() => this.setState({ chPick: true })} aria-label="Choose key source">
+              <b>Source</b><em style="display:flex;align-items:center;gap:8px">${this.keySrcName()}<span style="color:#b8a78a">▾</span></em></button>
+          </section>
+        </div>` : html`
+        <div style="flex:1;min-height:0;display:flex;align-items:center;gap:8px;padding:8px 14px">
+          <div style="flex:1;min-width:0;height:44px;display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:8px;background:#100f0d;border:1px solid #2c2721">
+            <span style=${`width:12px;height:12px;border-radius:50%;background:${lc};box-shadow:0 0 8px ${lc}`}></span>
+            <span style="font-family:var(--mono);font-size:15px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summary}</span>
+          </div>
+          ${onBtn('width:110px')}
+          <button class="pill on" style="width:110px" onClick=${() => this.updGate({ fs: false })}>EXIT</button>
+        </div>`}
+      ${st.keyPop && this.renderKeyPop(Hd)}
+      ${st.chPick && this.renderChPick(Hd)}`;
+  }
+
+  /* ---------- gate key (sidechain) ---------- */
+  keySrcName() {
+    const s = this.state.gate.sc.src;
+    if (s === 'SELF') return 'SELF · ' + this.state.chans[this.state.eqCh].name;
+    return 'CH ' + pad2(s + 1) + ' · ' + this.state.chans[s].name;
+  }
+  keyResp(f, sc) {
+    if (!sc.on) return 0;
+    const r = f / sc.f, Q = sc.q;
+    const m = sc.type === 'LC6' ? r / Math.sqrt(1 + r * r) : sc.type === 'HC6' ? 1 / Math.sqrt(1 + r * r)
+      : sc.type === 'LC12' ? r * r / Math.sqrt(1 + Math.pow(r, 4)) : sc.type === 'HC12' ? 1 / Math.sqrt(1 + Math.pow(r, 4))
+      : (r / Q) / Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(r / Q, 2));
+    return 20 * Math.log10(Math.max(m, 1e-6));
+  }
+  keyGeo(W, H) {
+    const top = 12, bot = -40;
+    return { x: f => W * Math.log10(f / 20) / 3, f: x => 20 * Math.pow(10, 3 * clamp(x, 0, W) / W), y: db => 6 + (top - clamp(db, bot, top)) / (top - bot) * (H - 12), top, bot };
+  }
+  keyGraph(W, H, big) {
+    const sc = this.state.gate.sc, base = this.state.eq.base, k = this.keyGeo(W, H), N = 160;
+    let curve = '', sIn = `M 0 ${H}`, sOut = `M 0 ${H}`;
+    for (let i = 0; i <= N; i++) { const f = 20 * Math.pow(10, 3 * i / N); curve += (i ? ' L ' : 'M ') + (W * i / N).toFixed(1) + ' ' + k.y(this.keyResp(f, sc)).toFixed(1); }
+    base.forEach((v, i) => {
+      const f = 20 * Math.pow(10, 3 * i / 119), db = -36 + (v + (Math.random() - 0.5) * 0.06) * 42, x = (W * i / 119).toFixed(1);
+      sIn += ` L ${x} ${k.y(db).toFixed(1)}`; sOut += ` L ${x} ${k.y(db + this.keyResp(f, sc)).toFixed(1)}`;
+    });
+    sIn += ` L ${W} ${H} Z`; sOut += ` L ${W} ${H} Z`;
+    const grid = [50, 100, 200, 500, 1000, 2000, 5000, 10000].map(f => `M ${k.x(f).toFixed(1)} 0 V ${H}`).join(' ');
+    return html`<svg width=${big ? W : '100%'} height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;display:block">
+      <path d=${grid} stroke="#16232a" stroke-width="1" fill="none"/>
+      <path d=${`M 0 ${k.y(0).toFixed(1)} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
+      <path d=${sIn} fill="#5e8796" fill-opacity=".12" stroke="#7fa6b4" stroke-opacity=".3" stroke-width="1"/>
+      ${sc.on && html`<path d=${sOut} fill="#4fc9b7" fill-opacity=".22" stroke="#4fc9b7" stroke-opacity=".7" stroke-width="1"/>`}
+      <path d=${curve} fill="none" stroke="#8fd3e0" stroke-width=${big ? 7 : 4} opacity=".18"/>
+      <path d=${curve} fill="none" stroke="#cfe0e5" stroke-width=${big ? 2.5 : 1.8} opacity=${!sc.on ? 0.35 : 1}/>
+    </svg>`;
+  }
+  updSc(p) { this.updGate(g => ({ sc: { ...g.sc, ...p } })); }
+  renderKeyPop(Hd) {
+    const st = this.state, G = st.gate, sc = G.sc, ch = st.chans[st.eqCh];
+    const W = 1084, H = Math.round(Hd - 188), k = this.keyGeo(W, H), off = !sc.on, bp = sc.type === 'BP';
+    const hx = k.x(sc.f), hy = H - 40;
+    const close = () => this.setState({ keyPop: false });
+    const kp = this.kptrs || (this.kptrs = {});
+    const down = (e, onHandle) => {
+      capture(e); kp[e.pointerId] = { x: e.clientX, y: e.clientY };
+      const ids = Object.keys(kp);
+      if (ids.length === 2) { const a = kp[ids[0]], b = kp[ids[1]]; this.kpinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: sc.q }; this.kfd = null; return; }
+      if (off) return;
+      if (onHandle && this.dbl('keyh')) { this.updSc({ f: 1000, q: 1 }); return; }
+      const r = (onHandle ? e.currentTarget.parentElement : e.currentTarget).getBoundingClientRect();
+      this.kfd = { sx: e.clientX, f0: sc.f, s: r.width / W };
+    };
+    const move = e => {
+      if (kp[e.pointerId]) kp[e.pointerId] = { x: e.clientX, y: e.clientY };
+      if (this.kpinch) { if (!bp) return; const ids = Object.keys(kp); if (ids.length < 2) return; const a = kp[ids[0]], b = kp[ids[1]]; this.updSc({ q: +clamp(this.kpinch.q0 * this.kpinch.d0 / Math.hypot(a.x - b.x, a.y - b.y), 0.5, 10).toFixed(2) }); return; }
+      const d = this.kfd; if (!d) return;
+      const dx = (e.clientX - d.sx) / d.s;
+      this.updSc({ f: Math.round(clamp(d.f0 * Math.pow(10, dx / W * 3), 20, 20000)) });
+    };
+    const up = e => { delete kp[e.pointerId]; if (Object.keys(kp).length < 2) this.kpinch = null; if (!Object.keys(kp).length) this.kfd = null; };
+    const wheel = e => { if (bp) this.updSc({ q: +clamp(sc.q * Math.exp(-e.deltaY * 0.0015), 0.5, 10).toFixed(2) }); };
+    const seg = (opts, val, set, w) => html`<div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
+      ${opts.map(o => html`<button onClick=${() => set(o)} aria-pressed=${String(val === o)} style=${`min-width:${w}px;height:36px;padding:0 10px;border-radius:7px;border:none;font-weight:700;font-size:15px;letter-spacing:.06em;cursor:pointer;${val === o ? 'background:#8fd3e0;color:#0c1214' : 'background:transparent;color:#cbbd9f'}`}>${o}</button>`)}</div>`;
+    return html`
+      <button class="scrim" aria-label="Close key filter" onClick=${close}></button>
+      <div class="pop" style=${`left:30px;top:20px;width:1120px;height:${Hd - 40}px;padding:16px 18px;gap:12px;border-color:#3b5258`}>
+        <div style="height:48px;display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + ch.color}>${ch.name}</span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">Gate key</span>
+          <span style="flex:1"></span>
+          <span style="font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">TAP</span>
+          ${seg(['IN', 'PRE EQ', 'POST EQ'], sc.tap, t => this.updSc({ tap: t }), 64)}
+          <button class="small" style="height:42px;display:flex;align-items:center;gap:8px" onClick=${() => this.setState({ chPick: true })}>
+            <span style="font-size:11px;letter-spacing:.14em;color:#b8a78a">SOURCE</span>${this.keySrcName()}<span style="color:#b8a78a">▾</span></button>
+          <button class="small" style="height:42px;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)" onClick=${close}>DONE</button>
+        </div>
+        <div style=${`position:relative;width:${W}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#142024,#0c1214 70%);border:1px solid #22302f`}>
+          <button aria-label="Key filter graph. Drag anywhere sideways to move the frequency; pinch to change Q" onPointerDown=${e => down(e, false)} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up} onWheel=${wheel}
+            style="position:absolute;inset:0;padding:0;border:none;background:transparent;touch-action:none;cursor:default">${this.keyGraph(W, H, true)}</button>
+          ${[50, 100, 200, 500, 1000, 2000, 5000, 10000].map(f => html`<span class="gl" style=${`left:${Math.round(k.x(f)) - 20}px;bottom:4px;width:40px;text-align:center`}>${f >= 1000 ? f / 1000 + 'k' : f}</span>`)}
+          <span style="position:absolute;left:12px;top:10px;font-size:12px;letter-spacing:.12em;color:#9b927f">SOURCE <span style="color:#7fa6b4">▬</span>  HEARD BY GATE <span style="color:#4fc9b7">▬</span></span>
+          ${!off && html`
+            <span style=${`position:absolute;left:${hx}px;top:0;bottom:0;width:1px;background:rgba(143,211,224,.3);pointer-events:none`}></span>
+            <button aria-label=${'Key frequency ' + fmtF(sc.f) + '. Drag sideways'}
+              onPointerDown=${e => down(e, true)} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up} onWheel=${wheel}
+              style=${`position:absolute;left:${hx}px;top:${hy}px;width:46px;height:46px;margin:-23px 0 0 -23px;padding:0;border-radius:50%;border:3px solid #e9f4f6;background:#2f8f9c;box-shadow:0 0 0 6px rgba(143,211,224,.15),0 0 20px rgba(143,211,224,.5);cursor:ew-resize;touch-action:none`}></button>
+            <span style=${`position:absolute;left:${clamp(hx + 30, 6, W - 190)}px;top:${hy - 40}px;font-family:var(--mono);font-size:16px;color:#cfe0e5;white-space:nowrap;pointer-events:none`}>${fmtF(sc.f)}${bp ? ' · Q ' + sc.q.toFixed(2) : ''}</span>`}
+          ${off && html`<span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:10px 18px;border-radius:10px;background:rgba(0,0,0,.55);font-family:'Heebo',sans-serif;font-size:16px;color:#cfe0e5" dir="rtl">הפילטר כבוי. הדלק אותו בכפתור ON למטה.</span>`}
+        </div>
+        <div style="height:44px;display:flex;align-items:center;gap:8px">
+          <button class="pill" aria-pressed=${String(sc.on)} onClick=${() => this.updSc({ on: !sc.on })}
+            style=${`width:72px;height:44px;border-radius:8px;${sc.on ? 'background:#1d2a19;color:#a6e39c;border-color:#62b85c' : 'background:#141210;color:#8a8170'}`}>${sc.on ? 'ON' : 'OFF'}</button>
+          <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
+            ${Object.keys(KEYT).map(t => html`<button onClick=${() => this.updSc({ type: t, on: true })} aria-pressed=${String(sc.type === t)}
+              style=${`height:36px;padding:0 12px;border-radius:7px;border:none;font-weight:700;font-size:15px;cursor:pointer;${sc.type === t ? 'background:#8fd3e0;color:#0c1214' : 'background:transparent;color:#cbbd9f'}`}>${KEYT[t]}</button>`)}
+          </div>
+          ${this.gbox('sc.f', 'Freq', fmtF(sc.f), [20, 20000, 1], '#8fd3e0', 'flex:1;min-width:0', off ? 0.4 : 1)}
+          ${bp && this.gbox('sc.q', 'Q', sc.q.toFixed(2), [0.5, 10, 1], '#8fd3e0', 'width:150px;flex:none', off ? 0.4 : 1)}
+        </div>
+      </div>`;
+  }
+  renderChPick(Hd) {
+    const st = this.state, me = st.eqCh, cur = st.gate.sc.src, close = () => this.setState({ chPick: false });
+    const pick = v => { this.updSc({ src: v }); close(); };
+    const row = (i, c, sel, label) => html`
+      <button onClick=${() => pick(label === 'SELF' ? 'SELF' : i)} aria-pressed=${String(sel)}
+        style=${`height:52px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;border-radius:8px;cursor:pointer;text-align:left;
+          ${sel ? 'background:#2a2014;border:1px solid var(--brass)' : 'background:#141210;border:1px solid #2c2721'}`}>
+        <span style=${'width:6px;height:28px;border-radius:3px;background:' + c.color}></span>
+        <span style="font-family:var(--mono);font-size:14px;color:#9b927f;width:44px">${label === 'SELF' ? 'SELF' : i < 40 ? 'CH ' + pad2(i + 1) : 'AUX ' + (i - 39)}</span>
+        <span style=${`flex:1;font-size:19px;font-weight:600;letter-spacing:.03em;color:${sel ? 'var(--brass-hi)' : '#e9dcc2'}`}>${c.name}</span>
+        ${label === 'SELF' && html`<span style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#b8a78a">This channel</span>`}
+        ${sel && html`<span style="width:10px;height:10px;border-radius:50%;background:#f3c27a;box-shadow:0 0 8px #f3c27a"></span>`}
+      </button>`;
+    return html`
+      <button class="scrim" style="z-index:5" aria-label="Close source list" onClick=${close}></button>
+      <div class="pop" style=${`z-index:6;left:330px;top:24px;width:520px;height:${Hd - 48}px;padding:16px;gap:10px;border-color:#8a6a3a`}>
+        <div style="height:40px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Key source</span>
+          <span style="flex:1"></span>
+          <button class="small" style="height:40px" onClick=${close}>CLOSE</button>
+        </div>
+        ${row(me, st.chans[me], cur === 'SELF' || cur === me, 'SELF')}
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.16em;color:#8a8170"><span>OTHER CHANNELS</span><span style="flex:1;height:1px;background:#2c2721"></span></div>
+        <div style="flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:6px;padding-right:4px">
+          ${st.chans.map((c, i) => i === me ? null : row(i, c, cur === i, ''))}
+        </div>
+      </div>`;
+  }
+
+  renderDyn(Hd) {
+    const st = this.state, model = st.slots[st.dynSlot];
+    if (model === DEQ) { this.ek = 'deq'; return html`${this.renderEQ(Hd)}${st.modelPop && this.renderModelPop(Hd)}`; }
+    if (model === 'Wing Gate') return html`${this.renderGate(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
+    const ch = st.chans[st.eqCh], m = MODELS.find(x => x.name === model), activeTab = st.dynSlot === 'gate' ? 'Gate' : 'Comp';
+    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    return html`
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
+        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
+        <nav style="display:flex;gap:4px;margin-left:6px">
+          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+        </nav>
+        <span style="flex:1"></span>
+        ${this.modelBtn()}
+      </header>
+      <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:20px">
+        <div class="sec" style="width:620px;align-items:center;gap:12px;padding:30px;text-align:center">
+          <span style="font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b8a78a">${activeTab} slot · ${m ? m.kind : ''}</span>
+          <span style="font-size:40px;font-weight:700;letter-spacing:.04em;color:var(--brass-hi)">${model}</span>
+          <p style="margin:0;font-family:'Heebo',sans-serif;font-size:16px;color:#d9cdb3" dir="rtl">הפאנל של המכשיר הזה ייבנה בשלב הבא. כדי לראות את האיקיו הדינמי, בחר Dual Dynamic EQ.</p>
+          <button class="pill on" style="padding:0 24px" onClick=${() => this.setState({ modelPop: true })}>Change model</button>
+        </div>
+      </div>
+      ${st.modelPop && this.renderModelPop(Hd)}`;
+  }
+
+  /* ---------- channel config ---------- */
+  goTab(t) {
+    if (t === 'EQ') this.setState({ screen: 'eq', lastTab: 'eq' });
+    else if (t === 'Config') this.setState({ screen: 'config', lastTab: 'config' });
+    else if (t === 'Gate' || t === 'Comp') this.setState({ screen: 'dyn', dynSlot: t === 'Gate' ? 'gate' : 'comp', lastTab: 'dyn' });
+    else this.toast('הלשונית הזו עוד לא נבנתה');
+  }
+  cfgOf(i) {
+    const c = this.state.cfg[i]; if (c) return c;
+    const viaDante = i < 2;
+    return { main: viaDante ? { grp: 'CRD', n: i + 1, mode: 'M' } : { grp: 'A', n: Math.min(48, i + 1), mode: 'M' },
+      alt: viaDante ? { grp: 'LCL', n: i + 1, mode: 'M' } : i < 12 ? { grp: 'USB', n: i + 1, mode: 'M' } : null, altOn: false,
+      trim: 0, bal: 0, bw: 1, bswap: false, inv: false, dlyOn: false, dly: 0,
+      dca: Array.from({ length: 16 }, (_, k) => (i < 6 && k === 0) || (i === 6 && k === 1) || (i === 7 && k === 2) || ((i === 8 || i === 9) && k === 3) || ((i === 10 || i === 11) && k === 4)),
+      mg: Array.from({ length: 8 }, (_, k) => i < 6 && k === 0) };
+  }
+  updCfg(i, patch) { this.setState(st => ({ cfg: { ...st.cfg, [i]: { ...this.cfgOf(i), ...st.cfg[i], ...patch } } })); }
+  srcOf(s) { const k = srcKey(s); return this.state.srcs[k] || { gain: s.grp === 'A' ? 30 : 15, ph: s.grp === 'A' && s.n <= 6, link: null }; }
+  updSrc(s, patch) { const k = srcKey(s); this.setState(st => ({ srcs: { ...st.srcs, [k]: { ...this.srcOf(s), ...patch } } })); }
+  srcName(s) {
+    if (!s) return 'Tap to choose a source';
+    if (s.grp === 'A' && s.n <= STAGE.length) return STAGE[s.n - 1] + (s.mode !== 'M' && STAGE[s.n] ? ' + ' + STAGE[s.n] : '');
+    if (s.grp === 'PLY') return s.n === 1 ? 'Player L' : 'Player R';
+    return GMAP[s.grp].name + ' ' + s.n + (s.mode !== 'M' ? '–' + (s.n + 1) : '');
+  }
+  srcLabel(s) { return s ? GMAP[s.grp].short + ' ' + pad2(s.n) + (s.mode !== 'M' ? '–' + pad2(s.n + 1) : '') : 'NONE'; }
+
+  gainDown(s, e, T) {
+    capture(e);
+    if (this.dbl('g' + srcKey(s))) { this.updSrc(s, { gain: 0 }); this.gd = null; return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    this.gd = { s, y: e.clientY, start: this.srcOf(s).gain, px: r.height * T / (T + 36) };
+  }
+  gainMove(e) {
+    const d = this.gd; if (!d) return;
+    const n0 = (d.start - GMIN) / (GSTEP * GSTEPS);
+    const n = clamp(n0 - (e.clientY - d.y) / d.px, 0, 1);
+    const g = GMIN + Math.round(n * GSTEPS) * GSTEP;
+    if (g !== this.srcOf(d.s).gain) { this.updSrc(d.s, { gain: g }); try { navigator.vibrate && navigator.vibrate(4); } catch (_) {} }
+  }
+
+  knobDown(key, e) {
+    capture(e);
+    const i = this.state.eqCh;
+    if (this.dbl('k' + key)) { this.updCfg(i, { [key]: 0 }); this.kd = null; return; }
+    this.kd = { key, x: e.clientX, y: e.clientY, start: this.cfgOf(i)[key], moved: false, h: e.currentTarget.getBoundingClientRect().height };
+    clearTimeout(this.kt);
+    if (key === 'bal') this.kt = setTimeout(() => { if (this.kd && !this.kd.moved) { this.kd = null; this.setState({ balPop: { pinned: true } }); } }, 450);
+  }
+  knobMove(e) {
+    const d = this.kd; if (!d) return;
+    const delta = (e.clientX - d.x) - (e.clientY - d.y);
+    if (!d.moved && Math.abs(delta) > 4) { d.moved = true; clearTimeout(this.kt); if (d.key === 'bal') this.setState({ balPop: { pinned: false } }); }
+    if (!d.moved) return;
+    const span = d.key === 'trim' ? 36 : 18, lim = span / 2;
+    let v = clamp(d.start + delta / (d.h * 2.2) * span, -lim, lim);
+    v = Math.round(v * 10) / 10; if (Math.abs(v) < 0.15) v = 0;
+    this.updCfg(this.state.eqCh, { [d.key]: v });
+  }
+  knobUp() { clearTimeout(this.kt); if (this.kd && this.kd.moved && this.kd.key === 'bal') this.setState({ balPop: null }); this.kd = null; }
+  slDown(e, set, padDesign, wDesign) { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.sl = { r, pad: padDesign * r.width / wDesign, set }; this.slMove(e); }
+  slMove(e) { const s = this.sl; if (!s) return; s.set(clamp((e.clientX - s.r.left - s.pad) / (s.r.width - 2 * s.pad), 0, 1)); }
+
+  knob(key, label, v, lim, text, accent) {
+    const a = v / lim * 135, S = this.kS || 120, c = 60;
+    const t = (a - 90) * Math.PI / 180;
+    return html`
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <span style="font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#b8a78a">${label}</span>
+        <button aria-label=${label + ' ' + text + ', drag up or right to raise'} onPointerDown=${e => this.knobDown(key, e)} onPointerMove=${e => this.knobMove(e)} onPointerUp=${() => this.knobUp()} onPointerCancel=${() => this.knobUp()}
+          style=${`width:${S}px;height:${S}px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none`}>
+          <svg width=${S} height=${S} viewBox="0 0 120 120" aria-hidden="true">
+            <defs><radialGradient id=${'kg' + key} cx="40%" cy="32%" r="70%"><stop offset="0" stop-color="#4a423a"/><stop offset=".6" stop-color="#211d19"/><stop offset="1" stop-color="#0e0c0a"/></radialGradient>
+            <radialGradient id=${'kc' + key} cx="38%" cy="30%" r="75%"><stop offset="0" stop-color="#f6e3b4"/><stop offset=".55" stop-color="#c9a25a"/><stop offset="1" stop-color="#6e5021"/></radialGradient></defs>
+            <path d=${arcPath(-135, 135, 54, c)} fill="none" stroke="#2c2721" stroke-width="5" stroke-linecap="round"/>
+            ${Math.abs(a) > 0.5 && html`<path d=${a > 0 ? arcPath(0, a, 54, c) : arcPath(a, 0, 54, c)} fill="none" stroke=${accent} stroke-width="5" stroke-linecap="round"/>`}
+            <circle cx=${c} cy=${c - 54} r="2.5" fill="#8a7d66"/>
+            <circle cx=${c} cy=${c + 2} r="44" fill="#000" opacity=".45"/>
+            <circle cx=${c} cy=${c} r="43" fill=${'url(#kg' + key + ')'} stroke="#3a342c" stroke-width="1"/>
+            <circle cx=${c} cy=${c} r="22" fill=${'url(#kc' + key + ')'}/>
+            <line x1=${(c + 24 * Math.cos(t)).toFixed(1)} y1=${(c + 24 * Math.sin(t)).toFixed(1)} x2=${(c + 40 * Math.cos(t)).toFixed(1)} y2=${(c + 40 * Math.sin(t)).toFixed(1)} stroke="#f3c27a" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+        </button>
+        <span style="font-family:var(--mono);font-size:17px;color:var(--ink)">${text}</span>
+      </div>`;
+  }
+
+  renderConfig(Hd) {
+    const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(i);
+    const H1 = Math.round(Hd - 176), GF = H1 - 136, GT = GF - 36;
+    this.kS = H1 < 372 ? 96 : 120;
+    const balText = Math.abs(cf.bal) < 0.05 ? 'C' : (cf.bal < 0 ? 'L ' : 'R ') + Math.abs(cf.bal).toFixed(1);
+
+    const card = which => {
+      const s = cf[which], isAlt = which === 'alt', active = isAlt ? cf.altOn : !cf.altOn;
+      const pre = s && PRE.has(s.grp), sv = s ? this.srcOf(s) : null;
+      const tgt = pre ? s : null, tv = tgt ? sv : null;
+      const n = tgt ? (tv.gain - GMIN) / (GSTEP * GSTEPS) : 0;
+      const ticks = [];
+      for (let k = 0; k <= GSTEPS; k++) {
+        const y = Math.round(18 + (1 - k / GSTEPS) * GT), val = GMIN + k * GSTEP, major = val % 10 === 0;
+        ticks.push(html`<span style=${`position:absolute;left:${major ? 30 : 36}px;width:${major ? 24 : 12}px;top:${y}px;height:1px;background:${major ? '#5a5144' : '#3a342c'}`}></span>`);
+        if (major) ticks.push(html`<span class="mk" style=${`left:0;top:${y - 7}px;width:24px`}>${val}</span>`);
+      }
+      const lv = st.cfgLv[isAlt ? 1 : 0];
+      return html`
+        <section class="sec" style=${`width:238px;flex:none;padding:8px;gap:8px;${active ? 'border-color:#8a6a3a;background:linear-gradient(180deg,#2a2420,#1a1815)' : ''}`}>
+          <button onClick=${() => { if (isAlt && !s) this.setState({ srcPop: { which, grp: 'USB', mode: 'M' } }); else this.updCfg(i, { altOn: isAlt }); }} aria-pressed=${String(active)}
+            style=${`height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:8px;border:1px solid ${active ? 'var(--brass)' : '#3a342c'};background:${active ? '#2a2014' : '#141210'};cursor:pointer`}>
+            <span style=${`width:12px;height:12px;border-radius:50%;background:${active ? (isAlt ? '#e8a33d' : '#62b85c') : '#2c2721'};box-shadow:${active ? '0 0 10px ' + (isAlt ? '#e8a33d' : '#62b85c') : 'none'}`}></span>
+            <span style=${`font-size:22px;font-weight:700;letter-spacing:.1em;color:${active ? 'var(--brass-hi)' : '#cbbd9f'}`}>${isAlt ? 'ALT' : 'MAIN'}</span>
+            <span style="flex:1"></span>
+            <span style=${`font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:${active ? '#f3c27a' : '#8a8170'}`}>${active ? 'On air' : 'Standby'}</span>
+          </button>
+          <button onClick=${() => this.setState({ srcPop: { which, grp: s ? s.grp : 'USB', mode: s ? s.mode : 'M' } })} aria-label=${'Choose ' + which + ' source'}
+            style="height:52px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:8px;border:1px solid #3a342c;background:#100f0d;cursor:pointer;text-align:left">
+            <span style=${`width:22px;height:22px;flex:none;border-radius:50%;background:radial-gradient(circle,#050404 40%,${s ? '#c9a25a' : '#3a342c'} 44%,${s ? '#7a5a26' : '#2c2721'} 70%,#151311 72%)`}></span>
+            <span style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.1">
+              <span style="font-family:var(--mono);font-size:14px;color:var(--brass-hi)">${this.srcLabel(s)}</span>
+              <span style="font-size:15px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcName(s)}</span>
+            </span>
+            ${s && html`<span style="flex:none;padding:3px 7px;border-radius:4px;border:1px solid #5a4630;font-size:12px;font-weight:700;letter-spacing:.08em;color:#e9dcc2">${MODES.find(m => m[0] === s.mode)[1].toUpperCase()}</span>`}
+          </button>
+          <div style="flex:1;min-height:0;display:flex;gap:8px">
+            <button class="fader" aria-label=${'Gain ' + (tgt ? tv.gain.toFixed(1) + ' dB' : 'unavailable')} disabled=${!tgt}
+              style=${`width:84px;height:${GF}px;cursor:${tgt ? 'ns-resize' : 'default'};opacity:${tgt ? 1 : 0.35}`}
+              onPointerDown=${e => tgt && this.gainDown(tgt, e, GT)} onPointerMove=${e => this.gainMove(e)} onPointerUp=${() => { this.gd = null; }} onPointerCancel=${() => { this.gd = null; }}>
+              ${ticks}
+              <span class="slot" style="left:41px;top:16px;bottom:16px"></span>
+              <span class="cap" style=${`left:24px;width:40px;height:30px;top:${Math.round((1 - n) * GT + 3)}px`}></span>
+            </button>
+            <span style=${`width:10px;height:${GT}px;margin-top:18px;flex:none;display:flex;flex-direction:column;justify-content:flex-end;border-radius:2px;background:#0c0b0a;box-shadow:0 0 0 1px #2c2721`}>
+              <span style=${`height:${Math.round((s ? lv : 0) * 100)}%;border-radius:2px;background:linear-gradient(0deg,#62b85c 0%,#62b85c 65%,#e8a33d 82%,#e0513f 100%)`}></span>
+            </span>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding-top:12px">
+              <span style="font-size:13px;font-weight:600;letter-spacing:.14em;color:#b8a78a">GAIN</span>
+              <span style="font-family:var(--mono);font-size:26px;line-height:1;color:var(--ink)">${tgt ? (tv.gain > 0 ? '+' : '') + tv.gain.toFixed(1) : '—'}</span>
+              ${pre && html`<span style="font-size:13px;color:#9b927f;line-height:1.25">dB · 2.5 dB steps${active ? '' : html`<br/><span style="color:#f3c27a">Live on standby</span>`}</span>`}
+              ${s && !pre && html`<span style="font-size:13px;line-height:1.25;color:#9b927f">Digital source, no preamp</span>`}
+              ${!s && html`<span style="font-size:13px;color:#9b927f">No source</span>`}
+              <span style="flex:1"></span>
+              ${tgt && html`<button onClick=${() => this.updSrc(tgt, { ph: !tv.ph })} aria-pressed=${String(tv.ph)}
+                style=${`height:44px;border-radius:8px;font-weight:700;font-size:17px;letter-spacing:.06em;cursor:pointer;${tv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b;box-shadow:0 0 12px rgba(208,57,43,.5)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>+48V</button>`}
+            </div>
+          </div>
+        </section>`;
+    };
+
+    const dlyM = (cf.dly * 0.343).toFixed(2);
+    const step = d => this.updCfg(i, { dly: Math.round(clamp(cf.dly + d, 0, 100) * 100) / 100, dlyOn: true });
+    const FH = Math.round(Hd - 72 - 12 - 26 - 32 - 14 - 18), T = FH - 44;
+    const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']].map(m => ({ label: m[1], c: Math.round((1 - m[0]) * T + 22) }));
+    const segs = []; for (let k = 17; k >= 0; k--) { const lit = st.cfgLv[2] > k / 18; segs.push(k >= 16 ? (lit ? '#e0513f' : '#2f1714') : k >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); }
+    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+
+    return html`
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
+        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
+        <nav style="display:flex;gap:4px;margin-left:6px">
+          ${tabs.map(t => html`<button class=${'tab' + (t === 'Config' ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+        </nav>
+        <span style="flex:1"></span>
+        <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>
+      </header>
+
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+          <div style=${`height:${H1}px;display:flex;gap:10px`}>
+            ${card('main')}${card('alt')}
+
+            <section class="sec" style="flex:1;min-width:200px;align-items:center;justify-content:space-around;padding:8px 10px">
+              ${this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a')}
+              ${this.knob('bal', 'Balance', cf.bal, 9, balText, '#7aa7e0')}
+              <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a8170">Hold balance for stereo</span>
+            </section>
+
+            <div style="width:262px;flex:none;display:flex;flex-direction:column;gap:10px">
+              <button onClick=${() => this.updCfg(i, { inv: !cf.inv })} aria-pressed=${String(cf.inv)}
+                style=${`height:96px;flex:none;display:flex;align-items:center;gap:16px;padding:0 18px;border-radius:8px;cursor:pointer;${cf.inv ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi);box-shadow:inset 0 0 24px rgba(232,163,61,.18)' : 'background:var(--panel);border:1px solid var(--line);color:#cbbd9f'}`}>
+                <span style="font-size:52px;line-height:1;font-weight:500">Ø</span>
+                <span style="display:flex;flex-direction:column;align-items:flex-start;gap:2px">
+                  <span style="font-size:20px;font-weight:700;letter-spacing:.08em">PHASE</span>
+                  <span style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.8">${cf.inv ? 'Inverted' : 'Normal'}</span>
+                </span>
+              </button>
+              <section class="sec" style="flex:1;min-height:0;gap:8px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:15px;font-weight:700;letter-spacing:.14em;color:#e9dcc2">DELAY</span>
+                  <span style="flex:1"></span>
+                  <button class="pill" aria-pressed=${String(cf.dlyOn)} onClick=${() => this.updCfg(i, { dlyOn: !cf.dlyOn })}
+                    style=${`width:72px;height:36px;border-radius:6px;font-size:15px;${cf.dlyOn ? 'background:#f0a24a;color:#1a1405;border-color:#f0a24a' : ''}`}>${cf.dlyOn ? 'ON' : 'OFF'}</button>
+                </div>
+                <button aria-label=${'Delay ' + cf.dly.toFixed(2) + ' ms, drag sideways'}
+                  onPointerDown=${e => { capture(e); this.dd = { x: e.clientX, start: cf.dly, w: e.currentTarget.getBoundingClientRect().width }; }}
+                  onPointerMove=${e => { const d = this.dd; if (!d) return; this.updCfg(i, { dly: Math.round(clamp(d.start + (e.clientX - d.x) / d.w * 12, 0, 100) * 100) / 100 }); }}
+                  onPointerUp=${() => { this.dd = null; }} onPointerCancel=${() => { this.dd = null; }}
+                  style=${`flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:8px;border:1px solid #2c2721;background:#100f0d;cursor:ew-resize;touch-action:none;opacity:${cf.dlyOn ? 1 : 0.45}`}>
+                  <span style="font-family:var(--mono);font-size:34px;line-height:1;color:var(--brass-hi)">${cf.dly.toFixed(2)}<span style="font-size:16px;color:#b8a78a"> ms</span></span>
+                  <span style="font-family:var(--mono);font-size:13px;color:#9b927f">≈ ${dlyM} m of air · drag ⇆</span>
+                </button>
+                <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px">
+                  ${[[-1,'−1'],[-0.1,'−0.1'],[0.1,'+0.1'],[1,'+1']].map(b => html`<button class="pill" style="height:44px;border-radius:6px;font-family:var(--mono);font-size:14px" onClick=${() => step(b[0])}>${b[1]}</button>`)}
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <section class="sec" style="height:94px;flex:none;padding:7px 10px;gap:6px">
+            <div style="display:flex;gap:5px;height:38px;align-items:stretch">
+              <span style="width:84px;flex:none;display:flex;align-items:center;font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">DCA</span>
+              ${cf.dca.map((on, k) => html`<button aria-pressed=${String(on)} aria-label=${'DCA ' + (k + 1)} onClick=${() => { const d = cf.dca.slice(); d[k] = !on; this.updCfg(i, { dca: d }); }}
+                style=${`flex:1;min-width:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;border-radius:5px;cursor:pointer;${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#8a8170'}`}>
+                <span style="font-size:15px;font-weight:700">${k + 1}</span>${DCAS[k] && html`<span style="font-size:10px;letter-spacing:.04em;text-transform:uppercase">${DCAS[k]}</span>`}</button>`)}
+            </div>
+            <div style="display:flex;gap:5px;height:38px;align-items:stretch">
+              <span style="width:84px;flex:none;display:flex;align-items:center;font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">MUTE GRP</span>
+              ${cf.mg.map((on, k) => html`<button aria-pressed=${String(on)} aria-label=${'Mute group ' + (k + 1)} onClick=${() => { const d = cf.mg.slice(); d[k] = !on; this.updCfg(i, { mg: d }); }}
+                style=${`flex:1;min-width:0;border-radius:5px;font-size:15px;font-weight:700;cursor:pointer;${on ? 'background:#3a1714;border:1px solid #d0392b;color:#ffb4a8' : 'background:#141210;border:1px solid #2c2721;color:#8a8170'}`}>${k + 1}</button>`)}
+              <span style="flex:8"></span>
+            </div>
+          </section>
+        </div>
+
+        <div class="strip" style="width:150px;flex:none">
+          <span class="tag" style=${'justify-content:center;background:' + ch.color}>${ch.name}</span>
+          <div class="ms">
+            <button onClick=${() => this.upd(i, { mute: !ch.mute })} aria-pressed=${String(ch.mute)}
+              style=${ch.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>
+            <button onClick=${() => this.upd(i, { solo: !ch.solo })} aria-pressed=${String(ch.solo)}
+              style=${ch.solo ? 'background:#e8b93a;color:#1a1405;border:1px solid #4a3d1a;box-shadow:0 0 12px rgba(232,185,58,.5)' : 'background:#2a2410;color:#d9bd6a;border:1px solid #4a3d1a'}>SOLO</button>
+          </div>
+          <div class="dbr">${dbText(ch.v)}</div>
+          <button class="fader" style=${`height:${FH}px;width:96px;align-self:center`} aria-label=${'Channel fader ' + dbText(ch.v) + ' dB'}
+            onPointerDown=${e => this.faderDown(i, e, T, FH, true)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+            ${marks.map(m => html`<span class="mk" style=${'top:' + (m.c - 7) + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.c + 'px'}></span>`)}
+            <span class="slot"></span>
+            <span class="meter" style=${'height:' + T + 'px'}>${segs.map(bg => html`<span style=${'background:' + bg}></span>`)}</span>
+            <span class="cap" style=${'top:' + Math.round((1 - ch.v) * T) + 'px'}></span>
+          </button>
+        </div>
+      </div>
+      ${st.srcPop && this.renderSrcPop(Hd)}
+      ${st.balPop && this.renderBalPop(Hd)}`;
+  }
+
+  renderSrcPop(Hd) {
+    const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(i), sp = st.srcPop, cur = cf[sp.which];
+    const g = GMAP[sp.grp], cols = 8, rows = Math.ceil(g.n / cols);
+    const PH = Math.round(Hd - 48), bodyH = PH - 32 - 56;
+    const tileH = Math.min(62, Math.floor((bodyH - 30 - (rows - 1) * 6) / rows));
+    const close = () => this.setState({ srcPop: null });
+    const linkOf = sp.link && cur ? this.srcOf(cur).link : null;
+    const pick = n => {
+      if (sp.link) { this.updSrc(cur, { link: { grp: sp.grp, n, mode: 'M' } }); close(); return; }
+      const start = sp.mode === 'M' ? n : (n % 2 ? n : n - 1);
+      const patch = { [sp.which]: { grp: sp.grp, n: Math.min(start, g.n - (sp.mode === 'M' ? 0 : 1)), mode: sp.mode } };
+      if (sp.which === 'alt' && !cur) patch.altOn = false;
+      this.updCfg(i, patch); close();
+    };
+    const setMode = m => {
+      this.setState({ srcPop: { ...sp, mode: m } });
+      if (cur) this.updCfg(i, { [sp.which]: { ...cur, mode: m, n: m === 'M' ? cur.n : (cur.n % 2 ? cur.n : cur.n - 1) } });
+    };
+    const inSel = n => sp.link ? !!(linkOf && linkOf.grp === sp.grp && linkOf.n === n) : cur && cur.grp === sp.grp && (n === cur.n || (cur.mode !== 'M' && n === cur.n + 1));
+    const tiles = [];
+    for (let n = 1; n <= g.n; n++) {
+      const sel = inSel(n), nm = sp.grp === 'A' && n <= STAGE.length ? STAGE[n - 1] : '';
+      const pairL = sp.mode !== 'M' && n % 2 === 1, pairR = sp.mode !== 'M' && n % 2 === 0;
+      tiles.push(html`<button onClick=${() => pick(n)} aria-label=${g.name + ' ' + n + (nm ? ' ' + nm : '')} aria-pressed=${String(!!sel)}
+        style=${`height:${tileH}px;min-width:0;display:flex;align-items:center;gap:8px;padding:0 10px;cursor:pointer;text-align:left;
+          border-radius:${pairL ? '8px 0 0 8px' : pairR ? '0 8px 8px 0' : '8px'};margin-right:${pairL ? '-6px' : '0'};
+          border:1px solid ${sel ? 'var(--brass)' : '#2c2721'};background:${sel ? '#2a2014' : '#141210'};box-shadow:${sel ? 'inset 0 0 18px rgba(232,163,61,.2)' : 'none'}`}>
+        <span style=${`width:20px;height:20px;flex:none;border-radius:50%;background:radial-gradient(circle,#050404 38%,${sel ? '#f3c27a' : '#8a7d66'} 42%,${sel ? '#9a7432' : '#4a4339'} 68%,transparent 72%)`}></span>
+        <span style="min-width:0;display:flex;flex-direction:column;line-height:1.1">
+          <span style=${`font-family:var(--mono);font-size:15px;color:${sel ? 'var(--brass-hi)' : '#e9dcc2'}`}>${pad2(n)}</span>
+          ${nm && html`<span style="font-size:12px;color:#9b927f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}</span>`}
+        </span>
+      </button>`);
+    }
+    return html`
+      <button class="scrim" aria-label="Close source picker" onClick=${close}></button>
+      <div class="pop" style=${`left:50px;top:24px;width:1080px;height:${PH}px;padding:16px 18px;gap:12px;border-color:#8a6a3a`}>
+        <div style="height:44px;display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + ch.color}>${ch.name}</span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">${sp.link ? 'Gain link for ' + this.srcLabel(cur) : (sp.which === 'main' ? 'Main' : 'Alt') + ' source'}</span>
+          <span style="flex:1"></span>
+          ${sp.link && linkOf && html`<button class="small" style="height:40px" onClick=${() => { this.updSrc(cur, { link: null }); close(); }}>UNLINK</button>`}
+          <div style=${`display:${sp.link ? 'none' : 'flex'};padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721`}>
+            ${MODES.map(m => html`<button onClick=${() => setMode(m[0])} aria-pressed=${String(sp.mode === m[0])}
+              style=${`width:96px;height:36px;border-radius:7px;border:none;font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;${sp.mode === m[0] ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>${m[1]}</button>`)}
+          </div>
+          ${sp.which === 'alt' && !sp.link && html`<button class="small" style="height:40px" onClick=${() => { this.updCfg(i, { alt: null, altOn: false }); close(); }}>NONE</button>`}
+          <button class="small" style="height:40px;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)" onClick=${close}>DONE</button>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;gap:14px">
+          <nav style="width:170px;flex:none;display:flex;flex-direction:column;gap:4px">
+            ${GROUPS.filter(gr => !sp.link || PRE.has(gr.id)).map(gr => { const on = gr.id === sp.grp, has = sp.link ? linkOf && linkOf.grp === gr.id : cur && cur.grp === gr.id; return html`
+              <button onClick=${() => this.setState({ srcPop: { ...sp, grp: gr.id } })} aria-pressed=${String(on)}
+                style=${`flex:1;max-height:40px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:7px;cursor:pointer;font-weight:600;font-size:16px;letter-spacing:.04em;text-align:left;
+                  ${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
+                <span style="flex:1">${gr.name}</span>
+                ${PRE.has(gr.id) && html`<span style="font-size:10px;letter-spacing:.1em;color:#9b927f">PRE</span>`}
+                ${has && html`<span style="width:7px;height:7px;border-radius:50%;background:#f3c27a"></span>`}
+              </button>`; })}
+          </nav>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+            <div style=${`display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:6px;align-content:start`}>${tiles}</div>
+            <span style="margin-top:auto;font-size:13px;color:#9b927f">${sp.link ? 'Pick the preamp this digital signal comes from. The gain fader on this card will then control that preamp, for every channel that uses it.' : sp.mode === 'M' ? 'Tap an input to patch it.' : 'Stereo and M/S take an odd/even pair. Tap either input of the pair.'} ${PRE.has(sp.grp) ? 'Gain and +48V live on this input and follow it to any channel.' : 'Digital input: no preamp gain.'}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  renderBalPop(Hd) {
+    const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(i), bp = st.balPop;
+    const close = () => this.setState({ balPop: null });
+    const balText = Math.abs(cf.bal) < 0.05 ? 'Center' : (cf.bal < 0 ? 'L ' : 'R ') + Math.abs(cf.bal).toFixed(1) + ' dB';
+    const ticks = []; for (let t = 0; t <= 18; t++) { const h = t === 9 ? 34 : t % 3 === 0 ? 22 : 10; ticks.push(html`<span style=${`position:absolute;left:${t / 18 * 100}%;top:50%;width:1px;height:${h}px;margin-top:${-h / 2}px;background:${t === 9 ? '#7aa7e0' : '#4a4339'}`}></span>`); }
+    return html`
+      ${bp.pinned && html`<button class="scrim" aria-label="Close balance" onClick=${close}></button>`}
+      <div class="pop" style=${`left:250px;top:${Math.max(62, Math.round((Hd - (bp.pinned ? 300 : 150)) / 2))}px;width:680px;padding:18px 22px;gap:14px;border-color:#4a6488;pointer-events:${bp.pinned ? 'auto' : 'none'}`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + ch.color}>${ch.name}</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Balance</span>
+          <span style="flex:1"></span>
+          <span style="font-family:var(--mono);font-size:28px;color:#a9c6ee">${balText}</span>
+        </div>
+        <button class="panmini" style="height:64px;width:100%;border-radius:32px;border-color:#3a342c" aria-label=${'Balance ' + balText}
+          onPointerDown=${e => { if (this.dbl('bal2')) { this.updCfg(i, { bal: 0 }); return; } this.slDown(e, f => { let v = Math.round((f * 18 - 9) * 10) / 10; if (Math.abs(v) < 0.3) v = 0; this.updCfg(i, { bal: v }); }, 28, 636); }}
+          onPointerMove=${e => this.slMove(e)} onPointerUp=${() => { this.sl = null; }} onPointerCancel=${() => { this.sl = null; }}>
+          <span style="position:absolute;left:28px;right:28px;top:0;bottom:0">${ticks}
+            <span class="knob" style=${`left:${(cf.bal + 9) / 18 * 100}%;width:40px;height:40px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 30%,#dbe8f8,#7aa7e0 55%,#34507a)`}></span></span>
+          <span style="position:absolute;left:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">L</span>
+          <span style="position:absolute;right:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">R</span>
+        </button>
+        ${!bp.pinned && html`<span style="font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#b8a78a;text-align:center">Lift finger to close</span>`}
+        ${bp.pinned && html`
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <div style="display:flex;justify-content:space-between;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#e9dcc2"><span>Stereo width</span><span style="font-family:var(--mono);color:#a9c6ee">${Math.round(cf.bw * 100)}%</span></div>
+            <button class="panmini" style="height:44px;width:100%;border-radius:22px" aria-label=${'Stereo width ' + Math.round(cf.bw * 100) + '%'}
+              onPointerDown=${e => this.slDown(e, f => { let w = f * 2; if (Math.abs(w - 1) < 0.04) w = 1; this.updCfg(i, { bw: w }); }, 20, 636)}
+              onPointerMove=${e => this.slMove(e)} onPointerUp=${() => { this.sl = null; }} onPointerCancel=${() => { this.sl = null; }}>
+              <span style="position:absolute;left:20px;right:20px;top:0;bottom:0">
+                <span style=${`position:absolute;left:0;top:50%;height:4px;margin-top:-2px;width:${cf.bw / 2 * 100}%;border-radius:2px;background:#7aa7e0;opacity:.6`}></span>
+                <span style="position:absolute;left:50%;top:8px;bottom:8px;width:1px;background:#4a4339"></span>
+                <span class="knob" style=${`left:${cf.bw / 2 * 100}%;width:28px;height:28px;margin:-14px 0 0 -14px`}></span>
+              </span>
+            </button>
+            <div style="display:flex;gap:10px">
+              <button class=${'pill' + (cf.bswap ? ' on' : '')} style="flex:1" onClick=${() => this.updCfg(i, { bswap: !cf.bswap })}>Swap L ⇄ R</button>
+              <button class="pill" style="flex:1" onClick=${() => this.updCfg(i, { bal: 0 })}>Center</button>
+              <button class="pill on" style="flex:1" onClick=${close}>Done</button>
+            </div>
+          </div>`}
+      </div>`;
+  }
+
+  render() {
+    const st = this.state, { s, Hd, offX } = this.dims();
+    const portrait = st.ch > st.cw * 1.05;
+    return html`
+      <div ref=${el => { this.stage = el; }} style="position:absolute;inset:0">
+        <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
+          ${st.screen === 'main' ? this.renderMain(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'dyn' ? this.renderDyn(Hd) : (this.ek = 'eq', this.renderEQ(Hd))}
+        </div>
+        ${!st.started && html`
+          <div class="overlay" dir="rtl">
+            <div class="card">
+              <h1>WING CONSOLE</h1>
+              <p>אב־טיפוס לבדיקת תחושה. הנתונים מדומים ואין חיבור למיקסר.</p>
+              <button class="cta" onClick=${() => this.goFullscreen()}>פתח במסך מלא</button>
+              <button class="ghost" onClick=${() => this.setState({ started: true })}>המשך בלי מסך מלא</button>
+            </div>
+          </div>`}
+        ${st.started && portrait && html`
+          <div class="overlay" dir="rtl" style="z-index:25">
+            <div class="card"><h1 style="font-size:30px">⟲</h1><p>סובב את המכשיר לרוחב</p></div>
+          </div>`}
+        ${st.toast && html`<div class="toast" role="status">${st.toast}</div>`}
+      </div>`;
+  }
+}
+
+render(html`<${App} />`, document.getElementById('stage'));
+</script>
+
+</body>
+</html>
