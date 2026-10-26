@@ -1,8 +1,8 @@
 {
   "name": "Wing Console",
   "short_name": "Wing Console",
-  "start_url": "/wing-console/app/",
-  "scope": "/wing-console/app/",
+  "start_url": "./",
+  "scope": "./",
   "display": "fullscreen",
   "display_override": [
     "fullscreen",
@@ -25,5 +25,5 @@
       "purpose": "any maskable"
     }
   ],
-  "id": "/wing-console/app/"
+  "id": "./"
 }
