@@ -57,6 +57,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box{position:relative;padding:0 10px;display:flex;align-items:center;justify-content:space-between;border-radius:6px;border:1px solid var(--line);background:#141210;cursor:ew-resize;touch-action:none;overflow:hidden;height:44px}
 .box b{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9b927f}
 .box em{font-style:normal;font-family:var(--mono);font-size:15px;color:var(--ink)}
+.box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
 .tab{height:36px;display:flex;align-items:center;gap:5px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
@@ -88,6 +89,7 @@ const IC = {
   route: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>`,
   scenes: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
   full: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+  unfull: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>`,
   back: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
   grip: html`<svg width="8" height="14" viewBox="0 0 8 14" fill="#7d7363" aria-hidden="true"><circle cx="2" cy="2" r="1.2"/><circle cx="6" cy="2" r="1.2"/><circle cx="2" cy="7" r="1.2"/><circle cx="6" cy="7" r="1.2"/><circle cx="2" cy="12" r="1.2"/><circle cx="6" cy="12" r="1.2"/></svg>`
 };
@@ -165,6 +167,9 @@ function makeEq() {
 
 /* Dynamics-slot models. Names taken from published firmware notes; the full list and each model's parameters get checked against the protocol document. */
 const DEQ = 'Dual Dynamic EQ';
+const TABS = ['Home', 'Config', 'Gate', 'EQ', 'Comp', 'Ins 1', 'Ins 2', 'Sends'];
+const NOGRIP = new Set(['Home', 'Config', 'Sends']);
+const SEND_LBL = ['Mon Vox','Mon Gtr','Mon Keys','Mon Drums','IEM 1','IEM 2','Reverb','Delay','Bus 9','Bus 10','Bus 11','Bus 12','Bus 13','Bus 14','Bus 15','Bus 16'];
 const RATIO_N = { '1:1.5': 1.5, '1:2': 2, '1:3': 3, '1:4': 4, 'GATE': Infinity };
 const GATE_DEF = { thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, 'sc.f': 1000, 'sc.q': 1 };
 const KEYT = { LC6: 'Lo-Cut 6dB', LC12: 'Lo-Cut 12dB', HC6: 'Hi-Cut 6dB', HC12: 'Hi-Cut 12dB', BP: 'Band Q' };
@@ -188,7 +193,7 @@ class App extends Component {
     this.state = { cw: innerWidth, ch: innerHeight, started: matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true, isFs: false, toast: '', screen: 'main', eqCh: 1,
       chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, lv: [0,0,0,0,0,0,0,0,0],
       panPop: null, sendPop: null, eq: makeEq(),
-      lastTab: 'config', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
+      lastTab: 'home', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
       deq: makeDeq(), slots: { gate: 'Wing Gate', comp: 'Wing Comp' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
       gate: { on: true, thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, ratio: '1:3', fs: false,
         sc: { on: false, type: 'BP', f: 1000, q: 1, src: 'SELF', tap: 'IN' },
@@ -214,7 +219,7 @@ class App extends Component {
         else t = st.main.mute ? 0 : Math.min(1, 0.68 * Math.sqrt(st.main.v / 0.75) * (0.85 + Math.random() * 0.2));
         return t > old ? t : old * 0.82;
       });
-      if (st.screen === 'config') {
+      if (st.screen === 'config' || st.screen === 'home') {
         const c = st.chans[st.eqCh], cf = this.cfgOf(st.eqCh);
         const lvl = s => { if (!s) return 0; const sv = this.srcOf(s); const g = PRE.has(s.grp) ? sv.gain : 30; return Math.min(1, (0.18 + g / 60) * (0.75 + Math.random() * 0.35)); };
         const tg = [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
@@ -473,7 +478,7 @@ class App extends Component {
   }
 
   /* ---------- EQ ---------- */
-  eqGeo(Hd) { const fs = this.state[this.ek].fs; return { W: 1102, H: Math.round(fs ? Hd - 114 : Hd - 244), pad: 16 }; }
+  eqGeo(Hd) { const fs = this.state[this.ek].fs; return { W: 1102, H: Math.round(fs ? Hd - 122 : Hd - 244), pad: 16 }; }
   X(f) { return this.g.W * Math.log10(f / 20) / 3; }
   F(x) { return 20 * Math.pow(10, 3 * clamp(x, 0, this.g.W) / this.g.W); }
   Y(db) { const g = this.g; return g.H / 2 - db / this.state[this.ek].R * (g.H / 2 - g.pad); }
@@ -613,7 +618,7 @@ class App extends Component {
     const bypBtn = (w, cls) => html`<button aria-pressed=${String(q.bypass)} onClick=${() => this.updEq({ bypass: !q.bypass })} class=${cls} style=${`${w};${q.bypass ? 'background:#3a1714;color:#ffb4a8;border-color:#d0392b' : ''}`}>BYPASS</button>`;
     const rangeBtn = h => html`<button class="small" style=${`height:${h}px;font-family:var(--mono);font-size:13px;color:#cbbd9f`} onClick=${() => { const rs = [6, 12, 18]; this.updEq({ R: rs[(rs.indexOf(q.R) + 1) % 3] }); }}>±${R} dB</button>`;
     const rtaBtn = h => html`<button class="small" style=${`height:${h}px;border-color:${q.pre ? '#7fa6b4' : '#3a342c'}`} onClick=${() => this.updEq({ pre: !q.pre })}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`;
-    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    const tabs = TABS;
     const dop = sb.dyn ? 1 : 0.4;
     const frow = (k, short, label, value, hasT) => {
       const on = hasT ? q[k].on : true;
@@ -630,16 +635,17 @@ class App extends Component {
           <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
           <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
           <nav style="display:flex;gap:4px;margin-left:6px">
-            ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+            ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
           </nav>
           <span style="flex:1"></span>
           ${D && this.modelBtn()}
           ${rangeBtn(36)}${!D && rtaBtn(36)}${bypBtn('', 'small')}
-          <button class="small" aria-label="Full screen" onClick=${() => this.updEq({ fs: true })} style="display:flex;align-items:center;gap:6px;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>
+          <button class="small" aria-label="Full screen" onClick=${() => this.updEq({ fs: true })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>
         </header>` : html`
-        <header style="height:44px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
+        <header style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
           <span style=${'font-size:15px;font-weight:700;letter-spacing:.08em;color:' + ch.color}>${ch.name.toUpperCase()} · ${D ? 'DYNAMIC EQ' : 'EQ'}</span>
-          <span style="width:12px"></span>${chips(32, true)}<span style="flex:1"></span>${rangeBtn(32)}${rtaBtn(32)}
+          <span style="width:12px"></span>${chips(32, true)}<span style="flex:1"></span>${rangeBtn(36)}${!D && rtaBtn(36)}
+          <button class="small" aria-label="Exit full screen" onClick=${() => this.updEq({ fs: false })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.unfull}</button>
         </header>`}
 
       <div style="flex:none;display:flex;gap:10px;padding:10px 14px 0">
@@ -689,7 +695,7 @@ class App extends Component {
         <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 14px">
           <section class="sec" style="flex:480 1 0">
             <div style="display:flex;gap:6px;height:44px">${chips(44, false)}
-              <button class="pill" style=${`width:64px;border-radius:6px;font-size:14px;background:#141210;color:${sb.on ? '#8cc47e' : '#8a8170'}`} onClick=${() => this.updBand(si, { on: !sb.on })}>${sb.on ? 'ON' : 'OFF'}</button>
+              <button class="pill" aria-pressed=${String(sb.on)} style=${`width:64px;border-radius:6px;font-size:15px;font-weight:800;${sb.on ? `background:${sb.color};color:#121110;border:1px solid ${sb.color};box-shadow:0 0 12px ${sb.color}66` : `background:#141210;color:${sb.color};border:1px dashed ${sb.color}88;opacity:.8`}`} onClick=${() => this.updBand(si, { on: !sb.on })}>${sb.on ? 'ON' : 'OFF'}</button>
             </div>
             <div style="display:flex;gap:4px;height:44px">
               ${(D ? [['bell','Bell'],['losh','Low shelf'],['hish','High shelf']] : [['bell','Bell'],['losh','Low shelf'],['hish','High shelf'],['notch','Notch']]).map(t => html`<button class=${'pill' + (sb.type === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:15px;font-weight:600" onClick=${() => this.updBand(si, { type: t[0] })}>${t[1]}</button>`)}
@@ -722,8 +728,160 @@ class App extends Component {
             <span style="font-family:var(--mono);font-size:16px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summary}</span>
           </div>
           ${D && lisBtn('width:110px')}${bypBtn('width:110px', 'pill')}
-          <button class="pill on" style="width:110px" onClick=${() => this.updEq({ fs: false })}>EXIT</button>
         </div>`}`;
+  }
+
+  /* ---------- channel home (overview) ---------- */
+  miniEq(key, W, H) {
+    const sg = this.g, sk = this.ek;
+    this.ek = key; this.g = { W, H, pad: 8 };
+    const q = this.state[key], D = key === 'deq';
+    const curve = this.path(f => (D ? 0 : this.filt(f)) + q.bands.reduce((a, b) => a + this.resp(b, f, D ? b.range : b.g), 0));
+    const dots = q.bands.map(b => ({ x: this.X(b.f), y: clamp(this.Y(D ? b.range : b.g), 6, H - 6), c: b.color, on: b.on }));
+    const z = this.Y(0).toFixed(1);
+    this.g = sg; this.ek = sk;
+    const grid = [100, 1000, 10000].map(f => `M ${(W * Math.log10(f / 20) / 3).toFixed(1)} 0 V ${H}`).join(' ');
+    return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
+      <path d=${grid} stroke="#1c2a30" stroke-width="1" fill="none"/>
+      <path d=${`M 0 ${z} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
+      <path d=${curve} stroke="#f6b45e" stroke-width="2.2" fill="none" opacity=${q.bypass ? 0.35 : 1}/>
+      ${dots.map(d => html`<circle cx=${d.x.toFixed(1)} cy=${d.y.toFixed(1)} r="5" fill=${d.c} opacity=${d.on ? 1 : 0.3}/>`)}
+    </svg>`;
+  }
+  miniGate(W, H) {
+    const G = this.state.gate, S = G.sim, X = db => (clamp(db, -80, 0) + 80) / 80 * W, Y = db => (-clamp(db, -80, 0)) / 80 * H;
+    let d = ''; for (let k = 0; k <= 80; k++) { const x = -80 + k; d += (k ? ' L ' : 'M ') + X(x).toFixed(1) + ' ' + Y(this.gateOut(x, G)).toFixed(1); }
+    const open = S.gr < 3, lc = open ? '#62b85c' : '#e0513f';
+    return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
+      <path d=${`M 0 ${H} L ${W} 0`} stroke="#3a342c" stroke-width="1" stroke-dasharray="3 4"/>
+      <path d=${d} stroke="#f6b45e" stroke-width="2.2" fill="none" opacity=${G.on ? 1 : 0.35}/>
+      <circle cx=${X(G.thr)} cy=${Y(G.thr)} r="4" fill="none" stroke="#f3c27a" stroke-width="2"/>
+      <circle cx=${X(S.lin).toFixed(1)} cy=${Y(S.lin - S.gr).toFixed(1)} r="6" fill=${lc}/>
+    </svg>`;
+  }
+  miniComp(W, H) {
+    const thr = -20, ratio = 3, X = db => (db + 60) / 60 * W, Y = db => (-db) / 60 * H;
+    let d = ''; for (let k = 0; k <= 60; k++) { const x = -60 + k, o = x < thr ? x : thr + (x - thr) / ratio; d += (k ? ' L ' : 'M ') + X(x).toFixed(1) + ' ' + Y(o).toFixed(1); }
+    return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
+      <path d=${`M 0 ${H} L ${W} 0`} stroke="#3a342c" stroke-width="1" stroke-dasharray="3 4"/>
+      <path d=${d} stroke="#f6b45e" stroke-width="2.2" fill="none"/>
+      <circle cx=${X(thr)} cy=${Y(thr)} r="4" fill="none" stroke="#f3c27a" stroke-width="2"/>
+    </svg>`;
+  }
+  chanStrip(Hd) {
+    const st = this.state, i = st.eqCh, ch = st.chans[i];
+    const FH = Math.round(Hd - 72 - 12 - 26 - 32 - 14 - 18), T = FH - 44;
+    const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']].map(m => ({ label: m[1], c: Math.round((1 - m[0]) * T + 22) }));
+    const segs = []; for (let k = 17; k >= 0; k--) { const lit = st.cfgLv[2] > k / 18; segs.push(k >= 16 ? (lit ? '#e0513f' : '#2f1714') : k >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); }
+    return html`
+      <div class="strip" style="width:150px;flex:none">
+        <span class="tag" style=${'justify-content:center;background:' + ch.color}>${ch.name}</span>
+        <div class="ms">
+          <button onClick=${() => this.upd(i, { mute: !ch.mute })} aria-pressed=${String(ch.mute)}
+            style=${ch.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>
+          <button onClick=${() => this.upd(i, { solo: !ch.solo })} aria-pressed=${String(ch.solo)}
+            style=${ch.solo ? 'background:#e8b93a;color:#1a1405;border:1px solid #4a3d1a;box-shadow:0 0 12px rgba(232,185,58,.5)' : 'background:#2a2410;color:#d9bd6a;border:1px solid #4a3d1a'}>SOLO</button>
+        </div>
+        <div class="dbr">${dbText(ch.v)}</div>
+        <button class="fader" style=${`height:${FH}px;width:96px;align-self:center`} aria-label=${'Channel fader ' + dbText(ch.v) + ' dB'}
+          onPointerDown=${e => this.faderDown(i, e, T, FH, true)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          ${marks.map(m => html`<span class="mk" style=${'top:' + (m.c - 7) + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.c + 'px'}></span>`)}
+          <span class="slot"></span>
+          <span class="meter" style=${'height:' + T + 'px'}>${segs.map(bg => html`<span style=${'background:' + bg}></span>`)}</span>
+          <span class="cap" style=${'top:' + Math.round((1 - ch.v) * T) + 'px'}></span>
+        </button>
+      </div>`;
+  }
+  renderHome(Hd) {
+    const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(i);
+    const bodyH = Math.round(Hd - 72), h1 = Math.round((bodyH - 10) * 0.56), h2 = bodyH - 10 - h1;
+    const src = cf.altOn ? cf.alt : cf.main, other = cf.altOn ? cf.main : cf.alt;
+    const pre = src && PRE.has(src.grp), sv = src ? this.srcOf(src) : null;
+    const opre = other && PRE.has(other.grp), ov = other ? this.srcOf(other) : null;
+    const gSlot = st.slots.gate, cSlot = st.slots.comp, q = st.eq;
+    const gHas = !!q.bands.length;
+    const tile = (label, sub, badge, onClick, body, extra) => html`
+      <button onClick=${onClick} aria-label=${'Open ' + label}
+        style=${`min-width:0;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:10px;border:1px solid #2c2721;background:linear-gradient(180deg,#221f1b,#181614);color:var(--ink);text-align:left;cursor:pointer;overflow:hidden;${extra || ''}`}>
+        <span style="display:flex;align-items:center;gap:8px;width:100%">
+          <span style="font-size:15px;font-weight:700;letter-spacing:.14em;color:#e9dcc2">${label}</span>
+          <span style="flex:1;min-width:0;font-size:13px;color:#9b927f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</span>
+          ${badge}
+          <span style="color:#8a7d66;font-size:16px">›</span>
+        </span>
+        ${body}
+      </button>`;
+    const badge = (on, txt) => html`<span style=${`padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.1em;${on ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#141210;color:#8a8170;border:1px solid #3a342c'}`}>${txt}</span>`;
+    const chip = (txt, on, color) => html`<span style=${`padding:4px 9px;border-radius:6px;font-family:var(--mono);font-size:13px;${on ? `background:#2a2014;color:${color || 'var(--brass-hi)'};border:1px solid #8a6a3a` : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${txt}</span>`;
+    const ph = v => html`<span style=${`padding:4px 10px;border-radius:6px;font-weight:700;font-size:14px;${v ? 'background:#d0392b;color:#fff6ee;box-shadow:0 0 10px rgba(208,57,43,.5)' : 'background:#2a1513;color:#8a5a52'}`}>+48V</span>`;
+    const gV = s => s ? (this.srcOf(s).gain > 0 ? '+' : '') + this.srcOf(s).gain.toFixed(1) : '—';
+    const sends = ch.sends.slice(0, 16);
+    const mH = Math.max(40, h1 - 78);
+
+    return html`
+      ${this.chanHeader('Home', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>`)}
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
+          <div style=${`height:${h1}px;display:flex;gap:10px`}>
+            ${tile('INPUT', cf.altOn ? 'Alt on air' : 'Main on air', null, () => this.goTab('Config'), html`
+              <span style="display:flex;align-items:center;gap:8px">
+                <span style=${`padding:3px 9px;border-radius:5px;font-weight:700;font-size:13px;letter-spacing:.1em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
+                <span style="font-family:var(--mono);font-size:14px;color:var(--brass-hi)">${this.srcLabel(src)}</span>
+              </span>
+              <span style="font-size:16px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcName(src)}</span>
+              <span style="display:flex;align-items:flex-end;gap:10px">
+                <span style="display:flex;flex-direction:column;line-height:1">
+                  <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
+                  <span style="font-family:var(--mono);font-size:30px">${pre ? gV(src) : '—'}</span>
+                </span>
+                ${pre && ph(sv.ph)}
+              </span>
+              <span style="display:flex;flex-wrap:wrap;gap:5px">
+                ${chip('TRIM ' + (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1), cf.trim !== 0)}
+                ${chip('Ø', cf.inv)}
+                ${chip(cf.dlyOn ? 'DLY ' + cf.dly.toFixed(1) + 'ms' : 'DLY OFF', cf.dlyOn)}
+              </span>
+              <span style="margin-top:auto;padding-top:6px;border-top:1px solid #2c2721;display:flex;align-items:center;gap:8px;font-size:13px;color:#9b927f">
+                <span style="letter-spacing:.1em">${cf.altOn ? 'MAIN' : 'ALT'} standby</span>
+                <span style="font-family:var(--mono);color:#cbbd9f">${other ? this.srcLabel(other) : 'none'}</span>
+                ${opre && html`<span style="font-family:var(--mono);color:#cbbd9f">${gV(other)} dB</span>`}
+                ${opre && ov.ph && html`<span style="color:#ff8a7a;font-weight:700">48V</span>`}
+              </span>`, 'width:250px;flex:none')}
+            ${tile('GATE', gSlot, gSlot === 'Wing Gate' ? badge(st.gate.on, st.gate.on ? (st.gate.sim.gr < 3 ? 'OPEN' : 'CLOSED') : 'OFF') : null, () => this.goTab('Gate'), html`
+              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
+                ${gSlot === 'Wing Gate' ? this.miniGate(180, mH) : gSlot === DEQ ? this.miniEq('deq', 180, mH) : html`<span style="padding:10px;font-size:13px;color:#9b927f">${gSlot}</span>`}
+              </span>
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'Wing Gate' ? `THR ${st.gate.thr.toFixed(0)} · ${st.gate.ratio} · R ${st.gate.range.toFixed(0)}` : gSlot === DEQ ? '2 bands' : ''}</span>`, 'width:210px;flex:none')}
+            ${tile('EQ', q.bypass ? 'Bypassed' : q.bands.filter(b => b.on).length + ' bands on', null, () => this.goTab('EQ'), html`
+              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', 400, mH)}</span>
+              <span style="display:flex;gap:5px;flex-wrap:wrap">
+                ${q.lc.on && chip('LC ' + fmtF(q.lc.f), true, '#cfe0e5')}${q.hc.on && chip('HC ' + fmtF(q.hc.f), true, '#cfe0e5')}
+                ${q.bands.filter(b => b.on && Math.abs(b.g) >= 0.5).slice(0, 3).map(b => chip(b.id + ' ' + fmtF(b.f) + ' ' + (b.g > 0 ? '+' : '') + b.g.toFixed(1), true, b.color))}
+              </span>`, 'flex:1')}
+            ${tile('COMP', cSlot, null, () => this.goTab('Comp'), html`
+              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
+                ${cSlot === DEQ ? this.miniEq('deq', 180, mH) : this.miniComp(180, mH)}
+              </span>
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === DEQ ? '2 bands' : 'Panel coming next'}</span>`, 'width:210px;flex:none')}
+          </div>
+          <div style=${`height:${h2}px;display:flex;gap:10px`}>
+            ${tile('SENDS', 'Bus 1–16', null, () => this.toast('לשונית ה-Sends עוד לא נבנתה'), html`
+              <span style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;column-gap:18px;row-gap:3px">
+                ${sends.map((v, k) => html`<span style="min-height:0;display:flex;align-items:center;gap:8px">
+                  <span style="width:78px;flex:none;font-size:13px;color:${v > 0 ? '#e9dcc2' : '#6f675a'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${SEND_LBL[k]}</span>
+                  <span style="flex:1;height:6px;border-radius:3px;background:#0c0b0a;overflow:hidden"><span style=${`display:block;height:100%;width:${Math.round(v * 100)}%;background:${k < 8 ? '#c9a25a' : '#7aa7e0'}`}></span></span>
+                  <span style="width:44px;text-align:right;font-family:var(--mono);font-size:12px;color:#9b927f">${dbText(v)}</span>
+                </span>`)}
+              </span>`, 'flex:1')}
+            ${tile('INSERTS', '', null, () => this.toast('לשוניות ה-Inserts עוד לא נבנו'), html`
+              <span style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
+                ${['INS 1', 'INS 2'].map(n => html`<span style="height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:7px;border:1px dashed #3a342c;background:#141210">
+                  <span style="font-weight:700;letter-spacing:.1em;color:#b8a78a">${n}</span><span style="font-size:14px;color:#6f675a">Empty</span></span>`)}
+              </span>`, 'width:250px;flex:none')}
+          </div>
+        </div>
+        ${this.chanStrip(Hd)}
+      </div>`;
   }
 
   /* ---------- gate / comp slots ---------- */
@@ -756,14 +914,14 @@ class App extends Component {
   }
   /* ---------- Wing Gate ---------- */
   chanHeader(activeTab, right) {
-    const st = this.state, ch = st.chans[st.eqCh], tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    const st = this.state, ch = st.chans[st.eqCh], tabs = TABS;
     return html`
       <header class="topbar" style="height:52px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
         <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
         <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
         <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
         </nav>
         <span style="flex:1"></span>${right}
       </header>`;
@@ -771,7 +929,7 @@ class App extends Component {
   updGate(p) { this.setState(st => ({ gate: { ...st.gate, ...(typeof p === 'function' ? p(st.gate) : p) } })); }
   gateSim() {
     const st = this.state;
-    if (st.screen !== 'dyn' || st.slots[st.dynSlot] !== 'Wing Gate') return;
+    if (!((st.screen === 'dyn' && st.slots[st.dynSlot] === 'Wing Gate') || (st.screen === 'home' && st.slots.gate === 'Wing Gate'))) return;
     const G = st.gate, s = { ...G.sim }, dt = 0.05;
     s.t += dt;
     if (s.t >= s.next) { s.env = Math.max(s.env, -8 - Math.random() * 10); s.next = s.t + 0.42 + Math.random() * 0.45; }
@@ -800,7 +958,7 @@ class App extends Component {
     const dn = n => { n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); };
     const rnd = v => k === 'q' ? Math.round(v * 100) / 100 : (k === 'thr' || k === 'range' || (k === 'att' && v < 10)) ? Math.round(v * 10) / 10 : Math.round(v);
     const set = v => sc ? this.updGate(g => ({ sc: { ...g.sc, [k]: rnd(v) } })) : this.updGate({ [k]: rnd(v) });
-    return html`<button class="box" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
+    return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
       onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width }; }}
       onPointerMove=${e => { const d = this.gnd; if (d) set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
       onPointerUp=${() => { this.gnd = null; }} onPointerCancel=${() => { this.gnd = null; }}>
@@ -816,7 +974,7 @@ class App extends Component {
 
   renderGate(Hd) {
     const st = this.state, G = st.gate, S = G.sim, ch = st.chans[st.eqCh];
-    const H = Math.round(G.fs ? Hd - 114 : Hd - 244), P = H;
+    const H = Math.round(G.fs ? Hd - 122 : Hd - 244), P = H;
     const pl = 32, pt = 10, pw = P - 44, ph = P - 32;
     const X = db => pl + (clamp(db, -80, 0) + 80) / 80 * pw, Y = db => pt + (-clamp(db, -80, 0)) / 80 * ph;
     const HW = 1152 - P - 96 - 20;
@@ -864,12 +1022,13 @@ class App extends Component {
     return html`
       ${!G.fs ? this.chanHeader(st.dynSlot === 'gate' ? 'Gate' : 'Comp', html`
         ${this.modelBtn()}
-        <button class="small" aria-label="Full screen" onClick=${() => this.updGate({ fs: true })} style="display:flex;align-items:center;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>`)
-      : html`<header style="height:44px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
+        <button class="small" aria-label="Full screen" onClick=${() => this.updGate({ fs: true })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>`)
+      : html`<header style="height:52px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
           <span style=${'font-size:15px;font-weight:700;letter-spacing:.08em;color:' + ch.color}>${ch.name.toUpperCase()} · GATE</span>
           <span style="flex:1"></span>
           <div style="display:flex;gap:4px">${ratios.map(r => html`<button onClick=${() => this.updGate({ ratio: r })} aria-pressed=${String(G.ratio === r)}
             style=${`height:32px;display:flex;align-items:center;gap:4px;padding:0 10px;border-radius:6px;font-weight:700;font-size:14px;cursor:pointer;${G.ratio === r ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#cbbd9f'}`}>${this.shapeIcon(r)}${r}</button>`)}</div>
+          <button class="small" aria-label="Exit full screen" onClick=${() => this.updGate({ fs: false })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.unfull}</button>
         </header>`}
 
       <div style="flex:none;display:flex;gap:10px;padding:10px 14px 0">
@@ -956,7 +1115,6 @@ class App extends Component {
             <span style="font-family:var(--mono);font-size:15px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summary}</span>
           </div>
           ${onBtn('width:110px')}
-          <button class="pill on" style="width:110px" onClick=${() => this.updGate({ fs: false })}>EXIT</button>
         </div>`}
       ${st.keyPop && this.renderKeyPop(Hd)}
       ${st.chPick && this.renderChPick(Hd)}`;
@@ -1098,14 +1256,14 @@ class App extends Component {
     if (model === DEQ) { this.ek = 'deq'; return html`${this.renderEQ(Hd)}${st.modelPop && this.renderModelPop(Hd)}`; }
     if (model === 'Wing Gate') return html`${this.renderGate(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
     const ch = st.chans[st.eqCh], m = MODELS.find(x => x.name === model), activeTab = st.dynSlot === 'gate' ? 'Gate' : 'Comp';
-    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    const tabs = TABS;
     return html`
       <header class="topbar" style="height:52px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
         <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
         <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
         <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
         </nav>
         <span style="flex:1"></span>
         ${this.modelBtn()}
@@ -1123,7 +1281,8 @@ class App extends Component {
 
   /* ---------- channel config ---------- */
   goTab(t) {
-    if (t === 'EQ') this.setState({ screen: 'eq', lastTab: 'eq' });
+    if (t === 'Home') this.setState({ screen: 'home', lastTab: 'home' });
+    else if (t === 'EQ') this.setState({ screen: 'eq', lastTab: 'eq' });
     else if (t === 'Config') this.setState({ screen: 'config', lastTab: 'config' });
     else if (t === 'Gate' || t === 'Comp') this.setState({ screen: 'dyn', dynSlot: t === 'Gate' ? 'gate' : 'comp', lastTab: 'dyn' });
     else this.toast('הלשונית הזו עוד לא נבנתה');
@@ -1274,7 +1433,7 @@ class App extends Component {
     const FH = Math.round(Hd - 72 - 12 - 26 - 32 - 14 - 18), T = FH - 44;
     const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']].map(m => ({ label: m[1], c: Math.round((1 - m[0]) * T + 22) }));
     const segs = []; for (let k = 17; k >= 0; k--) { const lit = st.cfgLv[2] > k / 18; segs.push(k >= 16 ? (lit ? '#e0513f' : '#2f1714') : k >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); }
-    const tabs = ['Config','Gate','EQ','Comp','Ins 1','Ins 2','Sends'];
+    const tabs = TABS;
 
     return html`
       <header class="topbar" style="height:52px;gap:10px">
@@ -1282,7 +1441,7 @@ class App extends Component {
         <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
         <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
         <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === 'Config' ? ' on' : '')} onClick=${() => this.goTab(t)}>${t !== 'Config' && t !== 'Sends' ? IC.grip : ''}${t}</button>`)}
+          ${tabs.map(t => html`<button class=${'tab' + (t === 'Config' ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
         </nav>
         <span style="flex:1"></span>
         <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>
@@ -1486,7 +1645,7 @@ class App extends Component {
     return html`
       <div ref=${el => { this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
-          ${st.screen === 'main' ? this.renderMain(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'dyn' ? this.renderDyn(Hd) : (this.ek = 'eq', this.renderEQ(Hd))}
+          ${st.screen === 'main' ? this.renderMain(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'dyn' ? this.renderDyn(Hd) : (this.ek = 'eq', this.renderEQ(Hd))}
         </div>
         ${!st.started && html`
           <div class="overlay" dir="rtl">
