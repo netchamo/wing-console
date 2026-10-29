@@ -329,8 +329,8 @@ class App extends Component {
     // While the user moves a control, leave the line free for the moves themselves.
     if (sending) return;
     const n = this.pollN = (this.pollN || 0) + 1, q = [];
-    if (n % 40 === 1) q.push('/*s');                       // ask the WING to push changes (subscription), renewed every 8 s
-    if (n % 50 === 1) for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/name', chAddr(i) + '/col');
+    if (n % 45 === 1) q.push('/*S');                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
+    if (n % 50 === 1) for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo');
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
@@ -342,6 +342,7 @@ class App extends Component {
     for (const e of list) {
       if (e.type === 'osc' && this.testAddr && e.address === this.testAddr) { const a = e.args || []; this.testRead = typeof a[2] === 'number' ? a[2] : a[0]; }
       if (e.type === 'osc') { const h = this.holdUntil && this.holdUntil[e.address]; if (!(h && Date.now() < h)) osc.push(e); else C().lastRx = Date.now(); continue; }
+      if (e.type === 'meters') { this.realM = { ch: e.ch, main: e.main, t: Date.now() }; continue; }
       if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
       if (e.type === 'net') { C().wifi = !!e.wifi; continue; }
       if (e.type === 'found') {
@@ -366,15 +367,16 @@ class App extends Component {
         const chans = st.chans.slice(); let main = st.main, touched = false;
         for (const m of osc) {
           const a = m.args || [];
-          let mm = /^\/(ch|aux)\/(\d+)\/(name|col|fdr|mute)$/.exec(m.address);
+          let mm = /^\/(ch|aux)\/(\d+)\/(\$?name|\$?col|fdr|mute|\$solo)$/.exec(m.address);
           if (mm) {
             const i = mm[1] === 'ch' ? +mm[2] - 1 : 39 + +mm[2];
             if (i < 0 || i >= 48) continue;
             const ch = { ...chans[i] };
             if (mm[3] === 'fdr' && typeof a[1] === 'number') ch.v = clamp(a[1], 0, 1);
             else if (mm[3] === 'mute') ch.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
-            else if (mm[3] === 'name' && typeof a[0] === 'string') ch.name = a[0].trim() || (i < 40 ? 'Ch ' + (i + 1) : 'Aux ' + (i - 39));
-            else if (mm[3] === 'col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
+            else if (mm[3] === '$solo') ch.solo = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
+            else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') ch.name = a[0].trim() || (i < 40 ? 'Ch ' + (i + 1) : 'Aux ' + (i - 39));
+            else if (mm[3] === 'col' || mm[3] === '$col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
             chans[i] = ch; touched = true; continue;
           }
           mm = /^\/main\/1\/(fdr|mute)$/.exec(m.address);
@@ -396,11 +398,13 @@ class App extends Component {
     });
   }
   tick() {
-    if (this.isLinked() && this.state.screen === 'main' && !this.state.lv.some(x => x > 0.001)) return;
+    const M = this.isLinked() && this.realM && Date.now() - this.realM.t < 1500 ? this.realM : null;
+    const mN = db => clamp((db + 60) / 60, 0, 1);
+    if (this.isLinked() && !M && this.state.screen === 'main' && !this.state.lv.some(x => x > 0.001)) return;
     this.setState(st => {
       const lv = st.lv.map((old, j) => {
         let t;
-        if (this.isLinked()) t = 0;
+        if (this.isLinked()) t = M ? mN(j < 8 ? M.ch[st.bank * 8 + j] : M.main) : 0;
         else if (j < 8) { const c = st.chans[st.bank * 8 + j]; t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35)); }
         else t = st.main.mute ? 0 : Math.min(1, 0.68 * Math.sqrt(st.main.v / 0.75) * (0.85 + Math.random() * 0.2));
         return t > old ? t : old * 0.82;
@@ -408,7 +412,7 @@ class App extends Component {
       if (st.screen === 'config' || st.screen === 'home') {
         const c = st.chans[st.eqCh], cf = this.cfgOf(st.eqCh);
         const lvl = s => { if (!s) return 0; const sv = this.srcOf(s); const g = PRE.has(s.grp) ? sv.gain : 30; return Math.min(1, (0.18 + g / 60) * (0.75 + Math.random() * 0.35)); };
-        const tg = [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
+        const tg = this.isLinked() ? [0, 0, M ? mN(M.ch[st.eqCh]) : 0] : [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
         return { lv, cfgLv: st.cfgLv.map((o, k) => tg[k] > o ? tg[k] : o * 0.82) };
       }
       const key = st.screen === 'eq' ? 'eq' : st.screen === 'dyn' && st.slots[st.dynSlot] === DEQ ? 'deq' : null;

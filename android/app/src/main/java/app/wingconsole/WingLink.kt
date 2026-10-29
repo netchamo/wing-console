@@ -37,6 +37,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     private val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val wifiManager = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val sendQueue = Executors.newSingleThreadExecutor()
+    private val meters = WingMeters(emit) { d, t -> log(d, t) }
 
     @Volatile private var wifiNet: Network? = null
     @Volatile private var socket: DatagramSocket? = null
@@ -75,6 +76,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     }
 
     fun stop() {
+        meters.stop()
         running = false
         runCatching { cm.unregisterNetworkCallback(netCallback) }
         closeSocket()
@@ -209,9 +211,12 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         running = true
         status("connecting", ip)
         thread(name = "wing-rx") { receiveLoop() }
+        val t = target
+        thread(name = "wing-meters-start") { meters.start(ip, netFor(t)) }
     }
 
     fun disconnect() {
+        meters.stop()
         live = false
         running = false
         target = null
