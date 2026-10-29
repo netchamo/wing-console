@@ -264,6 +264,29 @@ class App extends Component {
     const bits = +m[5], mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
     return ((n(m) & mask) >>> 0) === ((n(t) & mask) >>> 0);
   }
+  /* Diagnostics: try three documented write formats on channel 33's fader, read back after each, then restore. */
+  async testWrite() {
+    if (!this.canSend() || !this.state.conn.live) { this.toast('הדלק LIVE ON כדי להריץ את הבדיקה'); return; }
+    if (this.testing) return;
+    this.testing = true;
+    const A = '/ch/33', F = A + '/fdr', L = t => { this.logLine('sys', 'TEST ' + t); this.setState(st => ({ logV: st.logV + 1 })); };
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const hold = () => { this.lastSend = Date.now(); };
+    const read = async () => { this.testRead = undefined; this.testAddr = F; hold(); NATIVE.query(F); for (let k = 0; k < 10 && this.testRead === undefined; k++) await wait(60); return this.testRead; };
+    try {
+      const orig = await read();
+      L('ch 33 fader now: ' + orig);
+      if (orig === undefined) { L('no answer when reading ch 33, test stopped'); return; }
+      const tries = [['A  ,f -20.0', () => NATIVE.set(F, 'f', '-20')], ['B  ,s "-25"', () => NATIVE.set(F, 's', '-25')], ['C  node /ch/33 ,s "fdr=-30"', () => NATIVE.set(A, 's', 'fdr=-30')]];
+      for (const [name, fn] of tries) {
+        hold(); fn(); await wait(450);
+        const v = await read();
+        L(name + '  → mixer reads ' + v);
+      }
+      hold(); NATIVE.set(F, 'f', String(orig)); await wait(300); NATIVE.set(A, 's', 'fdr=' + orig); await wait(400);
+      L('restored → mixer reads ' + await read());
+    } finally { this.testing = false; this.testAddr = null; }
+  }
   canSend() { return !!NATIVE && typeof NATIVE.set === 'function' && typeof NATIVE.setLive === 'function'; }
   setLive(on) {
     if (on && !this.canSend()) { this.toast('צריך להתקין את הגרסה החדשה של האפליקציה (APK) כדי לשלוט במיקסר'); this.setState({ liveAsk: false }); return; }
@@ -317,6 +340,7 @@ class App extends Component {
     let conn = null;
     const C = () => conn || (conn = { ...this.state.conn });
     for (const e of list) {
+      if (e.type === 'osc' && this.testAddr && e.address === this.testAddr) { const a = e.args || []; this.testRead = typeof a[2] === 'number' ? a[2] : a[0]; }
       if (e.type === 'osc') { const h = this.holdUntil && this.holdUntil[e.address]; if (!(h && Date.now() < h)) osc.push(e); else C().lastRx = Date.now(); continue; }
       if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
       if (e.type === 'net') { C().wifi = !!e.wifi; continue; }
@@ -361,7 +385,7 @@ class App extends Component {
           } else {
             // log each unknown address once (the WING pushes e.g. /play/$pos every second); errors always
             const seen = this.seenAddr || (this.seenAddr = new Set());
-            const err = a.some(x => typeof x === 'string' && /ERROR|NOT FOUND|NOT PAR/i.test(x));
+            const err = a.some(x => typeof x === 'string' && /ERROR|NOT FOUND|NOT PAR|^OK$/i.test(x));
             if (err || !seen.has(m.address)) { seen.add(m.address); this.logLine('in', m.address + ' ' + JSON.stringify(a) + (err ? '' : '  (further ones hidden)')); }
           }
         }
@@ -1033,6 +1057,7 @@ class App extends Component {
               <span style="font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">DIAGNOSTICS</span>
               <span style="font-size:12px;color:#8a8170">App ${(() => { try { return NATIVE.version(); } catch (e) { return ''; } })()}</span>
               <span style="flex:1"></span>
+              <button class="small" style="height:36px" disabled=${!c.live} onClick=${() => this.testWrite()}>TEST WRITE · CH 33</button>
               <button class="small" style="height:36px" onClick=${() => { NATIVE.copy((this.logLines || []).join('\n')); this.toast('היומן הועתק. אפשר להדביק אותו בצ׳אט'); }}>COPY LOG</button>
             </div>
             <pre style="flex:1;min-height:0;margin:0;padding:10px 12px;overflow:auto;touch-action:pan-y;overscroll-behavior:contain;border-radius:8px;background:#0a0908;border:1px solid #2c2721;font-family:var(--mono);font-size:12px;line-height:1.5;color:#b9ad95;white-space:pre-wrap;word-break:break-all">${(this.logLines || []).slice(-60).join('\n') || 'No messages yet.'}</pre>

@@ -240,7 +240,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         log("sys", if (on) "LIVE CONTROL ON: changes are sent to the mixer" else "live control off: reading only")
     }
 
-    /** Send one value. Refused unless live control is on. type: "f" (float) or "i" (int). */
+    /** Send one value. Refused unless live control is on. type: "f" (float), "i" (int) or "s" (string). */
     fun set(address: String, type: String, value: String) {
         if (!live) { log("err", "blocked (live control off): $address $value"); return }
         val t = target ?: return
@@ -248,6 +248,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         val arg = when (type) {
             "f" -> ByteBuffer.allocate(4).putFloat(value.toFloatOrNull() ?: return).array()
             "i" -> ByteBuffer.allocate(4).putInt(value.toIntOrNull() ?: return).array()
+            "s" -> oscString(value)
             else -> return
         }
         val bytes = oscString(address) + oscString(",$type") + arg
