@@ -1,6 +1,12 @@
 package app.wingconsole
 
 import android.app.Activity
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.net.Uri
+import android.os.Environment
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
@@ -100,6 +106,7 @@ class MainActivity : Activity() {
         link.start()
         web.loadUrl("https://$HOST/index.html")
         checkWebUpdate()
+        checkApkUpdate()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -108,6 +115,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        updateReceiver?.let { runCatching { unregisterReceiver(it) } }
         link.stop()
         super.onDestroy()
     }
@@ -172,6 +180,63 @@ class MainActivity : Activity() {
         }
     }
 
+    // ------------------------------------------------------------ app (APK) updates
+
+    private fun versionCode(): Long = runCatching { packageManager.getPackageInfo(packageName, 0).longVersionCode }.getOrDefault(0L)
+
+    /** Asks GitHub which build is the latest release; tells the page when it is newer than this one. */
+    private fun checkApkUpdate() {
+        thread(name = "apk-update") {
+            try {
+                val c = URL(RELEASE_API).openConnection() as HttpURLConnection
+                c.connectTimeout = 5000; c.readTimeout = 8000
+                c.setRequestProperty("Accept", "application/vnd.github+json")
+                c.setRequestProperty("User-Agent", "WingConsole")
+                if (c.responseCode != 200) return@thread
+                val body = JSONObject(c.inputStream.bufferedReader().readText()).optString("body")
+                val build = Regex("Build #(\\d+)").find(body)?.groupValues?.get(1)?.toLongOrNull() ?: return@thread
+                if (build > versionCode()) post(JSONObject().put("type", "apkUpdate").put("build", build).put("current", versionCode()))
+            } catch (_: Exception) { /* no internet */ }
+        }
+    }
+
+    @Volatile private var updateId = -1L
+    private var updateReceiver: BroadcastReceiver? = null
+
+    private fun startUpdateDownload() {
+        val dm = getSystemService(DownloadManager::class.java)
+        if (updateId >= 0) runCatching { dm.remove(updateId) }
+        val req = DownloadManager.Request(Uri.parse(APK_URL))
+            .setTitle("Wing Console")
+            .setDescription("מוריד עדכון")
+            .setMimeType(APK_MIME)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "wing-console-${System.currentTimeMillis()}.apk")
+        updateId = dm.enqueue(req)
+        if (updateReceiver == null) {
+            val r = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                    if (id == updateId) installDownloaded(id)
+                }
+            }
+            val f = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+            if (Build.VERSION.SDK_INT >= 33) registerReceiver(r, f, Context.RECEIVER_EXPORTED) else registerReceiver(r, f)
+            updateReceiver = r
+        }
+    }
+
+    private fun installDownloaded(id: Long) {
+        val dm = getSystemService(DownloadManager::class.java)
+        val uri = dm.getUriForDownloadedFile(id) ?: return
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, APK_MIME)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        }
+    }
+
     // ------------------------------------------------------------ bridge
 
     inner class Bridge {
@@ -199,11 +264,41 @@ class MainActivity : Activity() {
             }
         }
         @JavascriptInterface fun reload() { main.post { web.reload() } }
+        @JavascriptInterface fun build(): Long = versionCode()
+        @JavascriptInterface fun checkUpdate() = checkApkUpdate()
+        /** Downloads the latest APK and opens the system installer. Returns "ok", or "perm" when Android first needs permission. */
+        @JavascriptInterface fun downloadUpdate(): String {
+            if (!packageManager.canRequestPackageInstalls()) {
+                main.post { runCatching { startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) } }
+                return "perm"
+            }
+            main.post { startUpdateDownload() }
+            return "ok"
+        }
+        /** 0–99 while downloading, 100 when done, -1 if it failed or nothing is running. */
+        @JavascriptInterface fun updateProgress(): Int {
+            val id = updateId
+            if (id < 0) return -1
+            val dm = getSystemService(DownloadManager::class.java)
+            dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+                if (!c.moveToFirst()) return -1
+                val status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                if (status == DownloadManager.STATUS_FAILED) return -1
+                if (status == DownloadManager.STATUS_SUCCESSFUL) return 100
+                val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                return if (total > 0) ((done * 99) / total).toInt() else 0
+            }
+            return -1
+        }
     }
 
     companion object {
         const val HOST = "appassets.androidplatform.net"
         const val UPDATE_URL = "https://netchamo.github.io/wing-console/app/index.html"
+        const val RELEASE_API = "https://api.github.com/repos/netchamo/wing-console/releases/tags/latest"
+        const val APK_URL = "https://github.com/netchamo/wing-console/releases/download/latest/wing-console.apk"
+        const val APK_MIME = "application/vnd.android.package-archive"
         const val CDN_HTM = "https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js"
     }
 }
