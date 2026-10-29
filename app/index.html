@@ -257,6 +257,7 @@ class App extends Component {
   }
   myAddr() { try { return typeof NATIVE.wifiAddress === 'function' ? NATIVE.wifiAddress() : ''; } catch (e) { return ''; } }
   sameNet(cidr, ip) {
+    if ((cidr || '').includes(',')) { const r = cidr.split(',').map(x => this.sameNet(x.trim(), ip)); return r.includes(true) ? true : r.includes(false) ? false : null; }
     const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)$/.exec(cidr || ''), t = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(ip || '');
     if (!m || !t) return null;
     const n = a => ((+a[1] << 24) >>> 0) + (+a[2] << 16) + (+a[3] << 8) + +a[4];
@@ -991,7 +992,7 @@ class App extends Component {
               <span style="display:flex;flex-direction:column;line-height:1.25">
                 <span style=${`font-size:15px;color:${c.wifi === false ? '#ff9a8a' : '#cbbd9f'}`}>${c.wifi === false ? 'Not connected to Wi-Fi' : c.wifi ? 'Connected · link locked to Wi-Fi' : 'Checking…'}</span>
                 ${(() => { const me = this.myAddr(); if (!me) return null; const same = this.sameNet(me, c.ip);
-                  return html`<span style=${`font-family:var(--mono);font-size:13px;color:${same === false ? '#ff9a8a' : '#9b927f'}`}>This device ${me.split('/')[0]}${same === false ? ' · different network from ' + c.ip : ''}</span>`; })()}
+                  return html`<span style=${`font-family:var(--mono);font-size:13px;color:${same === false ? '#ff9a8a' : '#9b927f'}`}>This device ${me.split(',').map(x => x.trim().split('/')[0]).join(', ')}${same === false ? ' · different network from ' + c.ip : ''}</span>`; })()}
               </span>
               <span style="flex:1"></span>
               <button class="small" style="height:38px" onClick=${() => NATIVE.openWifi()}>WI-FI</button>
