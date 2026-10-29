@@ -79,6 +79,17 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
 
     fun wifiAvailable() = wifiNet != null
 
+    /** This device's address on the Wi-Fi, e.g. "192.168.1.23/24", or "" when not on Wi-Fi. */
+    fun wifiAddress(): String {
+        val net = wifiNet ?: return ""
+        val lp = cm.getLinkProperties(net) ?: return ""
+        for (la in lp.linkAddresses) {
+            val a = la.address as? Inet4Address ?: continue
+            return "${a.hostAddress}/${la.prefixLength}"
+        }
+        return ""
+    }
+
     // ------------------------------------------------------------ discovery
 
     fun discover(hint: String?) {
@@ -201,7 +212,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             runCatching { s.send(DatagramPacket(bytes, bytes.size, t, OSC_PORT)) }
                 .onFailure { log("err", "send: ${it.message}") }
         }
-        log("out", "$address = $value")
+        // not logged per message: a fader drag sends dozens per second
     }
 
     /** Re-creates the socket when Wi-Fi changed, so the link follows the phone between networks. */
