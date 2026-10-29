@@ -194,6 +194,8 @@ class App extends Component {
       chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, lv: [0,0,0,0,0,0,0,0,0],
       panPop: null, sendPop: null, eq: makeEq(),
       lastTab: 'home', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
+      otherModel: { gate: 'Wing Expander', comp: 'BDX 160' }, dragPop: false, connPop: false,
+      conn: { ip: (() => { try { return localStorage.getItem('wing.ip') || ''; } catch (e) { return ''; } })() },
       deq: makeDeq(), slots: { gate: 'Wing Gate', comp: 'Wing Comp' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
       gate: { on: true, thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, ratio: '1:3', fs: false,
         sc: { on: false, type: 'BP', f: 1000, q: 1, src: 'SELF', tap: 'IN' },
@@ -359,6 +361,9 @@ class App extends Component {
           <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
           <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
         </div>
+        <button onClick=${() => this.setState({ connPop: true })} aria-label="Mixer connection"
+          style="height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid #6a4a2a;background:#1d1611;color:#f3c27a;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer">
+          <span style="width:10px;height:10px;border-radius:50%;background:#e8a33d;box-shadow:0 0 8px #e8a33d"></span>DEMO · NOT CONNECTED</button>
         <div style="flex:1;display:flex;justify-content:center">
           <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
         </div>
@@ -380,6 +385,7 @@ class App extends Component {
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
       </div>
       ${st.sendPop && this.renderSends(Hd)}
+      ${st.connPop && this.renderConnPop(Hd)}
       ${st.panPop && this.renderPan(Hd)}`;
   }
 
@@ -582,9 +588,11 @@ class App extends Component {
   }
   box(k, label, value, color, op, extraStyle) {
     return html`<button class="box" style=${`opacity:${op};${extraStyle || ''}`} aria-label=${label + ' ' + value + ', drag sideways'}
-      onPointerDown=${e => { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.nd = { k, sx: e.clientX, n0: this.norm(k, this.getVal(k)), w: r.width }; }}
-      onPointerMove=${e => { const d = this.nd; if (d) this.setVal(d.k, this.denorm(d.k, d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-      onPointerUp=${() => { this.nd = null; }} onPointerCancel=${() => { this.nd = null; }}>
+      onPointerDown=${e => { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.nd = { k, sx: e.clientX, n0: this.norm(k, this.getVal(k)), w: r.width, moved: false }; }}
+      onPointerMove=${e => { const d = this.nd; if (!d) return;
+        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.fmtEq(k), () => this.norm(k, this.getVal(k))); }
+        this.setVal(d.k, this.denorm(d.k, d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
+      onPointerUp=${() => { this.nd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.nd = null; this.hideDragPop(); }}>
       <b>${label}</b><em>${value}</em><s style=${`width:${Math.round(this.norm(k, this.getVal(k)) * 100)}%;background:${color}`}></s></button>`;
   }
 
@@ -639,7 +647,7 @@ class App extends Component {
           </nav>
           <span style="flex:1"></span>
           ${D && this.modelBtn()}
-          ${rangeBtn(36)}${!D && rtaBtn(36)}${bypBtn('', 'small')}
+          ${!D && rangeBtn(36)}${!D && rtaBtn(36)}${!D && bypBtn('', 'small')}
           <button class="small" aria-label="Full screen" onClick=${() => this.updEq({ fs: true })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.full}</button>
         </header>` : html`
         <header style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
@@ -709,7 +717,7 @@ class App extends Component {
           </section>
           ${D ? html`
           <section class="sec" style="flex:420 1 0">
-            <div style="display:flex;gap:6px">${lisBtn('flex:1;border-radius:6px')}</div>
+            <div style="display:flex;gap:6px">${lisBtn('flex:1;border-radius:6px')}${bypBtn('flex:1;border-radius:6px', 'pill')}</div>
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px">
               ${this.box('thr', 'Threshold', sb.thr.toFixed(1) + ' dB', '#f3c27a', 1, 'grid-column:span 2')}
               ${this.box('att', 'Attack', sb.att.toFixed(1) + ' ms', '#f3c27a', 1)}
@@ -729,6 +737,75 @@ class App extends Component {
           </div>
           ${D && lisBtn('width:110px')}${bypBtn('width:110px', 'pill')}
         </div>`}`;
+  }
+
+  /* ---------- drag value pop-up (shown only while a value box is dragged) ---------- */
+  showDragPop(label, color, text, pct) { this.dragInfo = { label, color, text, pct }; this.setState({ dragPop: true }); }
+  hideDragPop() { if (this.state.dragPop) this.setState({ dragPop: false }); }
+  fmtEq(k) {
+    const v = this.getVal(k);
+    if (k === 'f' || k === 'lc' || k === 'hc') return fmtF(v);
+    if (k === 'g' || k === 'range' || k === 'tilt') return fmtDb(v);
+    if (k === 'q') return v.toFixed(2);
+    if (k === 'thr') return v.toFixed(1) + ' dB';
+    if (k === 'att') return v.toFixed(1) + ' ms';
+    return Math.round(v) + ' ms';
+  }
+  fmtGate(key) {
+    const G = this.state.gate;
+    if (key === 'sc.f') return fmtF(G.sc.f);
+    if (key === 'sc.q') return G.sc.q.toFixed(2);
+    const v = G[key];
+    if (key === 'thr' || key === 'range') return v.toFixed(1) + ' dB';
+    if (key === 'acc') return String(v);
+    return v + ' ms';
+  }
+  renderDragPop() {
+    const d = this.dragInfo, pct = Math.round(clamp(d.pct(), 0, 1) * 100);
+    return html`<div aria-hidden="true" style="position:absolute;left:390px;top:66px;width:400px;z-index:15;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 20px 16px;border-radius:14px;background:rgba(26,24,21,.96);border:1px solid #5a4630;box-shadow:0 18px 40px rgba(0,0,0,.6)">
+      <span style="font-size:14px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#b8a78a">${d.label}</span>
+      <span style="font-family:var(--mono);font-size:40px;line-height:1;color:var(--ink)">${d.text()}</span>
+      <span style="width:100%;height:8px;border-radius:4px;background:#0c0b0a;overflow:hidden"><span style=${`display:block;height:100%;width:${pct}%;border-radius:4px;background:${d.color}`}></span></span>
+    </div>`;
+  }
+
+  /* ---------- mixer connection ---------- */
+  renderConnPop(Hd) {
+    const st = this.state, close = () => this.setState({ connPop: false });
+    const setIp = v => { this.setState({ conn: { ...st.conn, ip: v } }); try { localStorage.setItem('wing.ip', v); } catch (e) {} };
+    const wifi = () => {
+      try { location.href = 'intent:#Intent;action=android.settings.WIFI_SETTINGS;end'; } catch (e) {}
+      setTimeout(() => { if (document.visibilityState === 'visible') this.toast('פתח את הגדרות ה-Wi-Fi בטלפון וחבר אותו לרשת של המיקסר'); }, 900);
+    };
+    return html`
+      <button class="scrim" aria-label="Close connection" onClick=${close}></button>
+      <div class="pop" style=${`left:250px;top:${Math.max(30, Math.round((Hd - 430) / 2))}px;width:680px;padding:20px 22px;gap:14px;border-color:#8a6a3a`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style="width:12px;height:12px;border-radius:50%;background:#e8a33d;box-shadow:0 0 8px #e8a33d"></span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">Mixer connection</span>
+          <span style="flex:1"></span>
+          <button class="small" onClick=${close}>CLOSE</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;background:#141210;border:1px solid #2c2721">
+          <span style="font-weight:700;letter-spacing:.1em;color:#f3c27a">DEMO</span>
+          <span style="color:#cbbd9f;font-size:15px">Not connected. The screens show sample data.</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:stretch">
+          <label for="wingIp" style="display:flex;flex-direction:column;justify-content:center;font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">MIXER IP</label>
+          <input id="wingIp" inputmode="decimal" placeholder="192.168.1.62" value=${st.conn.ip} onInput=${e => setIp(e.currentTarget.value.trim())}
+            style="flex:1;min-width:0;height:48px;padding:0 14px;border-radius:8px;border:1px solid #3a342c;background:#0e0d0b;color:var(--ink);font-family:var(--mono);font-size:20px;user-select:text;-webkit-user-select:text;touch-action:manipulation"/>
+          <button class="pill on" style="width:130px;height:48px" onClick=${() => this.toast('החיבור למיקסר עוד לא נבנה. זה השלב הבא')}>CONNECT</button>
+        </div>
+        <div style="display:flex;gap:10px">
+          <button class="pill" style="flex:1;height:48px" onClick=${wifi}>Wi-Fi settings</button>
+          <button class="pill" style="flex:1;height:48px;opacity:.5" disabled aria-disabled="true">Live control: OFF</button>
+        </div>
+        <div dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;line-height:1.6;color:#d9cdb3">
+          <div>1. חבר את הטלפון לאותה רשת Wi-Fi שהמיקסר מחובר אליה.</div>
+          <div>2. את כתובת ה-IP של ה-Wing מוצאים במיקסר במסך ההגדרות, תחת הרשת.</div>
+          <div>3. בהתחברות האפליקציה רק <b>קוראת</b> מהמיקסר. היא לא משנה בו שום דבר עד שמדליקים <b>Live control</b>.</div>
+        </div>
+      </div>`;
   }
 
   /* ---------- channel home (overview) ---------- */
@@ -886,9 +963,20 @@ class App extends Component {
 
   /* ---------- gate / comp slots ---------- */
   modelBtn() {
-    const m = this.state.slots[this.state.dynSlot];
-    return html`<button class="small" onClick=${() => this.setState({ modelPop: true })} style="display:flex;align-items:center;gap:8px;border-color:#8a6a3a">
-      <span style="font-size:11px;letter-spacing:.14em;color:#b8a78a">MODEL</span>${m}<span style="color:#b8a78a">▾</span></button>`;
+    const st = this.state, slot = st.dynSlot, cur = st.slots[slot];
+    const def = slot === 'gate' ? 'Wing Gate' : 'Wing Comp', other = st.otherModel[slot];
+    const isOther = cur !== def && cur !== DEQ;
+    const pick = name => this.setState(s => ({ slots: { ...s.slots, [slot]: name } }));
+    const on = 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)', off = 'background:#141210;border:1px solid #3a342c;color:#cbbd9f';
+    const b = 'height:40px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.06em;cursor:pointer;white-space:nowrap;';
+    return html`<div style="display:flex;align-items:center;gap:4px" role="group" aria-label="Slot model">
+      <button onClick=${() => pick(def)} aria-pressed=${String(cur === def)} style=${b + 'border-radius:7px;' + (cur === def ? on : off)}>${slot === 'gate' ? 'GATE' : 'COMP'}</button>
+      <button onClick=${() => pick(DEQ)} aria-pressed=${String(cur === DEQ)} style=${b + 'border-radius:7px;' + (cur === DEQ ? on : off)}>DYN EQ</button>
+      <span style="display:flex">
+        <button onClick=${() => pick(isOther ? cur : other)} aria-pressed=${String(isOther)} style=${b + 'max-width:130px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${isOther ? cur : other}</button>
+        <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:34px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;' + (isOther ? on : off)}>▾</button>
+      </span>
+    </div>`;
   }
   renderModelPop(Hd) {
     const st = this.state, cur = st.slots[st.dynSlot], close = () => this.setState({ modelPop: false });
@@ -902,7 +990,7 @@ class App extends Component {
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
           ${MODELS.map(m => { const on = m.name === cur; return html`
-            <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [s.dynSlot]: m.name }, modelPop: false }))} aria-pressed=${String(on)}
+            <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [s.dynSlot]: m.name }, modelPop: false, otherModel: m.name !== DEQ && m.name !== (s.dynSlot === 'gate' ? 'Wing Gate' : 'Wing Comp') ? { ...s.otherModel, [s.dynSlot]: m.name } : s.otherModel }))} aria-pressed=${String(on)}
               style=${`height:70px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:8px;cursor:pointer;text-align:left;
                 ${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : m.name === DEQ ? 'background:#121c1f;border:1px solid #3b5258;color:#cfe0e5' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
               <span style="font-size:20px;font-weight:700;letter-spacing:.03em">${m.name}</span>
@@ -959,9 +1047,11 @@ class App extends Component {
     const rnd = v => k === 'q' ? Math.round(v * 100) / 100 : (k === 'thr' || k === 'range' || (k === 'att' && v < 10)) ? Math.round(v * 10) / 10 : Math.round(v);
     const set = v => sc ? this.updGate(g => ({ sc: { ...g.sc, [k]: rnd(v) } })) : this.updGate({ [k]: rnd(v) });
     return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
-      onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width }; }}
-      onPointerMove=${e => { const d = this.gnd; if (d) set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-      onPointerUp=${() => { this.gnd = null; }} onPointerCancel=${() => { this.gnd = null; }}>
+      onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width, moved: false }; }}
+      onPointerMove=${e => { const d = this.gnd; if (!d) return;
+        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.fmtGate(key), () => nrm(get())); }
+        set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
+      onPointerUp=${() => { this.gnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.gnd = null; this.hideDragPop(); }}>
       <b>${label}</b><em>${text}</em><s style=${`width:${Math.round(nrm(get()) * 100)}%;background:${color}`}></s></button>`;
   }
   shapeIcon(r) {
@@ -1048,7 +1138,10 @@ class App extends Component {
           ${ticks.map(t => html`<span class="gl" style=${`left:${X(t) - 14}px;bottom:3px;width:28px;text-align:center;color:#9b927f`}>${t}</span>`)}
           ${ticks.slice(0, 4).map(t => html`<span class="gl" style=${`left:2px;top:${Y(t) - 7}px;width:26px;text-align:right;color:#9b927f`}>${t}</span>`)}
           <span style=${`position:absolute;right:10px;top:10px;padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.14em;border:1px solid ${lc};color:${lc};background:rgba(0,0,0,.4)`}>${G.on ? (isOpen ? 'OPEN' : 'CLOSED') : 'BYPASS'}</span>
-          <span style=${`position:absolute;left:${X(G.thr)}px;top:${Y(G.thr)}px;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid #f3c27a;background:rgba(243,194,122,.12);box-shadow:0 0 14px rgba(243,194,122,.45);pointer-events:none`}></span>
+          <button aria-label=${'Threshold ' + G.thr.toFixed(1) + ' dB. Drag up or right to raise'} onPointerDown=${e => thrDrag(e, 'graph')} onPointerMove=${thrMove} onPointerUp=${gEnd} onPointerCancel=${gEnd}
+            style=${`position:absolute;left:${X(G.thr)}px;top:${Y(G.thr)}px;width:52px;height:52px;margin:-26px 0 0 -26px;padding:0;border:none;background:transparent;cursor:move;touch-action:none`}>
+            <span style="position:absolute;inset:11px;border-radius:50%;border:3px solid #f3c27a;background:rgba(243,194,122,.14);box-shadow:0 0 14px rgba(243,194,122,.45)"></span>
+          </button>
           <span style=${`position:absolute;left:${X(G.thr) + (G.thr > -20 ? -104 : 20)}px;top:${Y(G.thr) - 30}px;font-family:var(--mono);font-size:13px;color:#f3c27a;white-space:nowrap;pointer-events:none`}>THR ${G.thr.toFixed(1)}</span>
           <span style=${`position:absolute;left:${X(-80 + G.range) + 8}px;top:${Y(-80) - 22}px;font-size:12px;font-weight:700;letter-spacing:.08em;color:#e0513f;opacity:.8;pointer-events:none`}>RANGE ${G.range.toFixed(0)}</span>
         </div>
@@ -1335,7 +1428,7 @@ class App extends Component {
     if (!d.moved && Math.abs(delta) > 4) { d.moved = true; clearTimeout(this.kt); if (d.key === 'bal') this.setState({ balPop: { pinned: false } }); }
     if (!d.moved) return;
     const span = d.key === 'trim' ? 36 : 18, lim = span / 2;
-    let v = clamp(d.start + delta / (d.h * 2.2) * span, -lim, lim);
+    let v = clamp(d.start + delta / (d.h * (d.key === 'bal' ? 5 : 4)) * span, -lim, lim);
     v = Math.round(v * 10) / 10; if (Math.abs(v) < 0.15) v = 0;
     this.updCfg(this.state.eqCh, { [d.key]: v });
   }
@@ -1645,6 +1738,7 @@ class App extends Component {
     return html`
       <div ref=${el => { this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
+          ${st.dragPop && this.dragInfo && this.renderDragPop()}
           ${st.screen === 'main' ? this.renderMain(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'dyn' ? this.renderDyn(Hd) : (this.ek = 'eq', this.renderEQ(Hd))}
         </div>
         ${!st.started && html`
