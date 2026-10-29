@@ -267,6 +267,30 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         if (n == 1 || n % 50 == 0) log("out", "sent #$n: $address ,$type $value (${bytes.size} bytes to ${t.hostAddress}:$OSC_PORT)")
     }
 
+    /**
+     * Send one value over the native protocol (TCP 2222), the way Behringer's apps and Mixing Station
+     * do. Refused unless live control is on. id: the WING property id; type "f" or "i".
+     * Encoding from libwing set_float / set_int: D7 + id (4 bytes) [+ D5 + float] or [int].
+     * Any 0xDF byte in the payload is escaped as DF DE.
+     */
+    fun setNative(id: Int, type: String, value: String) {
+        if (!live) { log("err", "blocked (live control off): id $id $value"); return }
+        val buf = ByteArrayOutputStream()
+        fun esc(v: Int) { val x = v and 0xff; buf.write(x); if (x == 0xdf) buf.write(0xde) }
+        fun esc32(v: Int) { esc(v ushr 24); esc(v ushr 16); esc(v ushr 8); esc(v) }
+        buf.write(0xd7); esc32(id)
+        when (type) {
+            "f" -> { buf.write(0xd5); esc32(java.lang.Float.floatToIntBits(value.toFloatOrNull() ?: return)) }
+            "i" -> { val v = value.toIntOrNull() ?: return; if (v in 0..0x3f) buf.write(v) else { buf.write(0xd4); esc32(v) } }
+            else -> return
+        }
+        if (!meters.write(buf.toByteArray())) { log("err", "native link not open, change not sent"); return }
+        val n = ++sentCount
+        if (n == 1 || n % 50 == 0) log("out", "native #$n: id $id ,$type $value")
+    }
+
+    fun nativeOpen() = meters.isOpen()
+
     /** Re-creates the socket when Wi-Fi changed, so the link follows the phone between networks. */
     @Synchronized
     private fun ensureSocket(): DatagramSocket? {

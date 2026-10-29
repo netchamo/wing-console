@@ -15,8 +15,9 @@ import kotlin.concurrent.thread
 /**
  * Real meter levels from the WING, over its native protocol (the one Behringer's own apps use).
  *
- * READ ONLY: opens TCP 2222, asks for meter streams and keeps them alive. It never writes a
- * parameter. The WING then sends the levels as UDP packets to a local port we announce.
+ * Opens TCP 2222, asks for meter streams and keeps them alive; the WING sends the levels as UDP
+ * packets to a local port we announce. write() lets WingLink send a change on the same link, but
+ * WingLink only does that while live control is on.
  *
  * Byte layout follows libwing (github.com/dannyfiresnake/libwing, console.rs):
  *   keep-alive (data)   DF D1                                  every 7 s
@@ -31,6 +32,16 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     @Volatile private var running = false
     @Volatile private var tcp: Socket? = null
     @Volatile private var udp: DatagramSocket? = null
+    @Volatile private var nout: OutputStream? = null
+    private val wlock = Any()
+
+    fun isOpen() = nout != null
+
+    /** Writes raw native-protocol bytes on the open TCP link. Returns false when the link is not open. */
+    fun write(bytes: ByteArray): Boolean {
+        val o = nout ?: return false
+        return try { synchronized(wlock) { o.write(bytes); o.flush() }; true } catch (_: Exception) { false }
+    }
 
     fun start(ip: String, net: Network?) {
         stop()
@@ -40,6 +51,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
 
     fun stop() {
         running = false
+        nout = null
         runCatching { tcp?.close() }
         runCatching { udp?.close() }
         tcp = null; udp = null
@@ -52,12 +64,11 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         listOf(0xdf, 0xd3, 0xd3, port shr 8, port, 0xd4, id shr 8, id, port shr 8, port, 0xdc).forEach { buf.add(b(it)) }
         for ((g, n) in groups) { buf.add(b(g)); buf.add(b(n)) }
         listOf(0xde, 0xdf, 0xd1).forEach { buf.add(b(it)) }
-        out.write(buf.toByteArray()); out.flush()
+        synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
 
     private fun keepAlive(out: OutputStream, id: Int, port: Int) {
-        out.write(byteArrayOf(b(0xdf), b(0xd3), b(0xd4), b(id shr 8), b(id), b(port shr 8), b(port), b(0xdf), b(0xd1)))
-        out.flush()
+        synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd3), b(0xd4), b(id shr 8), b(id), b(port shr 8), b(port), b(0xdf), b(0xd1))); out.flush() }
     }
 
     private fun run(ip: String, net: Network?) {
@@ -77,7 +88,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 s.connect(InetSocketAddress(ip, 2222), 3000)
                 tcp = s
                 val out = s.getOutputStream()
-                out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush()
+                synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }
                 // The WING also sends data on this TCP link; read and discard it so it never backs up.
                 thread(name = "wing-native-drain") {
                     val buf = ByteArray(4096)
@@ -85,7 +96,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 }
                 request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
                 request(out, 2, port, listOf(0xa3 to 0))
-                log("sys", "meters: native link open (TCP 2222), levels to UDP $port")
+                nout = out
+                log("sys", "native link open (TCP 2222): meters to UDP $port, changes can go this way")
                 attempt = 0
 
                 var nextKeep = System.currentTimeMillis() + 3000
@@ -98,7 +110,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 while (running) {
                     val now = System.currentTimeMillis()
                     if (now >= nextKeep) { keepAlive(out, 1, port); keepAlive(out, 2, port); nextKeep = now + 3000 }
-                    if (now >= nextData) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush(); nextData = now + 7000 }
+                    if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
                     try {
                         val p = DatagramPacket(buf, buf.size)
                         u.receive(p)
@@ -123,6 +135,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
             } catch (e: Exception) {
                 if (running) log("err", "meters: ${e.message}")
             } finally {
+                nout = null
                 runCatching { tcp?.close() }
                 runCatching { udp?.close() }
             }

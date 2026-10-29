@@ -87,6 +87,8 @@ const NATIVE = window.WingNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/latest/wing-console.apk';
 /* WING colour index (1–12) → strip colour. Approximate until checked on the console. */
 const WING_COLORS = ['#8c9bb0', '#5f8fd6', '#4fb0d6', '#4fc9b7', '#62b85c', '#a5c94f', '#d9c86a', '#e8a33d', '#e07a6e', '#e05a8a', '#c47ad9', '#8a7ad9'];
+/* WING native-protocol property ids (from libwing propmap, firmware 3.0.5) for faders and mutes. */
+const NATIVE_IDS = {"/ch/1/mute":-183539208,"/ch/1/fdr":950957506,"/ch/2/mute":-509270653,"/ch/2/fdr":125312537,"/ch/3/mute":44948235,"/ch/3/fdr":-534056607,"/ch/4/mute":1940959569,"/ch/4/fdr":1836964016,"/ch/5/mute":-1354741471,"/ch/5/fdr":-1950983675,"/ch/6/mute":1898819184,"/ch/6/fdr":-85298440,"/ch/7/mute":1695726215,"/ch/7/fdr":710156725,"/ch/8/mute":-1465724012,"/ch/8/fdr":1048688132,"/ch/9/mute":-385259330,"/ch/9/fdr":-1883662956,"/ch/10/mute":-1593389838,"/ch/10/fdr":-139155691,"/ch/11/mute":606157068,"/ch/11/fdr":-1775892557,"/ch/12/mute":-1374796242,"/ch/12/fdr":-2022119807,"/ch/13/mute":-1506056216,"/ch/13/fdr":139209055,"/ch/14/mute":705281882,"/ch/14/fdr":1941306045,"/ch/15/mute":574232852,"/ch/15/fdr":-1825226181,"/ch/16/mute":-1406720778,"/ch/16/fdr":63487145,"/ch/17/mute":133531792,"/ch/17/fdr":1861844199,"/ch/18/mute":673355106,"/ch/18/fdr":-1882393147,"/ch/19/mute":-1307623876,"/ch/19/fdr":-1956886557,"/ch/20/mute":1617934207,"/ch/20/fdr":-563949912,"/ch/21/mute":1824435797,"/ch/21/fdr":653620802,"/ch/22/mute":1756510291,"/ch/22/fdr":910333708,"/ch/23/mute":1520768713,"/ch/23/fdr":-825274458,"/ch/24/mute":2118524791,"/ch/24/fdr":1017043872,"/ch/25/mute":1882620013,"/ch/25/fdr":539769178,"/ch/26/mute":-1809222389,"/ch/26/fdr":1128053252,"/ch/27/mute":2022508897,"/ch/27/fdr":-1341431362,"/ch/28/mute":1786772527,"/ch/28/fdr":593004888,"/ch/29/mute":1718793477,"/ch/29/fdr":870663922,"/ch/30/mute":1443284508,"/ch/30/fdr":644059246,"/ch/31/mute":2025321906,"/ch/31/fdr":-651018640,"/ch/32/mute":1422597952,"/ch/32/fdr":1755254690,"/ch/33/mute":882782006,"/ch/33/fdr":933265220,"/ch/34/mute":1071593412,"/ch/34/fdr":-513653610,"/ch/35/mute":1873753722,"/ch/35/fdr":-435219304,"/ch/36/mute":1271031048,"/ch/36/fdr":1656482346,"/ch/37/mute":1853067102,"/ch/37/fdr":1347063436,"/ch/38/mute":1984337548,"/ch/38/fdr":-481599714,"/ch/39/mute":1381647906,"/ch/39/fdr":1924677280,"/ch/40/mute":-345508572,"/ch/40/fdr":1364432462,"/aux/1/mute":182242462,"/aux/1/fdr":-1369599578,"/aux/2/mute":618030648,"/aux/2/fdr":-1111984372,"/aux/3/mute":-1362961598,"/aux/3/fdr":-122190022,"/aux/4/mute":240389148,"/aux/4/fdr":-1489586848,"/aux/5/mute":675563846,"/aux/5/fdr":-1337300242,"/aux/6/mute":-1304588032,"/aux/6/fdr":-913265868,"/aux/7/mute":351210122,"/aux/7/fdr":-1200402398,"/aux/8/mute":115068772,"/aux/8/fdr":-1238191992,"/main/1/mute":1784698283,"/main/1/fdr":-618700696};
 const chAddr = i => i < 40 ? '/ch/' + (i + 1) : '/aux/' + (i - 39);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const IC = {
@@ -277,13 +279,14 @@ class App extends Component {
       const orig = await read();
       L('ch 33 fader now: ' + orig);
       if (orig === undefined) { L('no answer when reading ch 33, test stopped'); return; }
-      const tries = [['A  ,f -20.0', () => NATIVE.set(F, 'f', '-20')], ['B  ,s "-25"', () => NATIVE.set(F, 's', '-25')], ['C  node /ch/33 ,s "fdr=-30"', () => NATIVE.set(A, 's', 'fdr=-30')]];
+      const nid = NATIVE_IDS[F];
+      const tries = [['NATIVE (TCP) -35', () => typeof NATIVE.setNative === 'function' ? NATIVE.setNative(nid, 'f', '-35') : null], ['A  ,f -20.0', () => NATIVE.set(F, 'f', '-20')], ['B  ,s "-25"', () => NATIVE.set(F, 's', '-25')], ['C  node /ch/33 ,s "fdr=-30"', () => NATIVE.set(A, 's', 'fdr=-30')]];
       for (const [name, fn] of tries) {
         hold(); fn(); await wait(450);
         const v = await read();
         L(name + '  → mixer reads ' + v);
       }
-      hold(); NATIVE.set(F, 'f', String(orig)); await wait(300); NATIVE.set(A, 's', 'fdr=' + orig); await wait(400);
+      hold(); if (typeof NATIVE.setNative === 'function') NATIVE.setNative(nid, 'f', String(orig)); await wait(200); NATIVE.set(F, 'f', String(orig)); await wait(300); NATIVE.set(A, 's', 'fdr=' + orig); await wait(400);
       L('restored → mixer reads ' + await read());
     } finally { this.testing = false; this.testAddr = null; }
   }
@@ -304,15 +307,22 @@ class App extends Component {
     this.lastSend = now;
     (this.holdUntil || (this.holdUntil = {}))[addr] = now + 700;
     const last = (this.sentAt || (this.sentAt = {}))[addr] || 0;
-    if (now - last >= 20 && !(this.outSet && this.outSet[addr])) { this.sentAt[addr] = now; NATIVE.set(addr, type, String(val)); return; }
+    if (now - last >= 20 && !(this.outSet && this.outSet[addr])) { this.sentAt[addr] = now; this.sendNow(addr, type, val); return; }
     (this.outSet || (this.outSet = {}))[addr] = [type, val];
     if (this.outT) return;
     this.outT = setTimeout(() => {
       this.outT = null;
       const o = this.outSet; this.outSet = {};
       const t = Date.now();
-      for (const a in o) { this.sentAt[a] = t; NATIVE.set(a, o[a][0], String(o[a][1])); }
+      for (const a in o) { this.sentAt[a] = t; this.sendNow(a, o[a][0], o[a][1]); }
     }, 20);
+  }
+  /* Prefer the native link (as Mixing Station does); fall back to OSC. */
+  sendNow(addr, type, val) {
+    const id = NATIVE_IDS[addr];
+    let viaNative = false;
+    try { viaNative = id !== undefined && typeof NATIVE.setNative === 'function' && NATIVE.nativeOpen(); } catch (e) {}
+    if (viaNative) NATIVE.setNative(id, type, String(val)); else NATIVE.set(addr, type, String(val));
   }
   nDiscover() {
     if (!NATIVE) return;

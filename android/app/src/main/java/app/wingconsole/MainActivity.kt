@@ -252,6 +252,8 @@ class MainActivity : Activity() {
         /** Live control: only after the user confirmed it in the app. */
         @JavascriptInterface fun setLive(on: Boolean) = link.setLive(on)
         @JavascriptInterface fun set(address: String, type: String, value: String) = link.set(address, type, value)
+        @JavascriptInterface fun setNative(id: Int, type: String, value: String) = link.setNative(id, type, value)
+        @JavascriptInterface fun nativeOpen(): Boolean = link.nativeOpen()
         @JavascriptInterface fun openWifi() {
             main.post {
                 val i = if (Build.VERSION.SDK_INT >= 29) Intent(Settings.Panel.ACTION_WIFI) else Intent(Settings.ACTION_WIFI_SETTINGS)
