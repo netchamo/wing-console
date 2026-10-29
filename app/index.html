@@ -358,7 +358,12 @@ class App extends Component {
             main = { ...main };
             if (mm[1] === 'fdr' && typeof a[1] === 'number') main.v = clamp(a[1], 0, 1);
             else if (mm[1] === 'mute') main.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
-          } else this.logLine('in', m.address + ' ' + JSON.stringify(a));
+          } else {
+            // log each unknown address once (the WING pushes e.g. /play/$pos every second); errors always
+            const seen = this.seenAddr || (this.seenAddr = new Set());
+            const err = a.some(x => typeof x === 'string' && /ERROR|NOT FOUND|NOT PAR/i.test(x));
+            if (err || !seen.has(m.address)) { seen.add(m.address); this.logLine('in', m.address + ' ' + JSON.stringify(a) + (err ? '' : '  (further ones hidden)')); }
+          }
         }
         if (touched) out.chans = chans;
         out.main = main;

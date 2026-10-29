@@ -44,6 +44,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     @Volatile private var target: InetAddress? = null
     @Volatile private var running = false
     @Volatile private var live = false
+    @Volatile private var sentCount = 0
     @Volatile private var pickedNet: Network? = null
     @Volatile private var pickedAt = 0L
 
@@ -235,6 +236,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
 
     fun setLive(on: Boolean) {
         live = on
+        sentCount = 0
         log("sys", if (on) "LIVE CONTROL ON: changes are sent to the mixer" else "live control off: reading only")
     }
 
@@ -254,7 +256,9 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             runCatching { s.send(DatagramPacket(bytes, bytes.size, t, OSC_PORT)) }
                 .onFailure { log("err", "send: ${it.message}") }
         }
-        // not logged per message: a fader drag sends dozens per second
+        // a fader drag sends dozens per second: log the first one and then every 50th
+        val n = ++sentCount
+        if (n == 1 || n % 50 == 0) log("out", "sent #$n: $address ,$type $value (${bytes.size} bytes to ${t.hostAddress}:$OSC_PORT)")
     }
 
     /** Re-creates the socket when Wi-Fi changed, so the link follows the phone between networks. */
