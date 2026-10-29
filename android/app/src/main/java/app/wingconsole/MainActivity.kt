@@ -28,7 +28,8 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 /**
- * Hosts the Wing Console interface and gives it a READ-ONLY link to the mixer.
+ * Hosts the Wing Console interface and links it to the mixer: reading by default,
+ * sending only after the user turns live control on.
  *
  * The interface ships inside the app (assets/index.html), so it opens with no internet,
  * for example on the mixer's own Wi-Fi. When internet is available, the newest interface
@@ -182,6 +183,9 @@ class MainActivity : Activity() {
         @JavascriptInterface fun disconnect() = link.disconnect()
         /** Read-only: ask the mixer for the current value of each address (newline separated). */
         @JavascriptInterface fun query(addresses: String) = link.query(addresses)
+        /** Live control: only after the user confirmed it in the app. */
+        @JavascriptInterface fun setLive(on: Boolean) = link.setLive(on)
+        @JavascriptInterface fun set(address: String, type: String, value: String) = link.set(address, type, value)
         @JavascriptInterface fun openWifi() {
             main.post {
                 val i = if (Build.VERSION.SDK_INT >= 29) Intent(Settings.Panel.ACTION_WIFI) else Intent(Settings.ACTION_WIFI_SETTINGS)

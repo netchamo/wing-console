@@ -23,9 +23,9 @@ import kotlin.concurrent.thread
 /**
  * Talks to a Behringer WING over the local network.
  *
- * READ ONLY by construction: this class can only send discovery ("WING?") and OSC
- * queries (an address with no arguments). There is no way to send a value, so the
- * mixer cannot be changed from here.
+ * READ ONLY unless live control is on: queries (an address with no arguments) always
+ * work; set() refuses to send anything until the user has turned live control on in
+ * the app, and live control switches off again on every new connection.
  *
  * Every socket is bound to the Wi-Fi network itself. When the Wi-Fi has no internet,
  * Android routes ordinary traffic over mobile data; without this binding the queries
@@ -43,6 +43,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     @Volatile private var socketNet: Network? = null
     @Volatile private var target: InetAddress? = null
     @Volatile private var running = false
+    @Volatile private var live = false
 
     private val netCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -147,6 +148,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     // ------------------------------------------------------------ OSC (queries only)
 
     fun connect(ip: String) {
+        live = false
         target = runCatching { InetAddress.getByName(ip) }.getOrNull()
         if (target == null) { status("error", "Bad address: $ip"); return }
         closeSocket()
@@ -156,6 +158,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     }
 
     fun disconnect() {
+        live = false
         running = false
         target = null
         closeSocket()
@@ -175,6 +178,30 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
                     .onFailure { log("err", "send: ${it.message}") }
             }
         }
+    }
+
+    fun setLive(on: Boolean) {
+        live = on
+        log("sys", if (on) "LIVE CONTROL ON: changes are sent to the mixer" else "live control off: reading only")
+    }
+
+    /** Send one value. Refused unless live control is on. type: "f" (float) or "i" (int). */
+    fun set(address: String, type: String, value: String) {
+        if (!live) { log("err", "blocked (live control off): $address $value"); return }
+        val t = target ?: return
+        if (!address.startsWith("/") || address.length > 120) return
+        val arg = when (type) {
+            "f" -> ByteBuffer.allocate(4).putFloat(value.toFloatOrNull() ?: return).array()
+            "i" -> ByteBuffer.allocate(4).putInt(value.toIntOrNull() ?: return).array()
+            else -> return
+        }
+        val bytes = oscString(address) + oscString(",$type") + arg
+        sendQueue.execute {
+            val s = ensureSocket() ?: return@execute
+            runCatching { s.send(DatagramPacket(bytes, bytes.size, t, OSC_PORT)) }
+                .onFailure { log("err", "send: ${it.message}") }
+        }
+        log("out", "$address = $value")
     }
 
     /** Re-creates the socket when Wi-Fi changed, so the link follows the phone between networks. */
