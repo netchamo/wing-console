@@ -17,5 +17,5 @@ head = '''<!doctype html>
 '''
 i = src.index('<div id="stage">')
 body = src[i:].replace("started: false,", "started: matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true,", 1)
-sw = "<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>\n"
+sw = "<script>if ('serviceWorker' in navigator && !window.WingNative) navigator.serviceWorker.register('sw.js').catch(() => {});</script>\n"
 open('app/index.html', 'w').write(head + src[:i] + sw + '</head>\n<body>\n' + body + '\n</body>\n</html>\n')

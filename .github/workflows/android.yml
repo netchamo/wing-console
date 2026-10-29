@@ -1,0 +1,74 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ["android/**", "app/index.html", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bundle the interface so the app opens with no internet
+        run: |
+          A=android/app/src/main/assets
+          mkdir -p $A/vendor
+          cp app/index.html app/manifest.webmanifest app/icon-192.png app/icon-512.png $A/
+          curl -fsSL https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js -o $A/vendor/htm-preact.js
+          sed -i 's#https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js#/vendor/htm-preact.js#' $A/index.html
+          grep -q '/vendor/htm-preact.js' $A/index.html
+          head -c 200 $A/vendor/htm-preact.js; echo
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee ../build.log
+
+      - name: Save the build log to the ci-logs branch (so a failure can be read without GitHub's UI)
+        if: failure()
+        run: |
+          git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
+          tail -n 400 build.log > /tmp/build-tail.log || echo "no log" > /tmp/build-tail.log
+          git checkout --orphan ci-logs
+          git rm -rf --cached . > /dev/null
+          cp /tmp/build-tail.log build.log
+          git add build.log
+          git commit -m "Failed build ${{ github.run_number }} at ${GITHUB_SHA::7}"
+          git push -f origin ci-logs
+
+      - name: Keep the APK with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: wing-console-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish as the "latest" download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk wing-console.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest wing-console.apk \
+            --title "Wing Console · latest build" \
+            --notes "Build #${{ github.run_number }} from ${GITHUB_SHA::7}. Download wing-console.apk on your phone and install it." \
+            --prerelease

@@ -74,7 +74,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Heebo:wght@400;700&display=swap">
-<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+<script>if ('serviceWorker' in navigator && !window.WingNative) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </head>
 <body>
 <div id="stage"></div>
@@ -82,6 +82,12 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js';
 
 const DW = 1180;
+/* Present only inside the Android app: a READ-ONLY link to the mixer (it can only ask for values). */
+const NATIVE = window.WingNative || null;
+const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/latest/wing-console.apk';
+/* WING colour index (1–12) → strip colour. Approximate until checked on the console. */
+const WING_COLORS = ['#8c9bb0', '#5f8fd6', '#4fb0d6', '#4fc9b7', '#62b85c', '#a5c94f', '#d9c86a', '#e8a33d', '#e07a6e', '#e05a8a', '#c47ad9', '#8a7ad9'];
+const chAddr = i => i < 40 ? '/ch/' + (i + 1) : '/aux/' + (i - 39);
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 const IC = {
   player: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2"/><circle cx="8.5" cy="11" r="2"/><circle cx="15.5" cy="11" r="2"/><path d="M8.5 11h7M6 19l1.5-3h9L18 19"/></svg>`,
@@ -190,12 +196,12 @@ function makeDeq() {
 class App extends Component {
   constructor() {
     super();
-    this.state = { cw: innerWidth, ch: innerHeight, started: matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true, isFs: false, toast: '', screen: 'main', eqCh: 1,
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', eqCh: 1,
       chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, lv: [0,0,0,0,0,0,0,0,0],
       panPop: null, sendPop: null, eq: makeEq(),
       lastTab: 'home', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
       otherModel: { gate: 'Wing Expander', comp: 'BDX 160' }, dragPop: false, connPop: false,
-      conn: { ip: (() => { try { return localStorage.getItem('wing.ip') || ''; } catch (e) { return ''; } })() },
+      conn: { ip: (() => { try { return localStorage.getItem('wing.ip') || ''; } catch (e) { return ''; } })(), status: 'demo', name: '', model: '', fw: '', found: [], searching: false, wifi: null, lastRx: 0, update: false }, logV: 0,
       deq: makeDeq(), slots: { gate: 'Wing Gate', comp: 'Wing Comp' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
       gate: { on: true, thr: -40, range: 40, att: 10, hld: 10, rel: 199, acc: 0, ratio: '1:3', fs: false,
         sc: { on: false, type: 'BP', f: 1000, q: 1, src: 'SELF', tap: 'IN' },
@@ -212,12 +218,107 @@ class App extends Component {
     document.addEventListener('contextmenu', e => e.preventDefault());
     this.iv = setInterval(() => this.tick(), 110);
     this.gv = setInterval(() => this.gateSim(), 50);
+    if (NATIVE) {
+      window.__wingNative = list => this.onNative(list);
+      try { NATIVE.ready(); } catch (e) {}
+      this.pv = setInterval(() => this.pollTick(), 200);
+      const ip = this.state.conn.ip;
+      setTimeout(() => { if (ip) this.nConnect(ip); else this.nDiscover(); }, 400);
+    }
+  }
+
+  /* ---------- mixer link (Android app only, read-only) ---------- */
+  isLinked() { const s = this.state.conn.status; return !!NATIVE && (s === 'connecting' || s === 'connected' || s === 'lost'); }
+  logLine(dir, text) {
+    const L = this.logLines || (this.logLines = []);
+    L.push(new Date().toTimeString().slice(0, 8) + (dir === 'in' ? ' ← ' : dir === 'out' ? ' → ' : dir === 'err' ? ' ✗ ' : ' · ') + text);
+    if (L.length > 150) L.splice(0, L.length - 150);
+  }
+  nConnect(ip) {
+    if (!NATIVE || !ip) return;
+    try { localStorage.setItem('wing.ip', ip); } catch (e) {}
+    this.pollN = 0;
+    this.setState(st => ({ conn: { ...st.conn, ip, status: 'connecting', lastRx: 0, connAt: Date.now() } }));
+    NATIVE.connect(ip);
+  }
+  nDisconnect() { if (!NATIVE) return; NATIVE.disconnect(); this.setState(st => ({ conn: { ...st.conn, status: 'demo' } })); }
+  nDiscover() {
+    if (!NATIVE) return;
+    this.setState(st => ({ conn: { ...st.conn, searching: true, found: [] } }));
+    NATIVE.discover(this.state.conn.ip || '');
+  }
+  pollTick() {
+    const st = this.state, c = st.conn;
+    if (!(c.status === 'connecting' || c.status === 'connected' || c.status === 'lost')) return;
+    const now = Date.now();
+    if (c.status === 'connected' && now - c.lastRx > 4000) this.setState(s => ({ conn: { ...s.conn, status: 'lost' } }));
+    if (c.status === 'connecting' && now - (c.connAt || now) > 6000 && !c.lastRx) this.setState(s => ({ conn: { ...s.conn, status: 'lost' } }));
+    const n = this.pollN = (this.pollN || 0) + 1, q = [];
+    if (n % 25 === 1) for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/name', chAddr(i) + '/col');
+    if (n % 10 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
+    else { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } }
+    q.push('/main/1/fdr', '/main/1/mute');
+    NATIVE.query(q.join('\n'));
+  }
+  onNative(list) {
+    const osc = [];
+    let conn = null;
+    const C = () => conn || (conn = { ...this.state.conn });
+    for (const e of list) {
+      if (e.type === 'osc') { osc.push(e); continue; }
+      if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
+      if (e.type === 'net') { C().wifi = !!e.wifi; continue; }
+      if (e.type === 'found') {
+        const c = C(); if (!c.found.some(f => f.ip === e.ip)) c.found = [...c.found, e];
+        this.logLine('in', 'found ' + e.name + ' (' + e.model + ') at ' + e.ip + ' fw ' + e.fw);
+        if (!c.ip && c.status === 'demo' && c.found.length === 1) setTimeout(() => this.nConnect(e.ip), 50);
+        continue;
+      }
+      if (e.type === 'discoverDone') { C().searching = false; if (!e.count) this.logLine('sys', 'no mixer answered'); continue; }
+      if (e.type === 'status') { const c = C(); if (e.status === 'idle') c.status = 'demo'; else if (e.status === 'error') { c.status = 'demo'; this.toast(e.detail); } continue; }
+      if (e.type === 'update') { C().update = true; continue; }
+    }
+    if (osc.length) {
+      const c = C(); c.lastRx = Date.now();
+      if (c.status !== 'connected') { c.status = 'connected'; this.logLine('sys', 'mixer is answering'); }
+    }
+    this.setState(st => {
+      const out = { logV: st.logV + 1 };
+      if (conn) out.conn = { ...st.conn, ...conn };
+      if (osc.length) {
+        const chans = st.chans.slice(); let main = st.main, touched = false;
+        for (const m of osc) {
+          const a = m.args || [];
+          let mm = /^\/(ch|aux)\/(\d+)\/(name|col|fdr|mute)$/.exec(m.address);
+          if (mm) {
+            const i = mm[1] === 'ch' ? +mm[2] - 1 : 39 + +mm[2];
+            if (i < 0 || i >= 48) continue;
+            const ch = { ...chans[i] };
+            if (mm[3] === 'fdr' && typeof a[1] === 'number') ch.v = clamp(a[1], 0, 1);
+            else if (mm[3] === 'mute') ch.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
+            else if (mm[3] === 'name' && typeof a[0] === 'string') ch.name = a[0].trim() || (i < 40 ? 'Ch ' + (i + 1) : 'Aux ' + (i - 39));
+            else if (mm[3] === 'col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
+            chans[i] = ch; touched = true; continue;
+          }
+          mm = /^\/main\/1\/(fdr|mute)$/.exec(m.address);
+          if (mm) {
+            main = { ...main };
+            if (mm[1] === 'fdr' && typeof a[1] === 'number') main.v = clamp(a[1], 0, 1);
+            else if (mm[1] === 'mute') main.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
+          } else this.logLine('in', m.address + ' ' + JSON.stringify(a));
+        }
+        if (touched) out.chans = chans;
+        out.main = main;
+      }
+      return out;
+    });
   }
   tick() {
     this.setState(st => {
       const lv = st.lv.map((old, j) => {
         let t;
-        if (j < 8) { const c = st.chans[st.bank * 8 + j]; t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35)); }
+        if (this.isLinked()) t = 0;
+        else if (j < 8) { const c = st.chans[st.bank * 8 + j]; t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35)); }
         else t = st.main.mute ? 0 : Math.min(1, 0.68 * Math.sqrt(st.main.v / 0.75) * (0.85 + Math.random() * 0.2));
         return t > old ? t : old * 0.82;
       });
@@ -264,6 +365,7 @@ class App extends Component {
   /* ---------- main mixer ---------- */
   get(i) { return i === -1 ? this.state.main : this.state.chans[i]; }
   upd(i, patch) {
+    if (this.isLinked()) { this.toast('קריאה בלבד: האפליקציה לא משנה את המיקסר עד שמדליקים Live control'); return; }
     this.setState(st => {
       if (i === -1) return { main: { ...st.main, ...patch } };
       const chans = st.chans.slice(); chans[i] = { ...chans[i], ...patch }; return { chans };
@@ -361,9 +463,7 @@ class App extends Component {
           <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
           <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
         </div>
-        <button onClick=${() => this.setState({ connPop: true })} aria-label="Mixer connection"
-          style="height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid #6a4a2a;background:#1d1611;color:#f3c27a;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer">
-          <span style="width:10px;height:10px;border-radius:50%;background:#e8a33d;box-shadow:0 0 8px #e8a33d"></span>DEMO · NOT CONNECTED</button>
+        ${this.connPill()}
         <div style="flex:1;display:flex;justify-content:center">
           <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
         </div>
@@ -770,40 +870,85 @@ class App extends Component {
   }
 
   /* ---------- mixer connection ---------- */
+  connLook() {
+    const c = this.state.conn;
+    if (!NATIVE || c.status === 'demo') return { dot: '#e8a33d', text: c.searching ? 'SEARCHING…' : 'DEMO · NOT CONNECTED', border: '#6a4a2a', fg: '#f3c27a' };
+    if (c.status === 'connecting') return { dot: '#e8a33d', text: 'CONNECTING · ' + c.ip, border: '#6a4a2a', fg: '#f3c27a' };
+    if (c.status === 'lost') return { dot: '#e0513f', text: 'NO ANSWER · ' + c.ip, border: '#7a2a22', fg: '#ff9a8a' };
+    return { dot: '#62b85c', text: (c.name || 'WING') + ' · READ ONLY', border: '#3d6a36', fg: '#a6e39c' };
+  }
+  connPill() {
+    const L = this.connLook();
+    return html`<button onClick=${() => this.setState({ connPop: true })} aria-label="Mixer connection"
+      style=${`height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid ${L.border};background:#1d1611;color:${L.fg};font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;max-width:300px;white-space:nowrap;overflow:hidden`}>
+      <span style=${`width:10px;height:10px;flex:none;border-radius:50%;background:${L.dot};box-shadow:0 0 8px ${L.dot}`}></span>${L.text}</button>`;
+  }
   renderConnPop(Hd) {
-    const st = this.state, close = () => this.setState({ connPop: false });
-    const setIp = v => { this.setState({ conn: { ...st.conn, ip: v } }); try { localStorage.setItem('wing.ip', v); } catch (e) {} };
-    const wifi = () => {
-      try { location.href = 'intent:#Intent;action=android.settings.WIFI_SETTINGS;end'; } catch (e) {}
-      setTimeout(() => { if (document.visibilityState === 'visible') this.toast('פתח את הגדרות ה-Wi-Fi בטלפון וחבר אותו לרשת של המיקסר'); }, 900);
-    };
-    return html`
+    const st = this.state, c = st.conn, close = () => this.setState({ connPop: false }), L = this.connLook();
+    const setIp = v => { this.setState({ conn: { ...c, ip: v } }); try { localStorage.setItem('wing.ip', v); } catch (e) {} };
+    const linked = this.isLinked();
+    const H = Math.round(Hd - 40);
+    if (!NATIVE) return html`
       <button class="scrim" aria-label="Close connection" onClick=${close}></button>
-      <div class="pop" style=${`left:250px;top:${Math.max(30, Math.round((Hd - 430) / 2))}px;width:680px;padding:20px 22px;gap:14px;border-color:#8a6a3a`}>
+      <div class="pop" style=${`left:250px;top:${Math.max(30, Math.round((Hd - 380) / 2))}px;width:680px;padding:20px 22px;gap:14px;border-color:#8a6a3a`}>
         <div style="display:flex;align-items:center;gap:12px">
-          <span style="width:12px;height:12px;border-radius:50%;background:#e8a33d;box-shadow:0 0 8px #e8a33d"></span>
-          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">Mixer connection</span>
-          <span style="flex:1"></span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">Mixer connection</span><span style="flex:1"></span>
           <button class="small" onClick=${close}>CLOSE</button>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;background:#141210;border:1px solid #2c2721">
-          <span style="font-weight:700;letter-spacing:.1em;color:#f3c27a">DEMO</span>
-          <span style="color:#cbbd9f;font-size:15px">Not connected. The screens show sample data.</span>
+        <div dir="rtl" style="font-family:'Heebo',sans-serif;font-size:16px;line-height:1.6;color:#d9cdb3">
+          דפדפן לא יכול לדבר ישירות עם ה-Wing. החיבור למיקסר עובד באפליקציה לאנדרואיד. מורידים אותה מהכתובת הזו ומתקינים:
         </div>
-        <div style="display:flex;gap:10px;align-items:stretch">
-          <label for="wingIp" style="display:flex;flex-direction:column;justify-content:center;font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">MIXER IP</label>
-          <input id="wingIp" inputmode="decimal" placeholder="192.168.1.62" value=${st.conn.ip} onInput=${e => setIp(e.currentTarget.value.trim())}
-            style="flex:1;min-width:0;height:48px;padding:0 14px;border-radius:8px;border:1px solid #3a342c;background:#0e0d0b;color:var(--ink);font-family:var(--mono);font-size:20px;user-select:text;-webkit-user-select:text;touch-action:manipulation"/>
-          <button class="pill on" style="width:130px;height:48px" onClick=${() => this.toast('החיבור למיקסר עוד לא נבנה. זה השלב הבא')}>CONNECT</button>
+        <div style="padding:12px 14px;border-radius:8px;background:#0e0d0b;border:1px solid #3a342c;font-family:var(--mono);font-size:14px;color:#f3c27a;user-select:text;-webkit-user-select:text;word-break:break-all">${APK_URL}</div>
+        <a href=${APK_URL} target="_blank" rel="noopener" class="pill on" style="height:48px;display:flex;align-items:center;justify-content:center;text-decoration:none">Download the Android app</a>
+      </div>`;
+    return html`
+      <button class="scrim" aria-label="Close connection" onClick=${close}></button>
+      <div class="pop" style=${`left:30px;top:20px;width:1120px;height:${H}px;padding:16px 18px;gap:12px;border-color:#8a6a3a`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span style=${`width:12px;height:12px;border-radius:50%;background:${L.dot};box-shadow:0 0 8px ${L.dot}`}></span>
+          <span style="font-size:24px;font-weight:600;letter-spacing:.04em">Mixer connection</span>
+          <span style=${`font-weight:700;letter-spacing:.1em;color:${L.fg}`}>${L.text}</span>
+          <span style="flex:1"></span>
+          ${c.update && html`<button class="small" style="height:40px;border-color:#62b85c;color:#a6e39c" onClick=${() => NATIVE.reload()}>NEW VERSION · RELOAD</button>`}
+          <button class="small" style="height:40px" onClick=${close}>CLOSE</button>
         </div>
-        <div style="display:flex;gap:10px">
-          <button class="pill" style="flex:1;height:48px" onClick=${wifi}>Wi-Fi settings</button>
-          <button class="pill" style="flex:1;height:48px;opacity:.5" disabled aria-disabled="true">Live control: OFF</button>
-        </div>
-        <div dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;line-height:1.6;color:#d9cdb3">
-          <div>1. חבר את הטלפון לאותה רשת Wi-Fi שהמיקסר מחובר אליה.</div>
-          <div>2. את כתובת ה-IP של ה-Wing מוצאים במיקסר במסך ההגדרות, תחת הרשת.</div>
-          <div>3. בהתחברות האפליקציה רק <b>קוראת</b> מהמיקסר. היא לא משנה בו שום דבר עד שמדליקים <b>Live control</b>.</div>
+        <div style="flex:1;min-height:0;display:flex;gap:14px">
+          <div style="width:460px;flex:none;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:#141210;border:1px solid #2c2721">
+              <span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">WI-FI</span>
+              <span style=${`font-size:15px;color:${c.wifi === false ? '#ff9a8a' : '#cbbd9f'}`}>${c.wifi === false ? 'Not connected to Wi-Fi' : c.wifi ? 'Connected · link locked to Wi-Fi' : 'Checking…'}</span>
+              <span style="flex:1"></span>
+              <button class="small" style="height:38px" onClick=${() => NATIVE.openWifi()}>WI-FI</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:stretch">
+              <label for="wingIp" style="display:flex;align-items:center;font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">IP</label>
+              <input id="wingIp" inputmode="decimal" placeholder="192.168.1.62" value=${c.ip} onInput=${e => setIp(e.currentTarget.value.trim())}
+                style="flex:1;min-width:0;height:48px;padding:0 12px;border-radius:8px;border:1px solid #3a342c;background:#0e0d0b;color:var(--ink);font-family:var(--mono);font-size:19px;user-select:text;-webkit-user-select:text;touch-action:manipulation"/>
+              ${linked ? html`<button class="pill" style="width:130px;height:48px" onClick=${() => this.nDisconnect()}>DISCONNECT</button>`
+                       : html`<button class="pill on" style="width:130px;height:48px" onClick=${() => this.nConnect(c.ip)}>CONNECT</button>`}
+            </div>
+            <button class="pill" style="height:46px" onClick=${() => this.nDiscover()} disabled=${c.searching}>${c.searching ? 'Searching the network…' : 'Find mixers on this network'}</button>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${c.found.map(f => html`<button onClick=${() => this.nConnect(f.ip)}
+                style=${`height:52px;display:flex;align-items:center;gap:12px;padding:0 14px;border-radius:8px;cursor:pointer;text-align:left;${f.ip === c.ip && linked ? 'background:#1d2a19;border:1px solid #62b85c;color:#a6e39c' : 'background:#141210;border:1px solid #3a342c;color:#e9dcc2'}`}>
+                <span style="font-size:18px;font-weight:700">${f.name || 'WING'}</span>
+                <span style="font-family:var(--mono);font-size:14px;color:#cbbd9f">${f.ip}</span>
+                <span style="flex:1"></span><span style="font-size:12px;color:#9b927f">${f.model} · ${f.fw}</span></button>`)}
+            </div>
+            <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:#141210;border:1px solid #2c2721">
+              <span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">LIVE CONTROL</span>
+              <span style="font-size:14px;color:#9b927f">Off. Reading only, nothing is sent to the mixer.</span>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">DIAGNOSTICS</span>
+              <span style="font-size:12px;color:#8a8170">App ${(() => { try { return NATIVE.version(); } catch (e) { return ''; } })()}</span>
+              <span style="flex:1"></span>
+              <button class="small" style="height:36px" onClick=${() => { NATIVE.copy((this.logLines || []).join('\n')); this.toast('היומן הועתק. אפשר להדביק אותו בצ׳אט'); }}>COPY LOG</button>
+            </div>
+            <pre style="flex:1;min-height:0;margin:0;padding:10px 12px;overflow:auto;touch-action:pan-y;overscroll-behavior:contain;border-radius:8px;background:#0a0908;border:1px solid #2c2721;font-family:var(--mono);font-size:12px;line-height:1.5;color:#b9ad95;white-space:pre-wrap;word-break:break-all">${(this.logLines || []).slice(-60).join('\n') || 'No messages yet.'}</pre>
+          </div>
         </div>
       </div>`;
   }
