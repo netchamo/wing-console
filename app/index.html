@@ -274,6 +274,10 @@ class App extends Component {
   /* Send at once, then at most one message per address every 20 ms while a fader is dragged. */
   sendSet(addr, type, val) {
     const now = Date.now();
+    // diagnostics: note what is sent, at most twice a second per control
+    const lg = this.sendLog || (this.sendLog = {});
+    lg[addr] = (lg[addr] || { n: 0, t: 0 }); lg[addr].n++;
+    if (now - lg[addr].t > 500) { this.logLine('out', addr + ' = ' + val + ' (' + type + ')' + (lg[addr].n > 1 ? '  · ' + lg[addr].n + ' msgs' : '')); lg[addr] = { n: 0, t: now }; }
     this.lastSend = now;
     (this.holdUntil || (this.holdUntil = {}))[addr] = now + 700;
     const last = (this.sentAt || (this.sentAt = {}))[addr] || 0;
