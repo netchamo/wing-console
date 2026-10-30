@@ -41,7 +41,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .mk{position:absolute;left:0;width:22px;text-align:right;font-family:var(--mono);font-size:9px;line-height:14px;color:#9b927f}
 .tk{position:absolute;left:30px;width:28px;height:1px;background:#3a342c}
 .slot{position:absolute;left:41px;width:6px;top:20px;bottom:20px;border-radius:3px;background:#070606;box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 0 0 1px #2c2721}
-.meter{position:absolute;left:66px;width:15px;top:22px;display:flex;gap:2px;padding:0}
+.meter{position:absolute;left:66px;width:15px;top:22px;display:flex;gap:2px;padding:0;z-index:0;isolation:isolate}
 .mcol{flex:1;position:relative;height:100%;border-radius:1px;overflow:hidden;background:linear-gradient(0deg,#14231a 0,#14231a 80%,#2a2212 80%,#2a2212 95%,#2e1613 95%)}
 .mfill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#3f9e4c 0,#7fd36b 72%,#e6c23e 80%,#f0a24a 92%,#ff4a3a 95%,#ff4a3a 100%);background-position:bottom;background-repeat:no-repeat}
 .mcol::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,#0b0a09 2px 3px);pointer-events:none;z-index:2}
@@ -2051,6 +2051,19 @@ class App extends Component {
         </button>
       </div>`;
   }
+  /* gain fader of the input on air, right on the channel's home screen */
+  homeGain(src, pre, sv, H) {
+    const FH = H - 22, T = FH - 36, sp = gspec(src ? src.grp : 'LCL');
+    const n = pre ? clamp((sv.gain - sp.min) / (sp.step * sp.n), 0, 1) : 0;
+    return html`<div style="width:62px;flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;padding-top:2px">
+      <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
+      <button class="fader" aria-label=${'Gain ' + (pre ? sv.gain.toFixed(1) + ' dB' : 'unavailable')} disabled=${!pre}
+        style=${`width:58px;height:${FH}px;border-radius:8px;background:#151311;box-shadow:inset 0 0 0 1px #2c2721;cursor:${pre ? 'ns-resize' : 'default'};opacity:${pre ? 1 : 0.35}`}
+        onPointerDown=${e => pre && this.gainDown(src, e, T)} onPointerMove=${e => this.gainMove(e)} onPointerUp=${() => { this.gd = null; }} onPointerCancel=${() => { this.gd = null; }}>
+        <span class="slot" style="left:27px;top:16px;bottom:16px"></span>
+        <span class="cap" style=${`left:9px;width:40px;height:30px;top:${Math.round((1 - n) * T + 3)}px`}></span>
+      </button></div>`;
+  }
   renderHome(Hd) {
     const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(i);
     const bodyH = Math.round(Hd - 72), h1 = Math.round((bodyH - 10) * 0.56), h2 = bodyH - 10 - h1;
@@ -2095,7 +2108,8 @@ class App extends Component {
       <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
           <div style=${`height:${h1}px;display:flex;gap:10px`}>
-            ${tile('INPUT', cf.altOn ? 'Alt on air' : 'Main on air', null, () => this.goTab('Config'), html`
+            <div style="width:226px;flex:none;display:flex;gap:6px">
+            ${tile('INPUT', cf.altOn ? 'Alt' : 'Main', null, () => this.goTab('Config'), html`
               <span style="display:flex;align-items:center;gap:8px">
                 <span style=${`padding:3px 9px;border-radius:5px;font-weight:700;font-size:13px;letter-spacing:.1em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
                 <span style="font-family:var(--mono);font-size:14px;color:var(--brass-hi)">${this.srcLabel(src)}</span>
@@ -2104,7 +2118,7 @@ class App extends Component {
               <span style="display:flex;align-items:flex-end;gap:10px">
                 <span style="display:flex;flex-direction:column;line-height:1">
                   <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
-                  <span style="font-family:var(--mono);font-size:30px">${pre ? gV(src) : '—'}</span>
+                  <span style="font-family:var(--mono);font-size:24px">${pre ? gV(src) : '—'}</span>
                 </span>
                 ${pre && ph(sv.ph)}
               </span>
@@ -2118,12 +2132,14 @@ class App extends Component {
                 <span style="font-family:var(--mono);color:#cbbd9f">${other ? this.srcLabel(other) : 'none'}</span>
                 ${opre && html`<span style="font-family:var(--mono);color:#cbbd9f">${gV(other)} dB</span>`}
                 ${opre && ov.ph && html`<span style="color:#ff8a7a;font-weight:700">48V</span>`}
-              </span>`, 'width:250px;flex:none')}
+              </span>`, 'flex:1;min-width:0')}
+              ${this.homeGain(src, pre, sv, h1)}
+            </div>
             ${tile('GATE', mName('gate', gSlot), gSlot === 'GATE' ? badge(st.gate.on, st.gate.on ? (st.gate.sim.gr < 3 ? 'OPEN' : 'CLOSED') : 'OFF') : null, () => this.goTab('Gate'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
                 ${gSlot === 'GATE' ? this.miniGate(180, mH) : isDeq(gSlot) ? this.miniEq('deq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RANGE ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${st.gate.rel}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:210px;flex:none', gFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', gFoot)}
             ${tile('EQ', q.bypass ? 'Bypassed' : q.bands.filter(b => b.on).length + ' bands on', null, () => this.goTab('EQ'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', 400, mH)}</span>
               <span style="display:flex;gap:5px;flex-wrap:wrap">
@@ -2134,7 +2150,7 @@ class App extends Component {
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
                 ${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `KNEE ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : ''}</span>`, 'width:210px;flex:none', cFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : ''}</span>`, 'width:196px;flex:none', cFoot)}
           </div>
           <div style=${`height:${h2}px;display:flex;gap:10px`}>
             ${tile('SENDS', 'Bus 1–16', null, () => this.setState({ sendPop: { i, bank: 0 } }), html`
