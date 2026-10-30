@@ -537,17 +537,20 @@ class App extends Component {
       if (this.isLinked()) { if (!M) return [0, 0]; if (s === 48) return [mN(M.ml), mN(M.mr)]; if (s >= 49) { const k = s - 49; return [mN(M.bl[k] ?? -90), mN(M.br[k] ?? -90)]; } return [mN(M.l[s]), mN(M.r[s])]; }
       const c = s === 48 ? st.main : st.chans[s];
       // demo: a slow, gentle movement instead of jumping levels
-      const ph = Date.now() / 1000, wob = 0.9 + 0.06 * Math.sin(ph * 0.9 + s * 1.7) + 0.03 * Math.sin(ph * 2.3 + s);
+      const ph = Date.now() / 1000, beat = Math.pow(Math.max(0, Math.sin(ph * (2.4 + (s % 5) * 0.35) + s * 1.7)), 3);
+      const wob = 0.74 + 0.16 * beat + 0.06 * Math.sin(ph * 5.1 + s) + Math.random() * 0.05;
       const t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, (s === 48 ? 0.68 : c.base) * Math.sqrt(c.v / 0.75) * wob);
       const stereo = s === 48 || /( L| R|OH|Keys)/.test(c.name);
       return [t, stereo ? Math.min(1, t * (0.95 + 0.04 * Math.sin(ph * 1.3 + s))) : t];
     };
-    const fall = (old, t) => this.isLinked() ? [t[0] > old[0] ? t[0] : old[0] * 0.82, t[1] > old[1] ? t[1] : old[1] * 0.82] : [old[0] + (t[0] - old[0]) * 0.25, old[1] + (t[1] - old[1]) * 0.25];
+    const fall = (old, t) => this.isLinked() ? [t[0] > old[0] ? t[0] : old[0] * 0.82, t[1] > old[1] ? t[1] : old[1] * 0.82]
+      : [t[0] > old[0] ? old[0] + (t[0] - old[0]) * 0.7 : old[0] + (t[0] - old[0]) * 0.35, t[1] > old[1] ? old[1] + (t[1] - old[1]) * 0.7 : old[1] + (t[1] - old[1]) * 0.35];
     const hold = (old, v) => [Math.max(v[0], old[0] - 0.012), Math.max(v[1], old[1] - 0.012)];
     this.setState(st => {
       const lv = st.lv.map((old, j) => fall(old, pair(st, j < 8 ? bankIdx(st.bank, j) : 48)));
       const pk = st.pk.map((old, j) => hold(old, lv[j]));
       const cLv = fall(st.cLv, pair(st, st.eqCh)), cPk = hold(st.cPk, cLv);
+      if (st.plPop) { const pl = fall(st.plLv || [0, 0], pair(st, this.playerCh())); setTimeout(() => this.setState({ plLv: pl }), 0); }
       if (st.screen === 'config' || st.screen === 'home') {
         const c = st.chans[st.eqCh], cf = this.cfgOf(st.eqCh);
         const lvl = s => { if (!s) return 0; const sv = this.srcOf(s); const g = PRE.has(s.grp) ? sv.gain : 30; return Math.min(1, (0.18 + g / 60) * (0.75 + Math.random() * 0.35)); };
@@ -929,6 +932,7 @@ class App extends Component {
     const st = this.state, strips = new Set([st.eqCh, 48]);
     for (let j = 0; j < 8; j++) strips.add(bankIdx(st.bank, j));
     if (st.sendPop) strips.add(st.sendPop.i);
+    if (st.plPop) strips.add(this.playerCh());
     if (this.touchS) { this.touchS.forEach(x => strips.add(x)); this.touchS.clear(); }
     const diff = [];
     for (const s of strips) {
@@ -1077,7 +1081,10 @@ class App extends Component {
           <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
         </div>
         <nav style="display:flex;gap:6px">
-          <button class="navbtn hot" onClick=${() => this.setState({ screen: 'rec' })}>${IC.player}<span>Player</span></button>
+          <button class="navbtn hot" aria-label="Player. Hold for its fader"
+            onPointerDown=${() => { this.plLong = false; clearTimeout(this.plT); this.plT = setTimeout(() => { this.plLong = true; this.setState({ plPop: true, plPick: false }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); }}
+            onPointerUp=${() => clearTimeout(this.plT)} onPointerCancel=${() => clearTimeout(this.plT)} onPointerLeave=${() => clearTimeout(this.plT)}
+            onClick=${() => { if (this.plLong) { this.plLong = false; return; } this.setState({ screen: 'rec' }); }}>${IC.player}<span>Player</span></button>
           <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.fx}<span>FX</span></button>
           <button class="navbtn" onClick=${() => this.setState({ screen: 'routing' })}>${IC.route}<span>Routing</span></button>
           <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.scenes}<span>Scenes</span></button>
@@ -1106,7 +1113,50 @@ class App extends Component {
             <button class="pill" style="flex:1;height:50px;background:#ff7a3d;color:#1a0d05;border-color:#ff7a3d" onClick=${() => this.setLive(true)}>Turn on</button>
           </div>
         </div>`}
-      ${st.panPop && this.renderPan(Hd)}`;
+      ${st.panPop && this.renderPan(Hd)}
+      ${st.plPop && this.renderPlayerFader(Hd)}`;
+  }
+  /* the channel the USB player comes in on: the one set by hand, else the first fed by the player */
+  playerCh() {
+    const p = this.state.prefs.playerCh;
+    if (p != null) return p;
+    for (let i = 0; i < 48; i++) { const cf = this.state.cfg[i]; if (cf && cf.main && cf.main.grp === 'PLY') return i; }
+    return 0;
+  }
+  renderPlayerFader(Hd) {
+    const st = this.state, i = this.playerCh(), c = st.chans[i];
+    const W = 156, L = 700, T = 60, H = Hd - 72, FH = H - 172, TT = FH - 44;
+    const close = () => this.setState({ plPop: false, plPick: false });
+    const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']].map(m => ({ label: m[1], c: Math.round((1 - m[0]) * TT + 22) }));
+    const lv = this.state.plLv || [0, 0];
+    return html`
+      <button class="scrim" style="z-index:12;background:rgba(8,7,6,.45)" aria-label="Close player fader" onClick=${close}></button>
+      <div class="pop" style=${`z-index:13;left:${L}px;top:${T}px;width:${W}px;height:${H}px;padding:10px;gap:8px;align-items:center;border-color:#8a6a3a`}>
+        <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#b8a78a">PLAYER</span>
+        <button onClick=${() => this.setState({ plPick: !st.plPick })} aria-label=${'Fader controls ' + c.name + '. Tap to choose another channel'}
+          style=${`width:100%;height:40px;display:flex;align-items:center;justify-content:center;gap:4px;border-radius:7px;border:none;cursor:pointer;font-weight:700;font-size:15px;color:#121110;background:${c.color}`}>
+          <span style="max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</span><span>▾</span></button>
+        <span style="font-family:var(--mono);font-size:15px;color:var(--brass-hi)">${dbText(c.v)}</span>
+        <button class="fader" style=${`height:${FH}px;width:110px`} aria-label=${c.name + ' fader ' + dbText(c.v) + ' dB'}
+          onPointerDown=${e => this.faderDown(i, e, TT, FH, true)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          ${marks.map(m => html`<span class="mk" style=${'top:' + (m.c - 7) + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.c + 'px'}></span>`)}
+          <span class="slot"></span>
+          ${this.mtr(lv[0], lv[1], TT, 0, 0)}
+          <span class="cap" style=${'top:' + Math.round((1 - c.v) * TT) + 'px'}></span>
+        </button>
+        <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)}
+          style=${`width:100%;height:44px;border-radius:7px;font-weight:700;font-size:15px;cursor:pointer;${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
+      </div>
+      ${st.plPick && html`<div class="pop" style=${`z-index:14;left:${L - 330}px;top:${T}px;width:320px;height:${H}px;padding:10px;gap:6px;border-color:#8a6a3a`}>
+        <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#cbbd9f;padding:2px 4px">איזה ערוץ מקבל את הנגן?</span>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+          ${st.chans.slice(0, 48).map((x, k) => html`<button onClick=${() => { this.setPref({ playerCh: k }); this.setState({ plPick: false }); }} aria-pressed=${String(k === i)}
+            style=${`min-height:42px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:7px;cursor:pointer;text-align:left;${k === i ? 'background:#2a2014;border:1px solid var(--brass)' : 'background:#141210;border:1px solid #2c2721'}`}>
+            <span style=${'width:6px;height:24px;border-radius:3px;background:' + x.color}></span>
+            <span style="width:52px;font-family:var(--mono);font-size:12px;color:#8a8170">${k < 40 ? 'CH ' + pad2(k + 1) : 'AUX ' + (k - 39)}</span>
+            <span style=${`flex:1;font-size:16px;font-weight:600;color:${k === i ? 'var(--brass-hi)' : '#e9dcc2'}`}>${x.name}</span>
+            ${this.cfgOf(k).main && this.cfgOf(k).main.grp === 'PLY' && html`<span style="font-size:11px;letter-spacing:.1em;color:#9b927f">PLAYER IN</span>`}</button>`)}
+        </div></div>`}`;
   }
 
   renderSends(Hd) {
