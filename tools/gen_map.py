@@ -2,7 +2,7 @@
 
 Source: libwing propmap.jsonl (firmware 3.0.5). Usage:
   python3 tools/gen_map.py path/to/propmap.jsonl > tools/wing-map.js
-Strips: 0-39 = /ch/1-40, 40-47 = /aux/1-8, 48 = /main/1, 49-64 = /bus/1-16, 65-72 = /mtx/1-8.
+Strips: 0-39 = /ch/1-40, 40-47 = /aux/1-8, 48 = /main/1, 49-64 = /bus/1-16, 65-72 = /mtx/1-8, 73-75 = /main/2-4.
 """
 import json, sys
 
@@ -44,7 +44,7 @@ for s in core + inp + flt + eq + gate + gsc + dyn + dsc + ins + sends + ['gate',
     if s not in SUF: SUF.append(s)
 
 bases = [f'/ch/{n}/' for n in range(1, 41)] + [f'/aux/{n}/' for n in range(1, 9)] + ['/main/1/'] + \
-        [f'/bus/{n}/' for n in range(1, 17)] + [f'/mtx/{n}/' for n in range(1, 9)]
+        [f'/bus/{n}/' for n in range(1, 17)] + [f'/mtx/{n}/' for n in range(1, 9)] + [f'/main/{n}/' for n in range(2, 5)]
 def lookup(b, s):
     pp = s.split('/')
     if pp[0] in ('gate', 'dyn') and len(pp) > 1 and pp[1].isdigit():
