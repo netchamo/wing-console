@@ -201,8 +201,8 @@ function makeEq() {
 const DEQ = 'Dual Dynamic EQ';
 const TABS = ['Home', 'Config', 'Gate', 'EQ', 'Comp', 'Ins 1', 'Ins 2', 'Sends'];
 const NOGRIP = new Set(['Home', 'Config', 'Sends', 'Outputs']);
-const BUS_TABS = ['Home', 'EQ', 'Comp', 'Ins 1', 'Ins 2', 'Outputs'];
-const tabsOf = s => s >= 48 ? BUS_TABS : TABS;
+const BUS_TABS = ['Home', 'EQ', 'Comp', 'Ins 1', 'Ins 2', 'Sends', 'Outputs'];
+const tabsOf = s => s >= 65 && s < 73 ? BUS_TABS.filter(t => t !== 'Sends') : s >= 48 ? BUS_TABS : TABS;
 const EQ_IDS = s => s >= 48 ? ['L', '1', '2', '3', '4', '5', '6', 'H'] : ['L', '1', '2', '3', '4', 'H'];
 const EXTRA_BANDS = { 5: { f: 4200, q: 1.4, color: '#e58fb5' }, 6: { f: 7500, q: 1.2, color: '#8cc47e' } };
 const SEND_LBL = ['Mon Vox','Mon Gtr','Mon Keys','Mon Drums','IEM 1','IEM 2','Reverb','Delay','Bus 9','Bus 10','Bus 11','Bus 12','Bus 13','Bus 14','Bus 15','Bus 16'];
@@ -313,6 +313,9 @@ class App extends Component {
     document.addEventListener('contextmenu', e => e.preventDefault());
     const ua = () => { this.uAct = Date.now(); };
     ['pointerdown', 'pointermove', 'click', 'wheel', 'keydown'].forEach(t => document.addEventListener(t, ua, true));
+    // a finger lifted anywhere is gone for pinch tracking too
+    const gone = e => { if (this.ptrs && this.ptrs[e.pointerId]) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; } };
+    ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, gone, true));
     this.iv = setInterval(() => this.tick(), 110);
     this.gv = setInterval(() => { this.gateSim(); this.compSim(); }, 50);
     if (NATIVE) {
@@ -722,7 +725,12 @@ class App extends Component {
       for (let k = 0; k < 16; k++) { const key = `send/${k + 1}/mode`; if (has(key)) { md[k] = mx[key]; so = true; } }
       if (so) { c.sendOn = on; c.sendMode = md; }
     }
-    if (isMain) o.main = c; else { const chans = st.chans.slice(); chans[s] = c; o.chans = chans; }
+    if (isMain) {
+      o.main = c;
+      const m = { ...st.chans[48] }, sends = m.sends.slice(), on = (m.sendOn || Array(24).fill(true)).slice(); let ch2 = false;
+      for (let k = 16; k < 24; k++) { const b = `send/MX${k - 15}/`; if (has(b + 'lvl')) { sends[k] = posOf(+mx[b + 'lvl']); ch2 = true; } if (has(b + 'on')) { on[k] = +mx[b + 'on'] === 1; ch2 = true; } }
+      if (ch2) { const chans = st.chans.slice(); chans[48] = { ...m, sends, sendOn: on }; o.chans = chans; }
+    } else { const chans = st.chans.slice(); chans[s] = c; o.chans = chans; }
     if (isMain && s !== st.eqCh) return o;
 
     // input / config
@@ -877,8 +885,9 @@ class App extends Component {
     d.fdr = fdrDb(c.v); d.mute = c.mute ? 1 : 0; d.pan = c.pan * 100; d.wid = c.width * 100 * (c.swap ? -1 : 1);
     if (s === 48 && s !== st.eqCh) return d;
     if (s !== 48) d.$solo = c.solo ? 1 : 0;
-    for (let k = 0; k < 24; k++) d[k < 16 ? `send/${k + 1}/lvl` : `send/MX${k - 15}/lvl`] = fdrDb(c.sends[k]);
-    if (c.sendOn) for (let k = 0; k < 24; k++) d[(k < 16 ? `send/${k + 1}` : `send/MX${k - 15}`) + '/on'] = c.sendOn[k] === false ? 0 : 1;
+    const cs = s === 48 ? st.chans[48] : c;
+    for (let k = 0; k < 24; k++) d[k < 16 ? `send/${k + 1}/lvl` : `send/MX${k - 15}/lvl`] = fdrDb(cs.sends[k]);
+    if (cs.sendOn) for (let k = 0; k < 24; k++) d[(k < 16 ? `send/${k + 1}` : `send/MX${k - 15}`) + '/on'] = cs.sendOn[k] === false ? 0 : 1;
     if (c.sendMode) for (let k = 0; k < 16; k++) d[`send/${k + 1}/mode`] = c.sendMode[k] || 'POST';
     const cf = st.cfg[s];
     if (cf && this.cfgSeen.has(s)) {
@@ -1306,7 +1315,7 @@ class App extends Component {
   ptrDown(e) {
     this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
     const ids = Object.keys(this.ptrs);
-    if (ids.length === 2 && !this.pinch) { const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: this.state[this.ek].bands[this.state[this.ek].sel].q }; this.drag = null; }
+    if (ids.length === 2 && !this.pinch && e.pointerType !== 'mouse') { const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: this.state[this.ek].bands[this.state[this.ek].sel].q }; this.drag = null; }
   }
   gMove(e) {
     if (this.ptrs[e.pointerId]) this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
@@ -1330,6 +1339,7 @@ class App extends Component {
       this.updEq({ [dr.kind]: { ...q[dr.kind], f: dr.kind === 'lc' ? clamp(nf, 20, 600) : clamp(nf, 1500, 20000) } });
     }
   }
+  ptrGone(e) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; }
   gUp(e) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; if (!Object.keys(this.ptrs).length) this.drag = null; }
   bandDown(i, e) {
     capture(e); this.ptrDown(e);
@@ -1454,7 +1464,7 @@ class App extends Component {
         <div style=${`position:relative;width:${W}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;touch-action:none;background:radial-gradient(ellipse at 50% 0%,#142024,#0c1214 70%);border:1px solid #22302f`}
           onPointerDownCapture=${e => this.ptrDown(e)}
           onPointerMoveCapture=${e => { if (this.pinch) { this.gMove(e); e.stopPropagation(); } }}
-          onPointerUpCapture=${e => { if (this.pinch) this.gUp(e); }} onPointerCancelCapture=${e => { if (this.pinch) this.gUp(e); }}>
+          onPointerUpCapture=${e => this.ptrGone(e)} onPointerCancelCapture=${e => this.ptrGone(e)} onLostPointerCaptureCapture=${e => this.ptrGone(e)}>
           <button aria-label="EQ graph. Pinch anywhere to change the selected band's Q" onPointerDown=${e => this.eqBgDown(e)} ...${gEv} onWheel=${wheel}
             style="position:absolute;inset:0;padding:0;border:none;background:transparent;touch-action:none;cursor:default">
             <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
@@ -1971,18 +1981,18 @@ class App extends Component {
   sendName(k) { return k < 16 ? 'BUS ' + (k + 1) : 'MTX ' + (k - 15); }
 
   renderSendsTab(Hd) {
-    const st = this.state, i = st.eqCh, ch = st.chans[i], bank = st.sendBank || 0;
+    const st = this.state, i = st.eqCh, ch = st.chans[i], onlyMtx = i === 48 || i >= 73, bank = onlyMtx ? 2 : (st.sendBank || 0);
     const FH = Math.max(120, Math.round(Hd - 52 - 20 - 56 - 214)), on = ch.sendOn || [], mode = ch.sendMode || [];
     const banks = ['Bus 1–8', 'Bus 9–16', 'Matrix 1–8'];
     return html`
-      ${this.chanHeader('Sends', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>`)}
+      ${this.chanHeader('Sends', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">${stripName(i)}</span>`)}
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 14px">
         <div style="height:46px;display:flex;gap:8px">
-          ${banks.map((l, n) => html`<button class=${'pill' + (n === bank ? ' on' : '')} style="flex:1;height:46px;font-size:18px" onClick=${() => this.setState({ sendBank: n })}>${l}</button>`)}
+          ${banks.map((l, n) => onlyMtx && n < 2 ? null : html`<button class=${'pill' + (n === bank ? ' on' : '')} style="flex:1;height:46px;font-size:18px" onClick=${() => this.setState({ sendBank: n })}>${l}</button>`)}
         </div>
         <div style="flex:1;min-height:0;display:flex;gap:8px">
           ${Array.from({ length: 8 }, (_, j) => bank * 8 + j).map(k => {
-            const v = ch.sends[k], isOn = on[k] !== false, md = mode[k] || 'POST', bus = k < 16;
+            const v = ch.sends[k], isOn = on[k] !== false, md = mode[k] || 'POST', bus = k < 16 && i < 48;
             return html`<div style=${`flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 6px;border-radius:8px;background:#161412;border:1px solid ${isOn ? '#3a342c' : '#2a1513'};opacity:${isOn ? 1 : 0.6}`}>
               <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#8a8170">${this.sendName(k)}</span>
               <span style="max-width:100%;font-size:15px;font-weight:600;letter-spacing:.03em;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.busLabel(k)}</span>
@@ -2741,7 +2751,7 @@ class App extends Component {
               <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', gFoot)}
 `}
             ${tile('EQ', q.bypass ? 'Bypassed' : '', onSw(!q.bypass, () => this.setState(s0 => ({ eq: { ...s0.eq, bypass: !s0.eq.bypass } })), 'EQ'), () => this.goTab('EQ'), html`
-              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
+              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', i >= 48 ? 760 : 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
             ${tile('COMP', mName('comp', cSlot), onSw(this.slotOn('comp'), () => this.setSlotOn('comp', !this.slotOn('comp')), 'Comp'), () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
                 ${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(180, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}
