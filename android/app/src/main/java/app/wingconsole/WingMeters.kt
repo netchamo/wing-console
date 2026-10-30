@@ -209,6 +209,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 }
                 request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
                 request(out, 2, port, listOf(0xa3 to 0))
+                request(out, 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
                 nout = out
                 log("sys", "native link open (TCP 2222): meters to UDP $port, changes can go this way")
                 emit(JSONObject().put("type", "nativeOpen"))
@@ -219,13 +220,15 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 var lastEmit = 0L
                 val chL = DoubleArray(48) { -90.0 }
                 val chR = DoubleArray(48) { -90.0 }
+                val bL = DoubleArray(24) { -90.0 }
+                val bR = DoubleArray(24) { -90.0 }
                 var mainL = -90.0
                 var mainR = -90.0
                 var gotFirst = false
                 val buf = ByteArray(8192)
                 while (running) {
                     val now = System.currentTimeMillis()
-                    if (now >= nextKeep) { keepAlive(out, 1, port); keepAlive(out, 2, port); nextKeep = now + 3000 }
+                    if (now >= nextKeep) { keepAlive(out, 1, port); keepAlive(out, 2, port); keepAlive(out, 3, port); nextKeep = now + 3000 }
                     if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
                     try {
                         val p = DatagramPacket(buf, buf.size)
@@ -239,14 +242,18 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                             if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values)") }
                         } else if (id == 2) {
                             mainL = v(2); mainR = v(3)
+                        } else if (id == 3) {
+                            for (i in 0 until 24) { bL[i] = v(i * 8 + 2); bR[i] = v(i * 8 + 3) }
                         }
                         if (now - lastEmit >= 50) {
                             lastEmit = now
                             // left and right separately: a stereo channel shows two different columns
                             val l = JSONArray(); val r = JSONArray()
                             for (i in 0 until 48) { l.put(Math.round(chL[i] * 10) / 10.0); r.put(Math.round(chR[i] * 10) / 10.0) }
+                            val bl = JSONArray(); val br = JSONArray()
+                            for (i in 0 until 24) { bl.put(Math.round(bL[i] * 10) / 10.0); br.put(Math.round(bR[i] * 10) / 10.0) }
                             emit(JSONObject().put("type", "meters").put("l", l).put("r", r)
-                                .put("ml", Math.round(mainL * 10) / 10.0).put("mr", Math.round(mainR * 10) / 10.0))
+                                .put("ml", Math.round(mainL * 10) / 10.0).put("mr", Math.round(mainR * 10) / 10.0).put("bl", bl).put("br", br))
                         }
                     } catch (_: SocketTimeoutException) { }
                 }
