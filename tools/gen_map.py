@@ -85,7 +85,7 @@ MODS = {'gate': {m: [[i, n, meta(r)] for i, n, r in sorted(L)] for m, L in GMODS
 G = {}
 for p, r in by.items():
     parts = p.split('/')
-    if p.startswith('/io/in/') and len(parts) == 6 and parts[5] in ('g', 'vph', 'mode', 'name') and not parts[3].startswith('$'):
+    if p.startswith('/io/in/') and len(parts) == 6 and parts[5] in ('g', 'vph', 'mode', 'name', 'pol', 'mute', 'col') and not parts[3].startswith('$'):
         G[p] = r
     elif p.startswith('/io/out/') and len(parts) == 6 and parts[5] in ('grp', 'in'):
         G[p] = r
