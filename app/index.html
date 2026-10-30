@@ -73,7 +73,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 20px;border-radius:10px;background:#2a2014;border:1px solid #8a6a3a;color:var(--brass-hi);font-family:'Heebo',var(--display);font-size:16px;z-index:30;direction:rtl;max-width:90%;text-align:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Heebo:wght@400;700&display=swap">
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Heebo:wght@400;700&display=swap">
 <script>if ('serviceWorker' in navigator && !window.WingNative) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
 </head>
 <body>
@@ -515,7 +515,7 @@ class App extends Component {
     let w = clamp((x - this.wr.left - pad) / (this.wr.width - 2 * pad), 0, 1) * 2; if (Math.abs(w - 1) < 0.04) w = 1;
     this.upd(pp.i, { width: w });
   }
-  sendSet(k, y) {
+  busSend(k, y) {
     const sp = this.state.sendPop; if (!sp || !this.sr) return;
     const v = clamp(1 - ((y - this.sr.top) / this.sr.height * 200 - 26) / 148, 0, 1);
     const idx = sp.bank * 8 + k, i = sp.i;
@@ -623,8 +623,8 @@ class App extends Component {
               <span style="max-width:100%;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</span>
               <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(v)}</span>
               <button class="fader" style="width:60px;height:200px" aria-label=${l + ' send ' + dbText(v)}
-                onPointerDown=${e => { capture(e); this.sr = e.currentTarget.getBoundingClientRect(); this.sendSet(k, e.clientY); }}
-                onPointerMove=${e => this.sendSet(k, e.clientY)} onPointerUp=${() => { this.sr = null; }} onPointerCancel=${() => { this.sr = null; }}>
+                onPointerDown=${e => { capture(e); this.sr = e.currentTarget.getBoundingClientRect(); this.busSend(k, e.clientY); }}
+                onPointerMove=${e => this.busSend(k, e.clientY)} onPointerUp=${() => { this.sr = null; }} onPointerCancel=${() => { this.sr = null; }}>
                 <span style="position:absolute;left:27px;width:6px;top:12px;bottom:12px;border-radius:3px;background:#070606;box-shadow:0 0 0 1px #2c2721"></span>
                 <span style=${`position:absolute;left:27px;width:6px;bottom:12px;height:${Math.round(v * 148 + 2)}px;border-radius:3px;background:#c9a25a;opacity:.55`}></span>
                 <span class="cap" style=${`left:12px;width:36px;height:28px;top:${Math.round((1 - v) * 148 + 12)}px`}></span>

@@ -79,6 +79,12 @@ class MainActivity : Activity() {
                     servedDownloaded = false
                     return assets.shouldInterceptRequest(android.net.Uri.parse("https://$HOST/index.html"))
                 }
+                if (url.host != HOST) {
+                    // Fonts and other outside files: answer at once when there is no internet
+                    // (mixer Wi-Fi), so nothing waits on the network and the screen never stays black.
+                    if (!hasInternet()) return WebResourceResponse("text/plain", "utf-8", 204, "No Content", emptyMap(), java.io.ByteArrayInputStream(ByteArray(0)))
+                    return null
+                }
                 return assets.shouldInterceptRequest(url)
             }
 
@@ -88,7 +94,7 @@ class MainActivity : Activity() {
                 // A downloaded interface that never starts is broken: drop it and use the built-in one.
                 main.postDelayed({
                     if (!jsReady && servedDownloaded) { downloadedIndex()?.delete(); servedDownloaded = false; web.reload() }
-                }, 12000)
+                }, 20000)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -158,6 +164,13 @@ class MainActivity : Activity() {
     }
 
     // ------------------------------------------------------------ interface updates
+
+    /** True only when the phone's default network really reaches the internet (validated). */
+    private fun hasInternet(): Boolean = runCatching {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork ?: return false) ?: return false
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }.getOrDefault(false)
 
     private fun downloadedIndex(): File? = File(filesDir, "web/index.html").takeIf { it.isFile && it.length() > 1000 }
 
