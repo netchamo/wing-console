@@ -26,7 +26,75 @@ import kotlin.concurrent.thread
  *                       values [2] and [3] are the strip's L/R level in 1/256 dB
  * Groups: A0 channel (0-based), A1 aux, A3 main.
  */
-class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (String, String) -> Unit) {
+/**
+ * Decodes the WING native data stream (layout from libwing console.rs read()/decode_next()).
+ * DF is the escape byte: DF DE = literal DF, DF D0..DD = switch channel. Then commands:
+ * D7 id(4) selects a parameter, and the value that follows belongs to it:
+ * 00-3F small int, D3 int16, D4 int32, D5/D6 float, 80-CF / D0 / D1 strings.
+ */
+class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, str: String?) -> Unit) {
+    private var esc = false
+    private var channel = -1
+    private var id = 0
+    private var cmd = -1
+    private var need = 0
+    private var acc = 0L
+    private var str: StringBuilder? = null
+    private var skip = 0
+    private var defLen = -1
+
+    fun feed(x: Int) {
+        if (!esc) { if (x == 0xdf) esc = true else token(x); return }
+        if (x == 0xdf) { token(0xdf); return }
+        esc = false
+        when {
+            x == 0xde -> token(0xdf)
+            x in 0xd0..0xdd -> channel = x - 0xd0
+            channel >= 0 -> { token(0xdf); token(x) }
+            else -> token(x)
+        }
+    }
+
+    private fun token(t: Int) {
+        if (skip > 0) { skip--; return }
+        if (need > 0) {
+            if (str != null) str!!.append(t.toChar()) else acc = (acc shl 8) or t.toLong()
+            need--
+            if (need == 0) finish()
+            return
+        }
+        cmd = t
+        acc = 0; str = null
+        when {
+            t <= 0x3f -> onValue(id, "i", t.toDouble(), null)
+            t in 0x80..0xcf -> { str = StringBuilder(); need = if (t <= 0xbf) t - 0x7f else t - 0xbf }
+            t == 0xd0 -> onValue(id, "s", 0.0, "")
+            t == 0xd1 -> { need = 1 }
+            t == 0xd2 || t == 0xd3 -> need = 2
+            t == 0xd4 || t == 0xd5 || t == 0xd6 || t == 0xd7 -> need = 4
+            t == 0xd9 -> skip = 1
+            t == 0xdf -> { defLen = -2; need = 2 }
+        }
+    }
+
+    private fun finish() {
+        val c = cmd
+        when (c) {
+            0xd1 -> if (str == null) { str = StringBuilder(); cmd = 0x80; need = acc.toInt() + 1; return }
+            0xd2 -> {}
+            0xd3 -> onValue(id, "i", acc.toInt().toShort().toDouble(), null)
+            0xd4 -> onValue(id, "i", acc.toInt().toDouble(), null)
+            0xd5, 0xd6 -> onValue(id, if (c == 0xd5) "f" else "r", java.lang.Float.intBitsToFloat(acc.toInt()).toDouble(), null)
+            0xd7 -> id = acc.toInt()
+            0xdf -> { val len = acc.toInt(); if (len == 0) skip = 4 else skip = len }
+            else -> if (str != null) onValue(id, "s", 0.0, str.toString())
+        }
+        str = null
+    }
+}
+
+class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (String, String) -> Unit,
+                 private val onValue: (Int, String, Double, String?) -> Unit = { _, _, _, _ -> }) {
 
     @Volatile private var running = false
     @Volatile private var tcp: Socket? = null
@@ -92,10 +160,12 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 tcp = s
                 val out = s.getOutputStream()
                 synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }
-                // The WING also sends data on this TCP link; read and discard it so it never backs up.
-                thread(name = "wing-native-drain") {
+                // The WING pushes every change made on the desk on this TCP link, at once.
+                // Decode it so the screen follows the desk smoothly (instead of polling).
+                thread(name = "wing-native-read") {
                     val buf = ByteArray(4096)
-                    runCatching { val inp = s.getInputStream(); while (running && inp.read(buf) >= 0) { } }
+                    val dec = NativeDecoder(onValue)
+                    runCatching { val inp = s.getInputStream(); while (running) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
                 }
                 request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
                 request(out, 2, port, listOf(0xa3 to 0))

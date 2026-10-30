@@ -109,6 +109,14 @@ function dbOf(v) {
   if (v >= 0.0625) return v * 160 - 70;
   return v * 480 - 90;
 }
+function posOf(d) {
+  if (!(d > -90)) return 0;
+  if (d >= -10) return clamp((d + 30) / 40, 0, 1);
+  if (d >= -30) return (d + 50) / 80;
+  if (d >= -60) return (d + 70) / 160;
+  return (d + 90) / 480;
+}
+const NATIVE_NAME = {}; for (const k in NATIVE_IDS) NATIVE_NAME[NATIVE_IDS[k]] = k;
 const dbText = v => { const d = dbOf(v); return d === -Infinity ? '-∞' : (d > 0 ? '+' : '') + d.toFixed(1); };
 const panText = p => Math.abs(p) < 0.01 ? 'C' : (p < 0 ? 'L' : 'R') + Math.round(Math.abs(p) * 100);
 const fmtF = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2) + ' kHz' : Math.round(f) + ' Hz';
@@ -342,7 +350,7 @@ class App extends Component {
     if (n % 45 === 1) q.push('/*S');                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     if (n % 50 === 1) for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo');
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
-    else if (n % 2 === 1) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
+    else if (n % 2 === 1 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
   }
   onNative(list) {
@@ -352,6 +360,19 @@ class App extends Component {
     for (const e of list) {
       if (e.type === 'osc' && this.testAddr && e.address === this.testAddr) { const a = e.args || []; this.testRead = typeof a[2] === 'number' ? a[2] : a[0]; }
       if (e.type === 'osc') { const h = this.holdUntil && this.holdUntil[e.address]; if (!(h && Date.now() < h)) osc.push(e); else C().lastRx = Date.now(); continue; }
+      if (e.type === 'nat') {
+        // a change pushed by the desk on the native link (instant, unlike polling)
+        const addr = NATIVE_NAME[e.id]; if (!addr || typeof e.v !== 'number') continue;
+        this.natAt = Date.now();
+        const isF = /\/fdr$/.test(addr);
+        if (!this.natSeen) { this.natSeen = true; this.logLine('in', 'desk pushes changes live (' + addr + ' ' + e.k + ' ' + e.v + ')'); }
+        let pos = e.v, db = e.v;
+        if (isF) { if (e.k === 'f') pos = posOf(e.v); else if (e.k === 'r') db = dbOf(e.v); else continue; }
+        const h = this.holdUntil && this.holdUntil[addr];
+        if (h && Date.now() < h) { C().lastRx = Date.now(); continue; }
+        osc.push({ type: 'osc', address: addr, args: ['', pos, db] });
+        continue;
+      }
       if (e.type === 'meters') { this.realM = { ch: e.ch, main: e.main, t: Date.now() }; continue; }
       if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
       if (e.type === 'net') { C().wifi = !!e.wifi; continue; }

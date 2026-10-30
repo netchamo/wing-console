@@ -149,7 +149,7 @@ class MainActivity : Activity() {
             if (flushQueued) return
             flushQueued = true
         }
-        main.postDelayed({ flush() }, 40)
+        main.postDelayed({ flush() }, 16)
     }
 
     private fun flush() {

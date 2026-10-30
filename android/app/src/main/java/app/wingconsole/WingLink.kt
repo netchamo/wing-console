@@ -37,7 +37,11 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     private val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val wifiManager = ctx.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
     private val sendQueue = Executors.newSingleThreadExecutor()
-    private val meters = WingMeters(emit) { d, t -> log(d, t) }
+    private val meters = WingMeters(emit, { d, t -> log(d, t) }) { id, kind, num, str ->
+        val o = JSONObject().put("type", "nat").put("id", id).put("k", kind)
+        if (str != null) o.put("s", str) else if (num.isFinite()) o.put("v", num)
+        emit(o)
+    }
 
     @Volatile private var wifiNet: Network? = null
     @Volatile private var socket: DatagramSocket? = null
