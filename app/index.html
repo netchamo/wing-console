@@ -31,7 +31,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .navbtn{width:60px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:transparent;border:1px solid transparent;border-radius:8px;color:#e9dcc2;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .navbtn.hot{background:#2a2014;border-color:#8a6a3a;color:var(--brass-hi);width:66px}
 .strip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px;padding:6px;background:linear-gradient(180deg,#27241f,#1a1815 60%,#161412);border:1px solid #302b25;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-.cname{height:26px;flex:none;border:none;border-radius:3px;padding:0 6px;color:#121110;font-weight:700;font-size:15px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.cname{height:34px;flex:none;border:none;border-radius:4px;padding:0 6px;color:#121110;font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
 .panmini{position:relative;height:30px;flex:none;padding:0;border:1px solid #34302a;border-radius:15px;background:#100f0d;cursor:ew-resize;touch-action:none}
 .knob{position:absolute;top:50%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e3b4,#c9a25a 55%,#7a5a26);box-shadow:0 2px 3px rgba(0,0,0,.6)}
 .ms{display:flex;gap:4px;height:32px;flex:none}
@@ -555,9 +555,12 @@ class App extends Component {
         const c = st.chans[st.eqCh], cf = this.cfgOf(st.eqCh);
         const lvl = s => { if (!s) return 0; const sv = this.srcOf(s); const g = PRE.has(s.grp) ? sv.gain : 30; return Math.min(1, (0.18 + g / 60) * (0.75 + Math.random() * 0.35)); };
         const tg = this.isLinked() ? [0, 0, 0] : [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
-        return { lv, pk, cLv, cPk, cfgLv: st.cfgLv.map((o, k) => tg[k] > o ? tg[k] : o * 0.82) };
+        const cfgLv = st.cfgLv.map((o, k) => tg[k] > o ? tg[k] : o * 0.82);
+        if (st.screen === 'config' || this.isLinked()) return { lv, pk, cLv, cPk, cfgLv };
+        const q = st.eq, ph = Date.now() / 1000;
+        return { lv, pk, cLv, cPk, cfgLv, eq: { ...q, spec: q.base.map((b, k) => q.spec[k] * 0.9 + Math.max(0.03, b + (Math.random() - 0.5) * 0.06 + 0.04 * Math.sin(ph * 3 + k * 0.2)) * 0.1) } };
       }
-      const key = st.screen === 'eq' ? 'eq' : st.screen === 'dyn' && isDeq(st.slots[st.dynSlot]) ? (st.dynSlot === 'gate' ? 'deq' : 'cdeq') : null;
+      const key = st.screen === 'eq' || st.screen === 'home' ? 'eq' : st.screen === 'dyn' && isDeq(st.slots[st.dynSlot]) ? (st.dynSlot === 'gate' ? 'deq' : 'cdeq') : null;
       if (!key) return { lv, pk, cLv, cPk };
       const q = st[key];
       if (this.isLinked()) {
@@ -1033,13 +1036,13 @@ class App extends Component {
 
   renderMain(Hd) {
     const st = this.state, b = st.bank;
-    const FH = Math.round(Hd - 216), T = FH - 44;
+    const FH = Math.round(Hd - 224), T = FH - 44;
     const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const segs = lv => { const o = []; for (let s = 17; s >= 0; s--) { const lit = lv > s / 18; o.push(s >= 16 ? (lit ? '#e0513f' : '#2f1714') : s >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); } return o; };
     const strip = (i, c, j, isMain) => html`
       <div class="strip" style=${isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
-        <button class="cname" style=${'background:' + (isMain ? '#d9b56a' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
+        <button class="cname" style=${'background:' + (isMain ? '#d9b56a;font-size:15px;letter-spacing:.02em' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
           onClick=${() => { if (isMain || i >= 49) this.setState({ screen: 'bus', busCh: isMain ? 48 : i, outDest: null }); else this.setState({ screen: this.state.prefs.back === 'last' ? this.state.lastTab : 'home', eqCh: i }); }}>${isMain ? 'Main LR' : c.name}</button>
         <button class="panmini" aria-label=${'Pan ' + panText(c.pan)}
           onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
@@ -2150,9 +2153,11 @@ class App extends Component {
   routeTabs() {
     const t = this.state.routeTab || 'out';
     return html`<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;padding:4px;gap:4px;border-radius:14px;background:linear-gradient(180deg,#14110d,#0c0a08);border:1px solid #6a5232;box-shadow:inset 0 2px 6px rgba(0,0,0,.7),0 0 0 1px #000,0 6px 16px rgba(0,0,0,.45)">
-      ${[['out', 'OUTPUTS'], ['ch', 'CHANNELS'], ['src', 'SOURCES']].map(([v, l]) => html`<button onClick=${() => this.setState({ routeTab: v, pick: null })} aria-pressed=${String(t === v)}
-        style=${`min-width:150px;height:44px;border-radius:10px;font-weight:800;font-size:17px;letter-spacing:.12em;cursor:pointer;
-        ${t === v ? 'background:linear-gradient(180deg,#e2bf74,#b88c40);color:#1a1205;border:1px solid #f3d58f;box-shadow:0 0 14px rgba(232,180,90,.35),inset 0 1px 0 rgba(255,255,255,.35)' : 'background:linear-gradient(180deg,#2a2621,#1a1714);color:#d9cdb3;border:1px solid #3a342c;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)'}`}>${l}</button>`)}
+      ${[['out', 'OUTPUTS', html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="12" height="14" rx="2"/><path d="M12 12h9M18 9l3 3-3 3"/></svg>`],
+        ['ch', 'CHANNELS', html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3v18M12 3v18M18 3v18"/><rect x="3.5" y="12" width="5" height="3" rx="1" fill="currentColor"/><rect x="9.5" y="6" width="5" height="3" rx="1" fill="currentColor"/><rect x="15.5" y="15" width="5" height="3" rx="1" fill="currentColor"/></svg>`],
+        ['src', 'SOURCES', html`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/><path d="M12 4v3M12 17v3"/></svg>`]].map(([v, l, ic]) => html`<button onClick=${() => this.setState({ routeTab: v, pick: null })} aria-pressed=${String(t === v)}
+        style=${`min-width:150px;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;font-weight:800;font-size:17px;letter-spacing:.12em;cursor:pointer;
+        ${t === v ? 'background:linear-gradient(180deg,#e2bf74,#b88c40);color:#1a1205;border:1px solid #f3d58f;box-shadow:0 0 14px rgba(232,180,90,.35),inset 0 1px 0 rgba(255,255,255,.35)' : 'background:linear-gradient(180deg,#2a2621,#1a1714);color:#d9cdb3;border:1px solid #3a342c;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)'}`}>${ic}${l}</button>`)}
     </div>`;
   }
   touch(s) { (this.touchS || (this.touchS = new Set())).add(s); }
@@ -2205,22 +2210,22 @@ class App extends Component {
   }
   /* a preamp dial in the style of a classic console: cream scale, brass skirt, red pointer */
   gainDial(s, I, sp) {
-    const S = 236, c = S / 2, R = 76, max = sp.min + sp.step * sp.n, n = clamp((I.gain - sp.min) / (max - sp.min), 0, 1), a = -135 + n * 270;
+    const S = 196, c = S / 2, R = 62, max = sp.min + sp.step * sp.n, n = clamp((I.gain - sp.min) / (max - sp.min), 0, 1), a = -135 + n * 270;
     const pt = (deg, r) => { const t = (deg - 90) * Math.PI / 180; return [c + r * Math.cos(t), c + r * Math.sin(t)]; };
     const ticks = [];
     for (let v = Math.ceil(sp.min / 2.5) * 2.5; v <= max + 0.01; v += 2.5) {
       const d = -135 + (v - sp.min) / (max - sp.min) * 270, major = Math.abs(v % 10) < 0.01;
       const [x1, y1] = pt(d, R + 4), [x2, y2] = pt(d, R + (major ? 16 : 10));
       ticks.push(html`<line x1=${x1.toFixed(1)} y1=${y1.toFixed(1)} x2=${x2.toFixed(1)} y2=${y2.toFixed(1)} stroke=${major ? '#efe2c2' : '#8f846d'} stroke-width=${major ? 2.4 : 1.4}/>`);
-      if (major) { const [tx, ty] = pt(d, R + 28); ticks.push(html`<text x=${tx.toFixed(1)} y=${(ty + 5).toFixed(1)} text-anchor="middle" font-size="15" font-weight="700" fill="#efe2c2" font-family="Barlow Condensed,sans-serif">${v}</text>`); }
+      if (major) { const [tx, ty] = pt(d, R + 24); ticks.push(html`<text x=${tx.toFixed(1)} y=${(ty + 5).toFixed(1)} text-anchor="middle" font-size="14" font-weight="700" fill="#efe2c2" font-family="Barlow Condensed,sans-serif">${v}</text>`); }
     }
-    const [px, py] = pt(a, 44), [qx, qy] = pt(a, 14);
+    const [px, py] = pt(a, 36), [qx, qy] = pt(a, 11);
     const down = e => { capture(e); this.gdl = { x: e.clientX, y: e.clientY, g0: I.gain }; };
     const move = e => { const d = this.gdl; if (!d) return; const delta = (e.clientX - d.x) - (e.clientY - d.y);
       const v = Math.round((clamp(d.g0 + delta / 260 * (max - sp.min), sp.min, max) - sp.min) / sp.step) * sp.step + sp.min, r = Math.round(v * 10) / 10;
       if (r !== this.srcOf(s).gain) { this.updSrc(s, { gain: r }); try { navigator.vibrate && navigator.vibrate(3); } catch (_) {} } };
     const up = () => { this.gdl = null; };
-    return html`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 6px;border-radius:12px;background:radial-gradient(ellipse at 50% 30%,#2b241b,#15120e 70%);border:1px solid #3a2f22;box-shadow:inset 0 0 30px rgba(0,0,0,.6)">
+    return html`<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 4px;border-radius:12px;background:radial-gradient(ellipse at 50% 30%,#2b241b,#15120e 70%);border:1px solid #3a2f22;box-shadow:inset 0 0 30px rgba(0,0,0,.6)">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:15px;font-weight:800;letter-spacing:.24em;color:#d9c79f">PREAMP GAIN</span>
         <span style="padding:3px 10px;border-radius:6px;background:#0a0806;border:1px solid #3a2f22;font-family:var(--mono);font-size:24px;color:#ffb35c;text-shadow:0 0 10px rgba(255,150,60,.55)">${(I.gain > 0 ? '+' : '') + I.gain.toFixed(1)}<span style="font-size:13px;color:#b0875a"> dB</span></span>
@@ -2235,10 +2240,10 @@ class App extends Component {
           <path d=${arcPath(-135, 135, R, c)} fill="none" stroke="#3a2f22" stroke-width="6" stroke-linecap="round"/>
           <path d=${arcPath(-135, a, R, c)} fill="none" stroke="#e8a33d" stroke-width="6" stroke-linecap="round" opacity=".85"/>
           ${ticks}
-          <circle cx=${c} cy=${c + 4} r="56" fill="#000" opacity=".5"/>
-          <circle cx=${c} cy=${c} r="54" fill="url(#gdSkirt)" stroke="#2a1d0c" stroke-width="2"/>
-          ${Array.from({ length: 36 }, (_, k) => { const [x1, y1] = pt(k * 10, 48), [x2, y2] = pt(k * 10, 54); return html`<line x1=${x1.toFixed(1)} y1=${y1.toFixed(1)} x2=${x2.toFixed(1)} y2=${y2.toFixed(1)} stroke="#5a4220" stroke-width="2"/>`; })}
-          <circle cx=${c} cy=${c} r="36" fill="url(#gdCap)" stroke="#000" stroke-width="1.5"/>
+          <circle cx=${c} cy=${c + 3} r="46" fill="#000" opacity=".5"/>
+          <circle cx=${c} cy=${c} r="44" fill="url(#gdSkirt)" stroke="#2a1d0c" stroke-width="2"/>
+          ${Array.from({ length: 36 }, (_, k) => { const [x1, y1] = pt(k * 10, 39), [x2, y2] = pt(k * 10, 44); return html`<line x1=${x1.toFixed(1)} y1=${y1.toFixed(1)} x2=${x2.toFixed(1)} y2=${y2.toFixed(1)} stroke="#5a4220" stroke-width="2"/>`; })}
+          <circle cx=${c} cy=${c} r="29" fill="url(#gdCap)" stroke="#000" stroke-width="1.5"/>
           <line x1=${qx.toFixed(1)} y1=${qy.toFixed(1)} x2=${px.toFixed(1)} y2=${py.toFixed(1)} stroke="#ff3b2f" stroke-width="5" stroke-linecap="round"/>
           <circle cx=${c} cy=${c} r="6" fill="#2a2420" stroke="#6a5a48" stroke-width="1"/>
         </svg>
@@ -2286,7 +2291,9 @@ class App extends Component {
             <span style="font-family:var(--mono);font-size:26px;color:var(--brass-hi)">${G.short} ${pad2(sel)}${I.mode !== 'M' ? '–' + pad2(sel + 1) : ''}</span>
             <span style="flex:1;min-width:0;font-size:24px;font-weight:700;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${I.name || G.name}</span>
           </div>
-          ${seg([['M', 'Mono'], ['ST', 'Stereo'], ['MS', 'M/S']], I.mode, m => this.setSrcMode(s, m))}
+          ${seg([['M', html`<span style="display:flex;align-items:center;gap:6px"><svg width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="8" r="6"/></svg>Mono</span>`],
+            ['ST', html`<span style="display:flex;align-items:center;gap:6px"><svg width="26" height="16" viewBox="0 0 26 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="9" cy="8" r="6"/><circle cx="17" cy="8" r="6"/></svg>Stereo</span>`],
+            ['MS', html`<span style="display:flex;align-items:center;gap:6px"><svg width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><ellipse cx="11" cy="8" rx="4" ry="7"/><ellipse cx="11" cy="8" rx="9" ry="3.2"/></svg>M/S</span>`]], I.mode, m => this.setSrcMode(s, m))}
           ${pre ? this.gainDial(s, I, sp) : null}
           ${false ? html`
             <div style="display:flex;flex-direction:column;gap:4px">
@@ -2303,7 +2310,7 @@ class App extends Component {
           ${!pre && html`<span style="padding:8px 0;font-size:16px;color:#9b927f">Digital input: no preamp gain or phantom.</span>`}
           <div style="display:flex;gap:6px">
             ${pre && tog(I.ph, '+48V', () => this.updSrc(s, { ph: !I.ph }), 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b;box-shadow:0 0 12px rgba(208,57,43,.5)')}
-            ${tog(I.pol, 'Ø  Polarity', () => this.updSrc(s, { pol: !I.pol }), 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass)')}
+            ${tog(I.pol, html`<svg width="34" height="34" viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="1.6" aria-label="Polarity invert"><circle cx="17" cy="17" r="10"/><path d="M8 28L26 6"/></svg>`, () => this.updSrc(s, { pol: !I.pol }), 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass)')}
             ${tog(I.mute, 'MUTE', () => this.updSrc(s, { mute: !I.mute }), 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b')}
           </div>
           <div style="display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px solid #2c2721">
@@ -2545,10 +2552,12 @@ class App extends Component {
   }
 
   /* ---------- channel home (overview) ---------- */
-  miniEq(key, W, H) {
+  miniEq(key, W, H, spec) {
     const sg = this.g, sk = this.ek;
     this.ek = key; this.g = { W, H, pad: 8 };
     const q = this.state[key], D = key !== 'eq';
+    let sp = '';
+    if (spec && q.pre && !this.isLinked()) { sp = `M 0 ${H}`; q.spec.forEach((v, k) => { sp += ` L ${(W * k / 119).toFixed(1)} ${(H - v * H * 0.72).toFixed(1)}`; }); sp += ` L ${W} ${H} Z`; }
     const curve = this.path(f => (D ? 0 : this.filt(f)) + q.bands.reduce((a, b) => a + this.resp(b, f, D ? b.range : b.g), 0));
     const dots = q.bands.map(b => ({ x: this.X(b.f), y: clamp(this.Y(D ? b.range : b.g), 6, H - 6), c: b.color, on: b.on }));
     const z = this.Y(0).toFixed(1);
@@ -2556,6 +2565,7 @@ class App extends Component {
     const grid = [100, 1000, 10000].map(f => `M ${(W * Math.log10(f / 20) / 3).toFixed(1)} 0 V ${H}`).join(' ');
     return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
       <path d=${grid} stroke="#1c2a30" stroke-width="1" fill="none"/>
+      ${sp && html`<path d=${sp} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".5" stroke-width="1"/>`}
       <path d=${`M 0 ${z} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
       <path d=${curve} stroke="#f6b45e" stroke-width="2.2" fill="none" opacity=${q.bypass ? 0.35 : 1}/>
       ${dots.map(d => html`<circle cx=${d.x.toFixed(1)} cy=${d.y.toFixed(1)} r="5" fill=${d.c} opacity=${d.on ? 1 : 0.3}/>`)}
@@ -2637,6 +2647,9 @@ class App extends Component {
         </span>
         ${body}
       </button>`;
+    const onSw = (on, fn, label) => html`<span role="switch" aria-checked=${String(on)} aria-label=${label + (on ? ' on' : ' off')} tabindex="0"
+      onClick=${e => { e.stopPropagation(); fn(); }} onPointerDown=${e => e.stopPropagation()}
+      style=${`min-width:52px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:7px;font-weight:800;font-size:13px;letter-spacing:.08em;${on ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c;box-shadow:0 0 8px rgba(98,184,92,.35)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${on ? 'ON' : 'OFF'}</span>`;
     const badge = (on, txt) => html`<span style=${`padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.1em;${on ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#141210;color:#8a8170;border:1px solid #3a342c'}`}>${txt}</span>`;
     const chip = (txt, on, color) => html`<span style=${`padding:4px 9px;border-radius:6px;font-family:var(--mono);font-size:13px;${on ? `background:#2a2014;color:${color || 'var(--brass-hi)'};border:1px solid #8a6a3a` : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${txt}</span>`;
     const ph = v => html`<span style=${`padding:4px 10px;border-radius:6px;font-weight:700;font-size:14px;${v ? 'background:#d0392b;color:#fff6ee;box-shadow:0 0 10px rgba(208,57,43,.5)' : 'background:#2a1513;color:#8a5a52'}`}>+48V</span>`;
@@ -2690,18 +2703,14 @@ class App extends Component {
               </span>`, 'flex:1;min-width:0')}
               ${this.homeGain(src, pre, sv, h1)}
             </div>
-            ${tile('GATE', mName('gate', gSlot), gSlot === 'GATE' ? badge(st.gate.on, st.gate.on ? (st.gate.sim.gr < 3 ? 'OPEN' : 'CLOSED') : 'OFF') : null, () => this.goTab('Gate'), html`
+            ${tile('GATE', mName('gate', gSlot), onSw(this.slotOn('gate'), () => this.setSlotOn('gate', !this.slotOn('gate')), 'Gate'), () => this.goTab('Gate'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
                 ${gSlot === 'GATE' ? this.miniGate(180, mH) : isDeq(gSlot) ? this.miniEq('deq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
               </span>
               <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', gFoot)}
-            ${tile('EQ', q.bypass ? 'Bypassed' : q.bands.filter(b => b.on).length + ' bands on', null, () => this.goTab('EQ'), html`
-              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', 400, mH)}</span>
-              <span style="display:flex;gap:5px;flex-wrap:wrap">
-                ${q.lc.on && chip('LC ' + fmtF(q.lc.f), true, '#cfe0e5')}${q.hc.on && chip('HC ' + fmtF(q.hc.f), true, '#cfe0e5')}
-                ${q.bands.filter(b => b.on && Math.abs(b.g) >= 0.5).slice(0, 3).map(b => chip(b.id + ' ' + fmtF(b.f) + ' ' + (b.g > 0 ? '+' : '') + b.g.toFixed(1), true, b.color))}
-              </span>`, 'flex:1')}
-            ${tile('COMP', mName('comp', cSlot), (cSlot === 'COMP' || cSlot === 'EXP') ? badge(st.comp.on, st.comp.on ? 'GR ' + Math.max(0, (st.comp.sim || { gr: 0 }).gr).toFixed(1) : 'OFF') : null, () => this.goTab('Comp'), html`
+            ${tile('EQ', q.bypass ? 'Bypassed' : '', onSw(!q.bypass, () => this.setState(s0 => ({ eq: { ...s0.eq, bypass: !s0.eq.bypass } })), 'EQ'), () => this.goTab('EQ'), html`
+              <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
+            ${tile('COMP', mName('comp', cSlot), onSw(this.slotOn('comp'), () => this.setSlotOn('comp', !this.slotOn('comp')), 'Comp'), () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
                 ${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(180, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}
               </span>
