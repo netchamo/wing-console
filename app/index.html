@@ -2655,16 +2655,28 @@ class App extends Component {
       </button></div>`;
   }
   /* Main / bus / matrix home: the outputs this strip feeds */
-  homeOutputs(s, tile) {
+  /* Main / bus home: the eight matrix sends at a glance; tap opens the Sends tab */
+  homeMtxSends(s, tile) {
+    const st = this.state, c = st.chans[s];
+    return tile('SENDS', 'To matrix', null, () => this.goTab('Sends'), html`
+      <span style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;column-gap:18px;row-gap:4px">
+        ${Array.from({ length: 8 }, (_, k) => 16 + k).map(k => { const v = c.sends[k] || 0, on = (c.sendOn || [])[k] !== false; return html`<span style=${`min-height:0;display:flex;align-items:center;gap:8px;opacity:${on ? 1 : 0.45}`}>
+          <span style=${`width:86px;flex:none;font-size:14px;color:${v > 0 ? '#e9dcc2' : '#6f675a'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${this.busLabel(k)}</span>
+          <span style="flex:1;height:7px;border-radius:3px;background:#0c0b0a;overflow:hidden"><span style=${`display:block;height:100%;width:${Math.round(v * 100)}%;background:#4fc9b7`}></span></span>
+          <span style="width:48px;text-align:right;font-family:var(--mono);font-size:12px;color:#9b927f">${on ? dbText(v) : 'OFF'}</span>
+        </span>`; })}
+      </span>`, 'flex:1');
+  }
+  homeOutputs(s, tile, extra) {
     const st = this.state, grp = s === 48 || s >= 73 ? 'MAIN' : s >= 65 ? 'MTX' : 'BUS', num = s === 48 ? 1 : s >= 73 ? s - 71 : s >= 65 ? s - 64 : s - 48;
     const fed = []; OUTG.forEach(G => { for (let n = 1; n <= G.n; n++) { const x = st.outs[G.id + '/' + n]; if (x && x.grp === grp && Math.ceil(x.n / 2) === num) fed.push({ G, n, side: x.n % 2 ? 'L' : 'R' }); } });
     return tile('OUTPUTS', fed.length + ' in use', null, () => this.goTab('Outputs'), html`
-      <span style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-content:start;overflow:hidden">
-        ${fed.length ? fed.slice(0, 15).map(f => html`<span style="height:34px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:6px;background:#141210;border:1px solid #2c2721">
+      <span style=${`flex:1;min-height:0;display:grid;grid-template-columns:repeat(${extra && extra.includes('300px') ? 1 : 3},minmax(0,1fr));gap:6px;align-content:start;overflow:hidden`}>
+        ${fed.length ? fed.slice(0, extra && extra.includes('300px') ? 6 : 15).map(f => html`<span style="height:34px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:6px;background:#141210;border:1px solid #2c2721">
           <span style=${`width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:4px;font-size:12px;font-weight:700;color:#121110;background:${f.side === 'L' ? '#7aa7e0' : '#e0a35e'}`}>${f.side}</span>
           <span style="font-size:14px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.G.name} ${f.n}</span></span>`)
           : html`<span dir="rtl" style="grid-column:1/-1;font-family:'Heebo',sans-serif;font-size:15px;color:#9b927f">אין יציאות שמקבלות את הערוץ הזה. לחץ כדי להוסיף.</span>`}
-      </span>`, 'flex:1');
+      </span>`, extra || 'flex:1');
   }
   renderHome(Hd) {
     const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(Math.min(i, 47));
@@ -2771,7 +2783,7 @@ class App extends Component {
                   clearTimeout(this.swT); this.swT = setTimeout(() => { this.swLong = true; this.setState({ sendWheel: { i, off: clamp(k - 2, 0, 19) } }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); },
                 onPointerMove: e => { if (this.swP && Math.hypot(e.clientX - this.swP.x, e.clientY - this.swP.y) > 10) clearTimeout(this.swT); },
                 onPointerUp: () => clearTimeout(this.swT), onPointerCancel: () => clearTimeout(this.swT), onPointerLeave: () => clearTimeout(this.swT) })}
-` : this.homeOutputs(i, tile)}
+` : html`${i < 65 || i >= 73 ? this.homeMtxSends(i, tile) : null}${this.homeOutputs(i, tile, i < 65 || i >= 73 ? 'width:300px;flex:none' : 'flex:1')}`}
             ${tile('INSERTS', '', null, () => this.toast('לשוניות ה-Inserts עוד לא נבנו'), html`
               <span style="flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center">
                 ${[['INS 1', 'preins'], ['INS 2', 'postins']].map(([n, k]) => { const mx = this.mx[i] || {}, fx = mx[k + '/ins'], on = +mx[k + '/on'] === 1; return html`<span style=${`height:44px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:7px;border:1px ${fx && fx !== 'NONE' ? 'solid #5a4630' : 'dashed #3a342c'};background:#141210`}>
