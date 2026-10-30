@@ -87,3 +87,14 @@ Highlights used by the screens:
   freq, Q, below/above. It does not exist in the dynamics (comp) slot.
 - Meters: values `[2]`/`[3]` of each strip are left/right; a mono channel reports the same on both.
 - Recorder source: `/io/out/REC/1…4/{grp,in}`. The WING has no EQ or gain on the recorder itself.
+
+## Definitions from the desk (firmware 3.1 and later)
+
+- `D7 id DD` asks for a definition; a node answers with one definition per child:
+  parent, id, index, name, long name, flags (type, unit, read only), then range or list items
+  (libwing node.rs `from_bytes`). They arrive framed as `DF len16 [len32]` + bytes.
+- The app asks for `/ch/N/gate`, `/ch/N/dyn` and their `mdl` when a channel opens: the model list
+  (3.1 puts every model in both slots and adds Dual Dynamic EQ, Even 88 Comp, LMT, One Knob) and the
+  current model's parameters with their real ids. The two bands of the dynamic EQ are found by name.
+- The player's song list is the item list of `/play/$songs` (definition request). The remote map has no
+  USB folder listing and no playlist create/save/open command.

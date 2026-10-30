@@ -318,6 +318,18 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
 
     /** Asks the WING for the current values of these ids (read only, allowed with live control off).
      *  libwing request_node_data: D7 + id + DC. The answers arrive as normal pushes (type "nat"). */
+    /** Asks for definitions (name, type, range, list items): D7 id DD. A node answers with its children. */
+    fun requestDef(ids: String) {
+        val buf = ByteArrayOutputStream()
+        fun esc(v: Int) { val x = v and 0xff; buf.write(x); if (x == 0xdf) buf.write(0xde) }
+        var n = 0
+        for (t in ids.split(',')) {
+            val id = t.trim().toLongOrNull()?.toInt() ?: continue
+            buf.write(0xd7); esc(id ushr 24); esc(id ushr 16); esc(id ushr 8); esc(id); buf.write(0xdd); n++
+        }
+        if (n > 0 && !meters.write(buf.toByteArray())) log("err", "native link not open, $n definitions not requested")
+    }
+
     fun request(ids: String) {
         val buf = ByteArrayOutputStream()
         fun esc(v: Int) { val x = v and 0xff; buf.write(x); if (x == 0xdf) buf.write(0xde) }

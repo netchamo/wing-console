@@ -268,6 +268,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun setNative(id: Int, type: String, value: String) = link.setNative(id, type, value)
         @JavascriptInterface fun nativeOpen(): Boolean = link.nativeOpen()
         @JavascriptInterface fun request(ids: String) = link.request(ids)
+        @JavascriptInterface fun requestDef(ids: String) = link.requestDef(ids)
         @JavascriptInterface fun openWifi() {
             main.post {
                 val i = if (Build.VERSION.SDK_INT >= 29) Intent(Settings.Panel.ACTION_WIFI) else Intent(Settings.ACTION_WIFI_SETTINGS)

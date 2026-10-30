@@ -32,7 +32,12 @@ import kotlin.concurrent.thread
  * D7 id(4) selects a parameter, and the value that follows belongs to it:
  * 00-3F small int, D3 int16, D4 int32, D5/D6 float, 80-CF / D0 / D1 strings.
  */
-class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, str: String?) -> Unit) {
+class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, str: String?) -> Unit,
+                    private val onDef: (JSONObject) -> Unit = {}) {
+    private var defPhase = 0          // 1: reading u16 length, 2: reading u32 length, 3: collecting the definition
+    private var defNeed = 0
+    private var defAcc = 0L
+    private var defBuf = java.io.ByteArrayOutputStream()
     private var esc = false
     private var channel = -1
     private var id = 0
@@ -56,6 +61,7 @@ class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, st
     }
 
     private fun token(t: Int) {
+        if (defPhase > 0) { defToken(t); return }
         if (skip > 0) { skip--; return }
         if (need > 0) {
             if (str != null) str!!.append(t.toChar()) else acc = (acc shl 8) or t.toLong()
@@ -73,8 +79,43 @@ class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, st
             t == 0xd2 || t == 0xd3 -> need = 2
             t == 0xd4 || t == 0xd5 || t == 0xd6 || t == 0xd7 -> need = 4
             t == 0xd9 -> skip = 1
-            t == 0xdf -> { defLen = -2; need = 2 }
+            t == 0xdf -> { defPhase = 1; defNeed = 2; defAcc = 0 }
         }
+    }
+
+    /* node definition (libwing node.rs from_bytes): DF len16 [len32 if 0] then the definition bytes */
+    private fun defToken(t: Int) {
+        when (defPhase) {
+            1, 2 -> { defAcc = (defAcc shl 8) or t.toLong(); defNeed--
+                if (defNeed == 0) {
+                    if (defPhase == 1 && defAcc == 0L) { defPhase = 2; defNeed = 4; defAcc = 0; return }
+                    defNeed = defAcc.toInt(); defBuf = java.io.ByteArrayOutputStream()
+                    defPhase = if (defNeed > 0) 3 else 0
+                } }
+            3 -> { defBuf.write(t); defNeed--; if (defNeed <= 0) { defPhase = 0; runCatching { onDef(parseDef(defBuf.toByteArray())) } } }
+        }
+    }
+
+    private fun parseDef(r: ByteArray): JSONObject {
+        var i = 0
+        fun u8() = r[i++].toInt() and 0xff
+        fun u16() = (u8() shl 8) or u8()
+        fun i32() = (u8() shl 24) or (u8() shl 16) or (u8() shl 8) or u8()
+        fun str(n: Int): String { val s = String(r, i, n, Charsets.UTF_8); i += n; return s }
+        val o = JSONObject().put("type", "def")
+        o.put("parent", i32()); o.put("id", i32()); o.put("index", u16())
+        o.put("name", str(u8())); o.put("lname", str(u8()))
+        val flags = u16()
+        val t = (flags shr 4) and 0x0f
+        o.put("t", arrayOf("node", "lin", "log", "fdr", "int", "enum", "fenum", "str").getOrElse(t) { "node" })
+        o.put("u", flags and 0x0f); o.put("ro", (flags shr 9) and 1)
+        when (t) {
+            1, 2 -> { o.put("a", java.lang.Float.intBitsToFloat(i32()).toDouble()); o.put("b", java.lang.Float.intBitsToFloat(i32()).toDouble()); o.put("n", i32()) }
+            4 -> { o.put("a", i32()); o.put("b", i32()) }
+            5 -> { val n = u16(); val it = JSONArray(); val li = JSONArray(); repeat(n) { it.put(str(u8())); li.put(str(u8())) }; o.put("i", it); o.put("li", li) }
+            6 -> { val n = u16(); val it = JSONArray(); val li = JSONArray(); repeat(n) { it.put(java.lang.Float.intBitsToFloat(i32()).toDouble()); li.put(str(u8())) }; o.put("i", it); o.put("li", li) }
+        }
+        return o
     }
 
     private fun finish() {
@@ -86,7 +127,6 @@ class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, st
             0xd4 -> onValue(id, "i", acc.toInt().toDouble(), null)
             0xd5, 0xd6 -> onValue(id, if (c == 0xd5) "f" else "r", java.lang.Float.intBitsToFloat(acc.toInt()).toDouble(), null)
             0xd7 -> id = acc.toInt()
-            0xdf -> { val len = acc.toInt(); if (len == 0) skip = 4 else skip = len }
             else -> if (str != null) onValue(id, "s", 0.0, str.toString())
         }
         str = null
@@ -164,7 +204,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 // Decode it so the screen follows the desk smoothly (instead of polling).
                 thread(name = "wing-native-read") {
                     val buf = ByteArray(4096)
-                    val dec = NativeDecoder(onValue)
+                    val dec = NativeDecoder(onValue) { emit(it) }
                     runCatching { val inp = s.getInputStream(); while (running) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
                 }
                 request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })

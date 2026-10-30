@@ -40,13 +40,13 @@ ins = ['preins/on', 'preins/ins', 'postins/on', 'postins/ins']
 sends = [f'send/{n}/{k}' for n in range(1, 17) for k in ['on', 'lvl', 'mode', 'pan']] + \
         [f'send/MX{n}/{k}' for n in range(1, 9) for k in ['on', 'lvl']]
 SUF = []
-for s in core + inp + flt + eq + gate + gsc + dyn + dsc + ins + sends:
+for s in core + inp + flt + eq + gate + gsc + dyn + dsc + ins + sends + ['gate', 'dyn']:
     if s not in SUF: SUF.append(s)
 
 bases = [f'/ch/{n}/' for n in range(1, 41)] + [f'/aux/{n}/' for n in range(1, 9)] + ['/main/1/']
 def lookup(b, s):
     pp = s.split('/')
-    if pp[0] in ('gate', 'dyn') and pp[1].isdigit():
+    if pp[0] in ('gate', 'dyn') and len(pp) > 1 and pp[1].isdigit():
         k = int(pp[1])
         for mods in (GMODS if pp[0] == 'gate' else DMODS).values():
             for idx, nm, _ in mods:
