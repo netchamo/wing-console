@@ -9,7 +9,6 @@ import java.net.DatagramSocket
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
-import javax.net.SocketFactory
 import kotlin.concurrent.thread
 
 /**
@@ -43,10 +42,11 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         return try { synchronized(wlock) { o.write(bytes); o.flush() }; true } catch (_: Exception) { false }
     }
 
-    fun start(ip: String, net: Network?) {
+    /** netFor: returns the local network that reaches the mixer right now (null = none yet). */
+    fun start(ip: String, netFor: () -> Network?) {
         stop()
         running = true
-        thread(name = "wing-meters") { run(ip, net) }
+        thread(name = "wing-meters") { run(ip, netFor) }
     }
 
     fun stop() {
@@ -71,19 +71,22 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd3), b(0xd4), b(id shr 8), b(id), b(port shr 8), b(port), b(0xdf), b(0xd1))); out.flush() }
     }
 
-    private fun run(ip: String, net: Network?) {
+    private fun run(ip: String, netFor: () -> Network?) {
         var attempt = 0
         while (running) {
+            // Never connect over mobile data: wait until a local network can reach the mixer.
+            val net = netFor()
+            if (net == null) { Thread.sleep(1000); continue }
             try {
                 val u = DatagramSocket(null)
                 u.reuseAddress = true
                 u.bind(InetSocketAddress(0))
-                net?.bindSocket(u)
+                net.bindSocket(u)
                 u.soTimeout = 500
                 udp = u
                 val port = u.localPort
 
-                val s = (net?.socketFactory ?: SocketFactory.getDefault()).createSocket()
+                val s = net.socketFactory.createSocket()
                 s.tcpNoDelay = true
                 s.connect(InetSocketAddress(ip, 2222), 3000)
                 tcp = s

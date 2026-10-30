@@ -117,6 +117,21 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     private fun broadcastOf(i: Iface): InetAddress =
         InetAddress.getByAddress(ByteBuffer.allocate(4).putInt((ipInt(i.addr) and maskOf(i.prefix)) or maskOf(i.prefix).inv()).array())
 
+    /** A local network whose range contains the address, or null. Never mobile data. */
+    private fun localNetFor(t: InetAddress?): Network? {
+        val ifs = localIfaces()
+        return (if (t != null) ifs.firstOrNull { contains(it, t) } else null)?.net
+    }
+
+    @Volatile private var lastErrAt = 0L
+    /** A send failed (e.g. the network went away): drop the socket so the next send binds again. */
+    private fun sendFailed(e: Throwable) {
+        pickedAt = 0L
+        closeSocket()
+        val now = System.currentTimeMillis()
+        if (now - lastErrAt > 2000) { lastErrAt = now; log("err", "send: ${e.message} (re-binding to the network)") }
+    }
+
     /** The local network that can reach this address (cached for 2 s). */
     private fun netFor(t: InetAddress?): Network? {
         val now = System.currentTimeMillis()
@@ -212,7 +227,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         status("connecting", ip)
         thread(name = "wing-rx") { receiveLoop() }
         val t = target
-        thread(name = "wing-meters-start") { meters.start(ip, netFor(t)) }
+        meters.start(ip) { pickedAt = 0L; localNetFor(t) }
     }
 
     fun disconnect() {
@@ -234,7 +249,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
                 if (!addr.startsWith("/") || addr.length > 120) continue
                 val bytes = oscString(addr)
                 runCatching { s.send(DatagramPacket(bytes, bytes.size, t, OSC_PORT)) }
-                    .onFailure { log("err", "send: ${it.message}") }
+                    .onFailure { sendFailed(it) }
             }
         }
     }
@@ -260,7 +275,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         sendQueue.execute {
             val s = ensureSocket() ?: return@execute
             runCatching { s.send(DatagramPacket(bytes, bytes.size, t, OSC_PORT)) }
-                .onFailure { log("err", "send: ${it.message}") }
+                .onFailure { sendFailed(it) }
         }
         // a fader drag sends dozens per second: log the first one and then every 50th
         val n = ++sentCount
