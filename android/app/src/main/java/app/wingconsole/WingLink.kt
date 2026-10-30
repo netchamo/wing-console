@@ -301,6 +301,12 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         when (type) {
             "f" -> { buf.write(0xd5); esc32(java.lang.Float.floatToIntBits(value.toFloatOrNull() ?: return)) }
             "i" -> { val v = value.toIntOrNull() ?: return; if (v in 0..0x3f) buf.write(v) else { buf.write(0xd4); esc32(v) } }
+            "s" -> {
+                // libwing set_string: D0 = empty, 0x7F+len for up to 64 bytes, D1 len-1 for longer
+                val b = value.toByteArray(Charsets.UTF_8)
+                when { b.isEmpty() -> buf.write(0xd0); b.size <= 64 -> buf.write(0x7f + b.size); b.size <= 256 -> { buf.write(0xd1); esc(b.size - 1) }; else -> return }
+                for (x in b) esc(x.toInt())
+            }
             else -> return
         }
         if (!meters.write(buf.toByteArray())) { log("err", "native link not open, change not sent"); return }
@@ -309,6 +315,19 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     }
 
     fun nativeOpen() = meters.isOpen()
+
+    /** Asks the WING for the current values of these ids (read only, allowed with live control off).
+     *  libwing request_node_data: D7 + id + DC. The answers arrive as normal pushes (type "nat"). */
+    fun request(ids: String) {
+        val buf = ByteArrayOutputStream()
+        fun esc(v: Int) { val x = v and 0xff; buf.write(x); if (x == 0xdf) buf.write(0xde) }
+        var n = 0
+        for (t in ids.split(',')) {
+            val id = t.trim().toLongOrNull()?.toInt() ?: continue
+            buf.write(0xd7); esc(id ushr 24); esc(id ushr 16); esc(id ushr 8); esc(id); buf.write(0xdc); n++
+        }
+        if (n > 0 && !meters.write(buf.toByteArray())) log("err", "native link not open, $n values not requested")
+    }
 
     /** Re-creates the socket when Wi-Fi changed, so the link follows the phone between networks. */
     @Synchronized
@@ -351,7 +370,9 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
                 if (msg != null) emit(msg) else log("in", "unparsed ${p.length} bytes")
             } catch (_: SocketTimeoutException) {
             } catch (e: Exception) {
-                if (running) { log("err", "receive: ${e.message}"); Thread.sleep(300) }
+                // a socket closed by a network change throws here; that is expected, so stay quiet then
+                if (running && socket === s && !s.isClosed) log("err", "receive: ${e.message}")
+                if (running) Thread.sleep(300)
             }
         }
     }
