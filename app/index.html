@@ -276,7 +276,7 @@ class App extends Component {
       conn: { ip: (() => { try { return localStorage.getItem('wing.ip') || ''; } catch (e) { return ''; } })(), status: 'demo', name: '', model: '', fw: '', found: [], searching: false, wifi: null, lastRx: 0, update: false, live: false, apk: null, dl: -1 }, logV: 0, liveAsk: false,
       prefs: (() => { try { return { back: 'home', ...JSON.parse(localStorage.getItem('wing.prefs') || '{}') }; } catch (e) { return { back: 'home' }; } })(),
       recMain: 1, recPrev: null, recMainPop: false,
-      deq: makeDeq(), slots: { gate: 'GATE', comp: 'COMP' }, mdlv: { gate: {}, comp: {} }, srcNm: {}, eqMdl: 'STD', busNm: {},
+      deq: makeDeq(), cdeq: makeDeq(), slots: { gate: 'GATE', comp: 'COMP' }, mdlv: { gate: {}, comp: {} }, srcNm: {}, eqMdl: 'STD', busNm: {},
       comp: { on: true, thr: -20, ratio: 3, knee: 2, det: 'PEAK', att: 10, hld: 20, rel: 150, env: 'LOG', auto: false, mix: 100, gain: 0, fs: false, sc: { on: false, type: 'HP12', f: 120, q: 1, src: 'SELF', tap: 'IN' } },
       rec: { state: 'STOP', time: 0, file: '', path: '', res: '24', chans: '2', src: [{ grp: 'MAIN', n: 1 }, { grp: 'MAIN', n: 2 }, { grp: 'OFF', n: 1 }, { grp: 'OFF', n: 1 }] },
       play: { state: 'STOP', song: '', artist: '', album: '', file: '', pos: 0, total: 0, repeat: false, format: '', rate: '', res: '', chans: '' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
@@ -538,7 +538,7 @@ class App extends Component {
         const tg = this.isLinked() ? [0, 0, 0] : [lvl(cf.main), lvl(cf.alt), c.mute ? 0 : Math.min(1, c.base * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35))];
         return { lv, pk, cLv, cPk, cfgLv: st.cfgLv.map((o, k) => tg[k] > o ? tg[k] : o * 0.82) };
       }
-      const key = st.screen === 'eq' ? 'eq' : st.screen === 'dyn' && st.dynSlot === 'gate' && isDeq(st.slots.gate) ? 'deq' : null;
+      const key = st.screen === 'eq' ? 'eq' : st.screen === 'dyn' && isDeq(st.slots[st.dynSlot]) ? (st.dynSlot === 'gate' ? 'deq' : 'cdeq') : null;
       if (!key) return { lv, pk, cLv, cPk };
       const q = st[key];
       if (this.isLinked()) {
@@ -614,10 +614,10 @@ class App extends Component {
     clearTimeout(this.defT); this.defT = setTimeout(() => { this.reqStrip(s, 'slots'); this.setState(s2 => ({ modelsV: Date.now(), ...this.injectAll(s2, [s]) })); }, 150);
   }
   /* which slots hold each dynamic EQ band, found by the names the desk uses (thr1, f2, …) */
-  deqLayout(s) {
-    const mdl = this.mx[s]['gate/mdl'];
-    let L = DEFM[s] ? Object.entries(DEFM[s]).filter(([k]) => k.startsWith('gate/')).map(([k, m]) => [k, String(m.name || '').toLowerCase()]) : null;
-    if (!L || !L.length) { const st = MD.gate[mdl] || MD.dyn[mdl]; L = st ? st.map(x => ['gate/' + x[0], x[1].toLowerCase()]) : []; }
+  deqLayout(s, kind = 'gate') {
+    const mdl = this.mx[s][kind + '/mdl'];
+    let L = DEFM[s] ? Object.entries(DEFM[s]).filter(([k]) => k.startsWith(kind + '/')).map(([k, m]) => [k, String(m.name || '').toLowerCase()]) : null;
+    if (!L || !L.length) { const st = MD.gate[mdl] || MD.dyn[mdl]; L = st ? st.map(x => [kind + '/' + x[0], x[1].toLowerCase()]) : []; }
     const AL = { g: ['g', 'gain'], f: ['f', 'freq'], filt: ['filt', 'type', 'flt'], thr: ['thr'], ratio: ['ratio'], att: ['att'], rel: ['rel'], q: ['q'], mode: ['mode'], on: ['on', 'bon'] };
     const find = (key, b) => {
       for (const [k, n] of L) for (const a of AL[key]) if (n === a + b || n === b + a || n === a + '_' + b || n === 'b' + b + a) return k;
@@ -738,20 +738,8 @@ class App extends Component {
       if (mdl === 'GATE' && sl(7) !== undefined) G.ratio = sl(7) === 'gate' ? 'GATE' : sl(7);
       G.sc = sc0('gatesc/', G.sc);
       o.gate = G;
-      const lay = isDeq(mdl) ? this.deqLayout(s) : [];
-      if (lay.length) {
-        const d = st.deq, DEF = makeDeq().bands;
-        const bands = lay.map((Lb, n) => {
-          const b = { ...(d.bands[n] || DEF[n] || DEF[0]), id: String(n + 1), dyn: true, g: 0 }, v = k => Lb[k] ? mx[Lb[k]] : undefined;
-          if (v('thr') !== undefined) b.thr = +v('thr'); if (v('att') !== undefined) b.att = +v('att'); if (v('rel') !== undefined) b.rel = +v('rel');
-          if (v('g') !== undefined) b.range = +v('g'); if (v('f') !== undefined) b.f = +v('f'); if (v('q') !== undefined) b.q = +v('q');
-          if (v('ratio') !== undefined) b.ratio = +v('ratio'); if (v('mode') !== undefined) b.mode = v('mode'); if (v('on') !== undefined) b.on = +v('on') === 1;
-          if (v('filt') !== undefined) b.filt = v('filt');
-          b.type = /^LP/.test(b.filt || '') ? 'losh' : /^HP/.test(b.filt || '') ? 'hish' : 'bell';
-          return b;
-        });
-        o.deq = { ...d, bands, sel: Math.min(d.sel, bands.length - 1), bypass: has('gate/on') ? +mx['gate/on'] === 0 : d.bypass };
-      }
+      const lay = isDeq(mdl) ? this.deqLayout(s, 'gate') : [];
+      if (lay.length) o.deq = this.deqIn(st.deq, lay, mx, 'gate/on');
       if (mdl !== 'GATE' && !lay.length) for (const k in mx) { const m = /^gate\/(\d+)$/.exec(k); if (m) mdlv.gate[m[1]] = mx[k]; }
     }
     if (has('dyn/mdl')) {
@@ -761,7 +749,9 @@ class App extends Component {
       if (has('dyn/mix')) C.mix = +mx['dyn/mix'];
       if (has('dyn/gain')) C.gain = +mx['dyn/gain'];
       const sl = k => mx['dyn/' + k];
-      if (mdl === 'COMP' || mdl === 'EXP') {
+      const clay = isDeq(mdl) ? this.deqLayout(s, 'dyn') : [];
+      if (clay.length) o.cdeq = this.deqIn(st.cdeq, clay, mx, 'dyn/on');
+      else if (mdl === 'COMP' || mdl === 'EXP') {
         ['thr', 'ratio', 'knee', 'det', 'att', 'hld', 'rel', 'env', 'auto'].forEach((k, n) => { const v = sl(n + 1); if (v !== undefined) C[k] = (k === 'det' || k === 'env') ? v : k === 'auto' ? +v === 1 : +v; });
       } else for (const k in mx) { const m = /^dyn\/(\d+)$/.exec(k); if (m) mdlv.comp[m[1]] = mx[k]; }
       C.sc = sc0('dynsc/', C.sc);
@@ -769,6 +759,27 @@ class App extends Component {
     }
     o.slots = slots; o.mdlv = mdlv;
     return o;
+  }
+  /* desk values -> a dynamic EQ (either slot) */
+  deqIn(d, lay, mx, onKey) {
+    const DEF = makeDeq().bands;
+    const bands = lay.map((Lb, n) => {
+      const b = { ...(d.bands[n] || DEF[n] || DEF[0]), id: String(n + 1), dyn: true, g: 0 }, v = k => Lb[k] ? mx[Lb[k]] : undefined;
+      if (v('thr') !== undefined) b.thr = +v('thr'); if (v('att') !== undefined) b.att = +v('att'); if (v('rel') !== undefined) b.rel = +v('rel');
+      if (v('g') !== undefined) b.range = +v('g'); if (v('f') !== undefined) b.f = +v('f'); if (v('q') !== undefined) b.q = +v('q');
+      if (v('ratio') !== undefined) b.ratio = +v('ratio'); if (v('mode') !== undefined) b.mode = v('mode'); if (v('on') !== undefined) b.on = +v('on') === 1;
+      if (v('filt') !== undefined) b.filt = v('filt');
+      b.type = /^LP/.test(b.filt || '') ? 'losh' : /^HP/.test(b.filt || '') ? 'hish' : 'bell';
+      return b;
+    });
+    return { ...d, bands, sel: Math.min(d.sel, bands.length - 1), bypass: onKey in mx ? +mx[onKey] === 0 : d.bypass };
+  }
+  /* a dynamic EQ (either slot) -> desk values */
+  deqOut(q, lay, d) {
+    lay.forEach((Lb, n) => { const b = q.bands[n]; if (!b) return;
+      const put = (k, v) => { if (Lb[k] && !(Lb[k] in d) && v !== undefined) d[Lb[k]] = v; };
+      put('thr', b.thr); put('att', b.att); put('rel', b.rel); put('g', b.range); put('f', b.f); put('q', b.q);
+      put('ratio', b.ratio); put('mode', b.mode); put('filt', b.filt); put('on', b.on ? 1 : 0); });
   }
   injectG(st) {
     const o = {}, srcs = { ...st.srcs }, nm = { ...st.srcNm };
@@ -847,22 +858,20 @@ class App extends Component {
     d['gate/mdl'] = st.slots.gate;
     if (mx['gate/mdl'] === st.slots.gate) {
       const G = st.gate, mdl = st.slots.gate;
-      const lay = isDeq(mdl) ? this.deqLayout(s) : [];
+      const lay = isDeq(mdl) ? this.deqLayout(s, 'gate') : [];
       d['gate/on'] = lay.length ? (st.deq.bypass ? 0 : 1) : G.on ? 1 : 0;
       if (mdl === 'GATE') { ['thr', 'range', 'att', 'hld', 'rel', 'acc'].forEach((k, n) => { d['gate/' + (n + 1)] = G[k]; }); d['gate/7'] = G.ratio === 'GATE' ? 'gate' : G.ratio; }
-      else if (lay.length) {
-        lay.forEach((Lb, n) => { const b = st.deq.bands[n]; if (!b) return;
-          const put = (k, v) => { if (Lb[k] && !(Lb[k] in d) && v !== undefined) d[Lb[k]] = v; };
-          put('thr', b.thr); put('att', b.att); put('rel', b.rel); put('g', b.range); put('f', b.f); put('q', b.q);
-          put('ratio', b.ratio); put('mode', b.mode); put('filt', b.filt); put('on', b.on ? 1 : 0); });
-      } else for (const k in st.mdlv.gate) d['gate/' + k] = st.mdlv.gate[k];
+      else if (lay.length) this.deqOut(st.deq, lay, d);
+      else for (const k in st.mdlv.gate) d['gate/' + k] = st.mdlv.gate[k];
       scOut('gatesc/', G.sc);
     }
     d['dyn/mdl'] = st.slots.comp;
     if (mx['dyn/mdl'] === st.slots.comp) {
       const C = st.comp, mdl = st.slots.comp;
-      d['dyn/on'] = C.on ? 1 : 0; d['dyn/mix'] = C.mix; d['dyn/gain'] = C.gain;
-      if (mdl === 'COMP' || mdl === 'EXP') ['thr', 'ratio', 'knee', 'det', 'att', 'hld', 'rel', 'env', 'auto'].forEach((k, n) => { d['dyn/' + (n + 1)] = k === 'auto' ? (C.auto ? 1 : 0) : C[k]; });
+      const clay = isDeq(mdl) ? this.deqLayout(s, 'dyn') : [];
+      d['dyn/on'] = clay.length ? (st.cdeq.bypass ? 0 : 1) : C.on ? 1 : 0; d['dyn/mix'] = C.mix; d['dyn/gain'] = C.gain;
+      if (clay.length) this.deqOut(st.cdeq, clay, d);
+      else if (mdl === 'COMP' || mdl === 'EXP') ['thr', 'ratio', 'knee', 'det', 'att', 'hld', 'rel', 'env', 'auto'].forEach((k, n) => { d['dyn/' + (n + 1)] = k === 'auto' ? (C.auto ? 1 : 0) : C[k]; });
       else for (const k in st.mdlv.comp) d['dyn/' + k] = st.mdlv.comp[k];
       scOut('dynsc/', C.sc);
     }
@@ -1204,7 +1213,7 @@ class App extends Component {
     const dx = (e.clientX - dr.sx) / dr.scale, dy = (e.clientY - dr.sy) / dr.scale;
     if (dr.kind === 'band') {
       const p = { f: Math.round(this.F(dr.x0 + dx)) };
-      if (this.ek === 'deq') p.range = Math.round(clamp(this.G(dr.y0 + dy), -15, 15) * 10) / 10;
+      if (this.ek !== 'eq') p.range = Math.round(clamp(this.G(dr.y0 + dy), -15, 15) * 10) / 10;
       else if (this.state[this.ek].bands[dr.i].type !== 'notch') p.g = Math.round(clamp(this.G(dr.y0 + dy), -15, 15) * 10) / 10;
       this.updBand(dr.i, p);
     } else if (dr.kind === 'thr') {
@@ -1219,7 +1228,7 @@ class App extends Component {
     capture(e); this.ptrDown(e);
     if (this.state[this.ek].sel !== i) this.updEq({ sel: i });
     if (this.pinch) return;
-    const D = this.ek === 'deq';
+    const D = this.ek !== 'eq';
     if (this.dbl('b' + i)) { this.updBand(i, D ? { range: 0 } : { g: 0 }); return; }
     const r = e.currentTarget.parentElement.getBoundingClientRect(), b = this.state[this.ek].bands[i];
     this.drag = { kind: 'band', i, sx: e.clientX, sy: e.clientY, x0: this.X(b.f), y0: this.Y(D ? b.range : b.g), scale: r.width / this.g.W };
@@ -1227,7 +1236,7 @@ class App extends Component {
   eqBgDown(e) {
     capture(e); this.ptrDown(e);
     if (this.pinch) return;
-    const q = this.state[this.ek], D = this.ek === 'deq', g = this.g, R = q.R;
+    const q = this.state[this.ek], D = this.ek !== 'eq', g = this.g, R = q.R;
     const r = e.currentTarget.getBoundingClientRect(), s = r.width / g.W;
     const mx = (e.clientX - r.left) / s, my = (e.clientY - r.top) / s;
     let best = -1, bd = 1e9;
@@ -1273,7 +1282,7 @@ class App extends Component {
   }
 
   renderEQ(Hd) {
-    const st = this.state, D = this.ek === 'deq', q = st[this.ek], ch = st.chans[st.eqCh];
+    const st = this.state, D = this.ek !== 'eq', q = st[this.ek], ch = st.chans[st.eqCh];
     const activeTab = D ? (st.dynSlot === 'gate' ? 'Gate' : 'Comp') : 'EQ';
     this.g = this.eqGeo(Hd);
     const { W, H, pad } = this.g, R = q.R, si = q.sel, sb = q.bands[si];
@@ -1994,7 +2003,7 @@ class App extends Component {
   miniEq(key, W, H) {
     const sg = this.g, sk = this.ek;
     this.ek = key; this.g = { W, H, pad: 8 };
-    const q = this.state[key], D = key === 'deq';
+    const q = this.state[key], D = key !== 'eq';
     const curve = this.path(f => (D ? 0 : this.filt(f)) + q.bands.reduce((a, b) => a + this.resp(b, f, D ? b.range : b.g), 0));
     const dots = q.bands.map(b => ({ x: this.X(b.f), y: clamp(this.Y(D ? b.range : b.g), 6, H - 6), c: b.color, on: b.on }));
     const z = this.Y(0).toFixed(1);
@@ -2101,7 +2110,8 @@ class App extends Component {
         ${bar('RATIO', st.gate.ratio, GR5.indexOf(st.gate.ratio) / 4, f => this.updGate({ ratio: GR5[Math.round(f * 4)] }), '#f0a24a')}`
       : isDeq(gSlot) ? html`${st.deq.bands.slice(0, 2).map((b, k) => bar('GAIN ' + (k + 1), (b.range > 0 ? '+' : '') + b.range.toFixed(1), (b.range + 15) / 30, f => this.setState(s0 => ({ deq: { ...s0.deq, bands: s0.deq.bands.map((x, j) => j === k ? { ...x, range: Math.round((f * 30 - 15) * 2) / 2 } : x) } })), b.color))}` : null;
     const cFoot = (cSlot === 'COMP' || cSlot === 'EXP') ? html`${bar('THR', st.comp.thr.toFixed(1), (st.comp.thr + 60) / 60, f => this.updComp({ thr: Math.round((f * 60 - 60) * 2) / 2 }), '#f3c27a')}
-        ${bar('RATIO', (st.comp.ratio >= 100 ? '∞' : st.comp.ratio) + ':1', RALL.findIndex(r => Math.abs(r - st.comp.ratio) < 0.05) / (RALL.length - 1), f => this.updComp({ ratio: RALL[Math.round(f * (RALL.length - 1))] }), '#f0a24a')}` : null;
+        ${bar('RATIO', (st.comp.ratio >= 100 ? '∞' : st.comp.ratio) + ':1', RALL.findIndex(r => Math.abs(r - st.comp.ratio) < 0.05) / (RALL.length - 1), f => this.updComp({ ratio: RALL[Math.round(f * (RALL.length - 1))] }), '#f0a24a')}`
+      : isDeq(cSlot) ? html`${st.cdeq.bands.slice(0, 2).map((b, k) => bar('GAIN ' + (k + 1), (b.range > 0 ? '+' : '') + b.range.toFixed(1), (b.range + 15) / 30, f => this.setState(s0 => ({ cdeq: { ...s0.cdeq, bands: s0.cdeq.bands.map((x, j) => j === k ? { ...x, range: Math.round((f * 30 - 15) * 2) / 2 } : x) } })), b.color))}` : null;
 
     return html`
       ${this.chanHeader('Home', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>`)}
@@ -2148,9 +2158,9 @@ class App extends Component {
               </span>`, 'flex:1')}
             ${tile('COMP', mName('comp', cSlot), (cSlot === 'COMP' || cSlot === 'EXP') ? badge(st.comp.on, st.comp.on ? 'GR ' + Math.max(0, (st.comp.sim || { gr: 0 }).gr).toFixed(1) : 'OFF') : null, () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                ${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}
+                ${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(180, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : ''}</span>`, 'width:196px;flex:none', cFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', cFoot)}
           </div>
           <div style=${`height:${h2}px;display:flex;gap:10px`}>
             ${tile('SENDS', 'Bus 1–16', null, () => this.setState({ sendPop: { i, bank: 0 } }), html`
@@ -2177,13 +2187,13 @@ class App extends Component {
   modelBtn() {
     const st = this.state, slot = st.dynSlot, cur = st.slots[slot];
     const def = slot === 'gate' ? 'GATE' : 'COMP', other = st.otherModel[slot];
-    const dq = MODEL_ORDER.gate.find(isDeq) || 'DEQ', isOther = cur !== def && !isDeq(cur);
+    const dq = MODEL_ORDER[slot].find(isDeq) || MODEL_ORDER.gate.find(isDeq) || 'DEQ', isOther = cur !== def && !isDeq(cur);
     const pick = name => this.setState(s => ({ slots: { ...s.slots, [slot]: name } }));
     const on = 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)', off = 'background:#141210;border:1px solid #3a342c;color:#cbbd9f';
     const b = 'height:40px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.06em;cursor:pointer;white-space:nowrap;';
     return html`<div style="display:flex;align-items:center;gap:4px" role="group" aria-label="Slot model">
       <button onClick=${() => pick(def)} aria-pressed=${String(cur === def)} style=${b + 'border-radius:7px;' + (cur === def ? on : off)}>${slot === 'gate' ? 'GATE' : 'COMP'}</button>
-      ${slot === 'gate' && html`<button onClick=${() => pick(dq)} aria-pressed=${String(isDeq(cur))} style=${b + 'border-radius:7px;' + (isDeq(cur) ? on : off)}>DYN EQ</button>`}
+      ${html`<button onClick=${() => pick(dq)} aria-pressed=${String(isDeq(cur))} style=${b + 'border-radius:7px;' + (isDeq(cur) ? on : off)}>DYN EQ</button>`}
       <span style="display:flex">
         <button onClick=${() => pick(isOther ? cur : other)} aria-pressed=${String(isOther)} style=${b + 'max-width:132px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
         <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:34px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;' + (isOther ? on : off)}>▾</button>
@@ -2565,7 +2575,8 @@ class App extends Component {
   renderDyn(Hd) {
     const st = this.state, slot = st.dynSlot, model = st.slots[slot];
     if (st.eqCh >= 40) return this.renderNoDyn(Hd);
-    if (slot === 'gate' && isDeq(model) && (!this.isLinked() || this.deqLayout(st.eqCh).length || !this.mx[st.eqCh]['gate/mdl'])) { this.ek = 'deq'; return html`${this.renderEQ(Hd)}${st.modelPop && this.renderModelPop(Hd)}`; }
+    const kd = SLOTK[slot];
+    if (isDeq(model) && (!this.isLinked() || this.deqLayout(st.eqCh, kd).length || !this.mx[st.eqCh][kd + '/mdl'])) { this.ek = slot === 'gate' ? 'deq' : 'cdeq'; return html`${this.renderEQ(Hd)}${st.modelPop && this.renderModelPop(Hd)}`; }
     if (slot === 'gate' && model === 'GATE') return html`${this.renderGate(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
     if (slot === 'comp' && (model === 'COMP' || model === 'EXP')) return html`${this.renderComp(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
     return html`${this.renderModel(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
