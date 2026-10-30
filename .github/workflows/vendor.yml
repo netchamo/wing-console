@@ -1,0 +1,29 @@
+name: Vendor UI library
+
+# Keeps a copy of the UI library (htm + preact, MIT) in the vendor branch, so the app and its
+# tests can run without reaching a CDN.
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/vendor.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch htm/preact standalone and publish to the vendor branch
+        run: |
+          mkdir -p /tmp/v
+          curl -fsSL https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js -o /tmp/v/htm-preact.js
+          git config user.name ci; git config user.email ci@users.noreply.github.com
+          git checkout --orphan vendor
+          git rm -rf --cached . > /dev/null
+          mkdir -p vendor && cp /tmp/v/htm-preact.js vendor/
+          git add vendor/htm-preact.js
+          git commit -m "htm 3.1.1 preact standalone"
+          git push -f origin vendor
