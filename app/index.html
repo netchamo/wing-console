@@ -65,7 +65,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.tab{height:36px;display:flex;align-items:center;gap:5px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:15px;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+.tab{height:36px;display:flex;align-items:center;gap:4px;padding:0 9px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
 .gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
@@ -1318,8 +1318,9 @@ class App extends Component {
     this.drag = { kind: 'band', i, sx: e.clientX, sy: e.clientY, x0: this.X(b.f), y0: this.Y(D ? b.range : b.g), scale: r.width / this.g.W };
   }
   eqBgDown(e) {
+    // the open graph is only for pinching the selected band's Q: no picking or dragging here
     capture(e); this.ptrDown(e);
-    if (this.pinch) return;
+    return;
     const q = this.state[this.ek], D = this.ek !== 'eq', g = this.g, R = q.R;
     const r = e.currentTarget.getBoundingClientRect(), s = r.width / g.W;
     const mx = (e.clientX - r.left) / s, my = (e.clientY - r.top) / s;
@@ -1431,7 +1432,7 @@ class App extends Component {
           onPointerDownCapture=${e => this.ptrDown(e)}
           onPointerMoveCapture=${e => { if (this.pinch) { this.gMove(e); e.stopPropagation(); } }}
           onPointerUpCapture=${e => { if (this.pinch) this.gUp(e); }} onPointerCancelCapture=${e => { if (this.pinch) this.gUp(e); }}>
-          <button aria-label="EQ graph. Drag near a band to move it" onPointerDown=${e => this.eqBgDown(e)} ...${gEv} onWheel=${wheel}
+          <button aria-label="EQ graph. Pinch anywhere to change the selected band's Q" onPointerDown=${e => this.eqBgDown(e)} ...${gEv} onWheel=${wheel}
             style="position:absolute;inset:0;padding:0;border:none;background:transparent;touch-action:none;cursor:default">
             <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
               <path d=${gn} stroke="#16232a" stroke-width="1" fill="none"/>
@@ -1456,7 +1457,8 @@ class App extends Component {
               style=${`position:absolute;left:${Math.round(this.X(q[k].f))}px;top:${Math.round(clamp(this.Y(-3), 14, H - 14))}px;width:34px;height:24px;margin:-12px 0 0 -17px;padding:0;border-radius:6px;border:1px solid #8fa3aa;background:#1b272b;color:#cfe0e5;font-weight:700;font-size:12px;letter-spacing:.06em;cursor:ew-resize;touch-action:none`}>${k.toUpperCase()}</button>`)}
           ${q.bands.map((b, i) => { const y = D ? this.Y(b.range) : b.type === 'notch' ? this.Y(-R * 0.55) : this.Y(b.g); return html`
             <button aria-label=${`Band ${b.id}, ${fmtF(b.f)}`} onPointerDown=${e => this.bandDown(i, e)} ...${gEv} onWheel=${wheel}
-              style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(clamp(y, 18, H - 18))}px;width:36px;height:36px;margin:-18px 0 0 -18px;padding:0;border-radius:50%;border:2px solid rgba(0,0,0,.35);background:${b.color};color:#121110;opacity:${b.on ? 1 : 0.35};box-shadow:${i === si ? `0 0 0 5px rgba(0,0,0,.35),0 0 0 9px ${b.color}55,0 0 22px ${b.color}` : '0 2px 6px rgba(0,0,0,.6)'};font-weight:700;font-size:17px;cursor:grab;touch-action:none`}>${b.id}</button>`; })}
+              style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(clamp(y, 18, H - 18))}px;width:54px;height:54px;margin:-27px 0 0 -27px;padding:0;border:none;border-radius:50%;background:transparent;cursor:grab;touch-action:none`}>
+              <span style=${`position:absolute;left:9px;top:9px;width:36px;height:36px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:2px solid rgba(0,0,0,.35);background:${b.color};color:#121110;opacity:${b.on ? 1 : 0.35};box-shadow:${i === si ? `0 0 0 5px rgba(0,0,0,.35),0 0 0 9px ${b.color}55,0 0 22px ${b.color}` : '0 2px 6px rgba(0,0,0,.6)'};font-weight:700;font-size:17px;pointer-events:none`}>${b.id}</span></button>`; })}
           ${showDyn && html`
             <button aria-label=${'Threshold ' + sb.thr.toFixed(1)} onPointerDown=${e => this.thrDown(e)} ...${gEv}
               style=${`position:absolute;left:${Math.round(tx)}px;top:${railTop}px;width:36px;height:${railH}px;margin-left:-18px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none`}>
@@ -2632,19 +2634,36 @@ class App extends Component {
   }
 
   /* ---------- gate / comp slots ---------- */
+  dualDeq(slot) {
+    const dqs = [...MODEL_ORDER[slot], ...MODEL_ORDER.gate].filter(isDeq);
+    return dqs.find(c => /DUAL|2/i.test(MODEL_NAMES[slot][c] || MODEL_NAMES.gate[c] || '') || /D.?DEQ|2/i.test(c)) || dqs.find(c => c !== 'DEQ') || dqs[0] || 'DEQ';
+  }
+  /* is the processor in this slot switched on (whatever model runs there) */
+  slotOn(slot) {
+    const st = this.state, m = st.slots[slot];
+    if (isDeq(m)) return !(slot === 'gate' ? st.deq : st.cdeq).bypass;
+    return slot === 'gate' ? st.gate.on : st.comp.on;
+  }
+  setSlotOn(slot, on) {
+    const st = this.state, m = st.slots[slot];
+    if (isDeq(m)) this.setState(s0 => ({ [slot === 'gate' ? 'deq' : 'cdeq']: { ...s0[slot === 'gate' ? 'deq' : 'cdeq'], bypass: !on } }));
+    if (slot === 'gate') this.updGate({ on }); else this.updComp({ on });
+  }
   modelBtn() {
     const st = this.state, slot = st.dynSlot, cur = st.slots[slot];
     const def = slot === 'gate' ? 'GATE' : 'COMP', other = st.otherModel[slot];
-    const dqs = [...MODEL_ORDER[slot], ...MODEL_ORDER.gate].filter(isDeq);
-    const dq = dqs.find(c => /DUAL|2/i.test(MODEL_NAMES[slot][c] || MODEL_NAMES.gate[c] || '') || /D.?DEQ|2/i.test(c)) || dqs.find(c => c !== 'DEQ') || dqs[0] || 'DEQ', isOther = cur !== def && !isDeq(cur);
+    const dq = this.dualDeq(slot), isOther = cur !== def && cur !== dq;
     const pick = name => this.setState(s => ({ slots: { ...s.slots, [slot]: name } }));
     const on = 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)', off = 'background:#141210;border:1px solid #3a342c;color:#cbbd9f';
-    const b = 'height:40px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.06em;cursor:pointer;white-space:nowrap;';
+    const b = 'height:40px;padding:0 10px;font-weight:700;font-size:13px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;';
+    const isOn = this.slotOn(slot);
     return html`<div style="display:flex;align-items:center;gap:4px" role="group" aria-label="Slot model">
+      <button onClick=${() => this.setSlotOn(slot, !isOn)} aria-pressed=${String(isOn)} aria-label=${(slot === 'gate' ? 'Gate' : 'Comp') + ' slot ' + (isOn ? 'on' : 'off')}
+        style=${`height:40px;min-width:58px;padding:0 10px;margin-right:4px;border-radius:7px;font-weight:800;font-size:15px;letter-spacing:.08em;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c;box-shadow:0 0 10px rgba(98,184,92,.35)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>
       <button onClick=${() => pick(def)} aria-pressed=${String(cur === def)} style=${b + 'border-radius:7px;' + (cur === def ? on : off)}>${slot === 'gate' ? 'GATE' : 'COMP'}</button>
       ${html`<button onClick=${() => pick(dq)} aria-pressed=${String(isDeq(cur))} style=${b + 'border-radius:7px;' + (isDeq(cur) ? on : off)}>DYN EQ</button>`}
       <span style="display:flex">
-        <button onClick=${() => pick(isOther ? cur : other)} aria-pressed=${String(isOther)} style=${b + 'max-width:132px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
+        <button onClick=${() => pick(isOther ? cur : other)} aria-pressed=${String(isOther)} style=${b + 'max-width:116px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
         <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:34px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;' + (isOther ? on : off)}>▾</button>
       </span>
     </div>`;
@@ -2661,7 +2680,7 @@ class App extends Component {
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
           ${MODEL_ORDER[st.dynSlot].map(code => { const on = code === cur, sl = st.dynSlot; return html`
-            <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [sl]: code }, modelPop: false, otherModel: !isDeq(code) && code !== (sl === 'gate' ? 'GATE' : 'COMP') ? { ...s.otherModel, [sl]: code } : s.otherModel }))} aria-pressed=${String(on)}
+            <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [sl]: code }, modelPop: false, otherModel: code !== this.dualDeq(sl) && code !== (sl === 'gate' ? 'GATE' : 'COMP') ? { ...s.otherModel, [sl]: code } : s.otherModel }))} aria-pressed=${String(on)}
               style=${`height:62px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 14px;border-radius:8px;cursor:pointer;text-align:left;
                 ${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : isDeq(code) ? 'background:#121c1f;border:1px solid #3b5258;color:#cfe0e5' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
               <span style="font-size:18px;font-weight:700;letter-spacing:.03em">${mName(sl, code)}</span>
