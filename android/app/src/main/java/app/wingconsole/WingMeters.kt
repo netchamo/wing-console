@@ -112,8 +112,8 @@ class NativeDecoder(private val onValue: (id: Int, kind: String, num: Double, st
         when (t) {
             1, 2 -> { o.put("a", java.lang.Float.intBitsToFloat(i32()).toDouble()); o.put("b", java.lang.Float.intBitsToFloat(i32()).toDouble()); o.put("n", i32()) }
             4 -> { o.put("a", i32()); o.put("b", i32()) }
-            5 -> { val n = u16(); val it = JSONArray(); val li = JSONArray(); repeat(n) { it.put(str(u8())); li.put(str(u8())) }; o.put("i", it); o.put("li", li) }
-            6 -> { val n = u16(); val it = JSONArray(); val li = JSONArray(); repeat(n) { it.put(java.lang.Float.intBitsToFloat(i32()).toDouble()); li.put(str(u8())) }; o.put("i", it); o.put("li", li) }
+            5 -> { val n = u16(); val items = JSONArray(); val li = JSONArray(); repeat(n) { items.put(str(u8())); li.put(str(u8())) }; o.put("i", items); o.put("li", li) }
+            6 -> { val n = u16(); val items = JSONArray(); val li = JSONArray(); repeat(n) { items.put(java.lang.Float.intBitsToFloat(i32()).toDouble()); li.put(str(u8())) }; o.put("i", items); o.put("li", li) }
         }
         return o
     }
