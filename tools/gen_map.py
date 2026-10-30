@@ -21,6 +21,8 @@ inp = ['in/set/' + k for k in ['$mode', 'altsrc', 'inv', 'trim', 'bal', '$g', '$
       ['in/conn/' + k for k in ['grp', 'in', 'altgrp', 'altin']]
 flt = ['flt/' + k for k in ['lc', 'lcf', 'lcs', 'hc', 'hcf', 'hcs', 'tf', 'mdl', 'TILT/tilt']]
 eq = ['eq/on', 'eq/mdl'] + [p[6:] for p in by if p.startswith('/ch/1/eq/STD/')]
+# buses, mains and matrices have two more EQ bands and a tilt
+eq += [p[7:] for p in by if p.startswith('/bus/1/eq/STD/') and p[7:] not in eq]
 def slots(kind):
     # model parameters share ids by position: gate/1..n hold whatever the current model puts there
     mods, n = {}, 0
