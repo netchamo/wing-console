@@ -614,6 +614,7 @@ class App extends Component {
     if (own && own[0] >= 0 && /\/mdl$/.test(own[1]) && e.i) {
       const slot = own[1] === 'gate/mdl' ? 'gate' : 'comp';
       MODEL_ORDER[slot] = e.i.slice(); e.i.forEach((k, n) => { MODEL_NAMES[slot][k] = (e.li && e.li[n]) || k; });
+      if (!(this.mdlLogged || (this.mdlLogged = {}))[slot]) { this.mdlLogged[slot] = true; this.logLine('in', (slot === 'gate' ? 'gate' : 'comp') + ' models: ' + e.i.join(' ')); }
       this.setState({ modelsV: Date.now() }); return;
     }
     const par = WREV.get(e.parent);
@@ -1222,14 +1223,14 @@ class App extends Component {
   ptrDown(e) {
     this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
     const ids = Object.keys(this.ptrs);
-    if (ids.length === 2) { const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: this.state[this.ek].bands[this.state[this.ek].sel].q }; this.drag = null; }
+    if (ids.length === 2 && !this.pinch) { const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]]; this.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, q0: this.state[this.ek].bands[this.state[this.ek].sel].q }; this.drag = null; }
   }
   gMove(e) {
     if (this.ptrs[e.pointerId]) this.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
     if (this.pinch) {
       const ids = Object.keys(this.ptrs); if (ids.length < 2) return;
       const a = this.ptrs[ids[0]], b = this.ptrs[ids[1]];
-      this.updBand(this.state[this.ek].sel, { q: +clamp(this.pinch.q0 * this.pinch.d0 / Math.hypot(a.x - b.x, a.y - b.y), 0.3, 16).toFixed(2) });
+      this.updBand(this.state[this.ek].sel, { q: +clamp(this.pinch.q0 * this.pinch.d0 / Math.hypot(a.x - b.x, a.y - b.y), 0.442, 10).toFixed(2) });
       return;
     }
     const dr = this.drag; if (!dr) return;
@@ -1366,7 +1367,10 @@ class App extends Component {
         </header>`}
 
       <div style="flex:none;display:flex;gap:10px;padding:10px 14px 0">
-        <div style=${`position:relative;width:${W}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:radial-gradient(ellipse at 50% 0%,#142024,#0c1214 70%);border:1px solid #22302f`}>
+        <div style=${`position:relative;width:${W}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;touch-action:none;background:radial-gradient(ellipse at 50% 0%,#142024,#0c1214 70%);border:1px solid #22302f`}
+          onPointerDownCapture=${e => this.ptrDown(e)}
+          onPointerMoveCapture=${e => { if (this.pinch) { this.gMove(e); e.stopPropagation(); } }}
+          onPointerUpCapture=${e => { if (this.pinch) this.gUp(e); }} onPointerCancelCapture=${e => { if (this.pinch) this.gUp(e); }}>
           <button aria-label="EQ graph. Drag near a band to move it" onPointerDown=${e => this.eqBgDown(e)} ...${gEv} onWheel=${wheel}
             style="position:absolute;inset:0;padding:0;border:none;background:transparent;touch-action:none;cursor:default">
             <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
@@ -2499,7 +2503,8 @@ class App extends Component {
   modelBtn() {
     const st = this.state, slot = st.dynSlot, cur = st.slots[slot];
     const def = slot === 'gate' ? 'GATE' : 'COMP', other = st.otherModel[slot];
-    const dq = MODEL_ORDER[slot].find(isDeq) || MODEL_ORDER.gate.find(isDeq) || 'DEQ', isOther = cur !== def && !isDeq(cur);
+    const dqs = [...MODEL_ORDER[slot], ...MODEL_ORDER.gate].filter(isDeq);
+    const dq = dqs.find(c => /DUAL|2/i.test(MODEL_NAMES[slot][c] || MODEL_NAMES.gate[c] || '') || /D.?DEQ|2/i.test(c)) || dqs.find(c => c !== 'DEQ') || dqs[0] || 'DEQ', isOther = cur !== def && !isDeq(cur);
     const pick = name => this.setState(s => ({ slots: { ...s.slots, [slot]: name } }));
     const on = 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)', off = 'background:#141210;border:1px solid #3a342c;color:#cbbd9f';
     const b = 'height:40px;padding:0 12px;font-weight:700;font-size:14px;letter-spacing:.06em;cursor:pointer;white-space:nowrap;';
