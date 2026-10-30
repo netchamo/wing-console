@@ -329,6 +329,8 @@ class App extends Component {
       }
       if (st.sendPop && (!ps.sendPop || ps.sendPop.i !== st.sendPop.i)) this.reqStrip(st.sendPop.i, 'all');
       if ((st.screen === 'routing' || st.screen === 'bus') && ps.screen !== st.screen) this.reqG(['/io/out/']);
+      if (st.screen === 'routing' && st.routeTab === 'ch' && (ps.routeTab !== 'ch' || ps.screen !== 'routing')) { const K = ['in/conn/grp', 'in/conn/in', 'in/conn/altgrp', 'in/conn/altin', 'in/set/altsrc']; const ids = []; for (let s = 0; s < 48; s++) K.forEach(k => ids.push(wid(s, k))); this.reqIds(ids); }
+      if (st.screen === 'routing' && st.routeTab === 'src' && (ps.routeTab !== 'src' || ps.routeSrc !== st.routeSrc || ps.screen !== 'routing')) this.reqG([`/io/in/${wgrp(st.routeSrc || 'LCL')}/`]);
       if (st.screen === 'rec' && ps.screen !== 'rec') { this.reqG(['/rec/', '/play/', '/io/out/REC/']); this.reqDef([GID['/play/$songs']]); }
       if (st.srcPop && (!ps.srcPop || ps.srcPop.grp !== st.srcPop.grp)) this.reqG([`/io/in/${wgrp(st.srcPop.grp)}/`]);
     }
@@ -534,11 +536,13 @@ class App extends Component {
     const pair = (st, s) => {
       if (this.isLinked()) { if (!M) return [0, 0]; if (s === 48) return [mN(M.ml), mN(M.mr)]; if (s >= 49) { const k = s - 49; return [mN(M.bl[k] ?? -90), mN(M.br[k] ?? -90)]; } return [mN(M.l[s]), mN(M.r[s])]; }
       const c = s === 48 ? st.main : st.chans[s];
-      const t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, (s === 48 ? 0.68 : c.base) * Math.sqrt(c.v / 0.75) * (0.75 + Math.random() * 0.35));
+      // demo: a slow, gentle movement instead of jumping levels
+      const ph = Date.now() / 1000, wob = 0.9 + 0.06 * Math.sin(ph * 0.9 + s * 1.7) + 0.03 * Math.sin(ph * 2.3 + s);
+      const t = (c.mute || c.v < 0.01) ? 0 : Math.min(1, (s === 48 ? 0.68 : c.base) * Math.sqrt(c.v / 0.75) * wob);
       const stereo = s === 48 || /( L| R|OH|Keys)/.test(c.name);
-      return [t, stereo ? Math.min(1, t * (0.86 + Math.random() * 0.22)) : t];
+      return [t, stereo ? Math.min(1, t * (0.95 + 0.04 * Math.sin(ph * 1.3 + s))) : t];
     };
-    const fall = (old, t) => [t[0] > old[0] ? t[0] : old[0] * 0.82, t[1] > old[1] ? t[1] : old[1] * 0.82];
+    const fall = (old, t) => this.isLinked() ? [t[0] > old[0] ? t[0] : old[0] * 0.82, t[1] > old[1] ? t[1] : old[1] * 0.82] : [old[0] + (t[0] - old[0]) * 0.25, old[1] + (t[1] - old[1]) * 0.25];
     const hold = (old, v) => [Math.max(v[0], old[0] - 0.012), Math.max(v[1], old[1] - 0.012)];
     this.setState(st => {
       const lv = st.lv.map((old, j) => fall(old, pair(st, j < 8 ? bankIdx(st.bank, j) : 48)));
@@ -558,9 +562,9 @@ class App extends Component {
         const db = this.realLv(st.eqCh), lvP = db === null ? 0 : clamp((db + 60) / 60, 0, 1) * 100;
         return { lv, pk, cLv, cPk, [key]: { ...q, bl: q.bl.map(() => db === null ? -90 : db), mIn: lvP, mOut: q.bypass ? lvP : lvP } };
       }
-      const spec = q.base.map((b, k) => q.spec[k] * 0.5 + Math.max(0.03, b + (Math.random() - 0.5) * 0.22) * 0.5);
-      const bl = q.bl.map(o => o * 0.55 + (-32 + Math.random() * 24) * 0.45);
-      return { lv, pk, cLv, cPk, [key]: { ...q, spec, bl, mIn: 55 + Math.random() * 25, mOut: 50 + Math.random() * 22 } };
+      const spec = q.base.map((b, k) => q.spec[k] * 0.9 + Math.max(0.03, b + (Math.random() - 0.5) * 0.06) * 0.1);
+      const ph = Date.now() / 1000, bl = q.bl.map((o, k) => o * 0.85 + (-24 + 7 * Math.sin(ph * 0.8 + k * 1.3)) * 0.15);
+      return { lv, pk, cLv, cPk, [key]: { ...q, spec, bl, mIn: q.mIn * 0.85 + (62 + 6 * Math.sin(ph)) * 0.15, mOut: q.mOut * 0.85 + (57 + 5 * Math.sin(ph * 1.1)) * 0.15 } };
     });
   }
   dims() {
@@ -624,6 +628,9 @@ class App extends Component {
     (DYNID[s] || (DYNID[s] = {}))[suf] = e.id; WREV.set(e.id, [s, suf]);
     (DEFM[s] || (DEFM[s] = {}))[suf] = { t: e.t, a: e.a, b: e.b, n: e.n, i: e.i, li: e.li, l: e.lname || e.name, name: e.name, u: UNITS[e.u] || '' };
     if (!this.defLogged) { this.defLogged = true; this.logLine('in', 'desk describes its own models (firmware definitions)'); }
+    clearTimeout(this.defLogT); this.defLogT = setTimeout(() => { const k = par[1], mdl = this.mx[s][k + '/mdl'];
+      if (isDeq(mdl) && !(this.deqLogged || (this.deqLogged = {}))[s + k + mdl]) { this.deqLogged[s + k + mdl] = true;
+        this.logLine('in', `${k} ${mdl} params: ` + Object.entries(DEFM[s] || {}).filter(([x]) => x.startsWith(k + '/')).map(([x, m]) => m.name + (m.l ? '(' + m.l + ')' : '')).join(' ') + ` · bands found: ${this.deqLayout(s, k).length}`); } }, 400);
     clearTimeout(this.defT); this.defT = setTimeout(() => { this.reqStrip(s, 'slots'); this.setState(s2 => ({ modelsV: Date.now(), ...this.injectAll(s2, [s]) })); }, 150);
   }
   /* which slots hold each dynamic EQ band, found by the names the desk uses (thr1, f2, …) */
@@ -631,9 +638,12 @@ class App extends Component {
     const mdl = this.mx[s][kind + '/mdl'];
     let L = DEFM[s] ? Object.entries(DEFM[s]).filter(([k]) => k.startsWith(kind + '/')).map(([k, m]) => [k, String(m.name || '').toLowerCase()]) : null;
     if (!L || !L.length) { const st = MD.gate[mdl] || MD.dyn[mdl]; L = st ? st.map(x => [kind + '/' + x[0], x[1].toLowerCase()]) : []; }
-    const AL = { g: ['g', 'gain'], f: ['f', 'freq'], filt: ['filt', 'type', 'flt'], thr: ['thr'], ratio: ['ratio'], att: ['att'], rel: ['rel'], q: ['q'], mode: ['mode'], on: ['on', 'bon'] };
+    const AL = { g: ['g', 'gain', 'gn', 'rng', 'range'], f: ['f', 'freq', 'fr'], filt: ['filt', 'type', 'flt', 'shp'], thr: ['thr', 'th', 'thrs'], ratio: ['ratio', 'rat', 'rt'], att: ['att', 'atk'], rel: ['rel', 'rls'], q: ['q', 'bw'], mode: ['mode', 'md', 'dir'], on: ['on', 'bon', 'en'] };
+    const MK = { 1: ['1', 'l', 'lo', 'low', 'a', 'b1', 'band1'], 2: ['2', 'h', 'hi', 'high', 'b', 'b2', 'band2'] };
+    const LN = DEFM[s] ? Object.fromEntries(Object.entries(DEFM[s]).map(([k, m]) => [k, String(m.l || '').toLowerCase().split(/[\s_.-]+/).filter(Boolean)])) : {};
     const find = (key, b) => {
-      for (const [k, n] of L) for (const a of AL[key]) if (n === a + b || n === b + a || n === a + '_' + b || n === 'b' + b + a) return k;
+      for (const [k, n] of L) for (const a of AL[key]) for (const m of MK[b]) if (n === a + m || n === m + a || n === a + '_' + m || n === m + '_' + a) return k;
+      for (const [k] of L) { const t = LN[k] || []; if (t.some(x => AL[key].includes(x) || (key === 'f' && x === 'frequency')) && t.some(x => MK[b].includes(x))) return k; }
       for (const [k, n] of L) for (const a of AL[key]) if (n === a) return k;
       return null;
     };
@@ -904,10 +914,9 @@ class App extends Component {
     const d = {}, s = st.eqCh, cf = st.cfg[s];
     if (cf && this.cfgSeen.has(s)) ['main', 'alt'].forEach(w => {
       const x = cf[w]; if (!x) return;
-      const base = `/io/in/${wgrp(x.grp)}/${x.n}/`, sv = st.srcs[srcKey(x)];
-      d[base + 'mode'] = x.mode === 'MS' ? 'M/S' : x.mode;
-      if (sv) { d[base + 'g'] = sv.gain; d[base + 'vph'] = sv.ph ? 1 : 0; }
+      d[`/io/in/${wgrp(x.grp)}/${x.n}/mode`] = x.mode === 'MS' ? 'M/S' : x.mode;
     });
+    for (const k in st.srcs) { const [g, n] = k.split('-'), sv = st.srcs[k], base = `/io/in/${wgrp(g)}/${n}/`; d[base + 'g'] = sv.gain; d[base + 'vph'] = sv.ph ? 1 : 0; }
     st.rec.src.forEach((x, k) => { d[`/io/out/REC/${k + 1}/grp`] = x.grp; d[`/io/out/REC/${k + 1}/in`] = x.n; });
     for (const k in st.outs) { const [G, n] = k.split('/'), x = st.outs[k]; d[`/io/out/${G}/${n}/grp`] = x.grp; if (x.grp !== 'OFF') d[`/io/out/${G}/${n}/in`] = x.n; }
     d['/rec/resolution'] = st.rec.res; d['/rec/channels'] = st.rec.chans; d['/play/repeat'] = st.play.repeat ? 1 : 0;
@@ -920,6 +929,7 @@ class App extends Component {
     const st = this.state, strips = new Set([st.eqCh, 48]);
     for (let j = 0; j < 8; j++) strips.add(bankIdx(st.bank, j));
     if (st.sendPop) strips.add(st.sendPop.i);
+    if (this.touchS) { this.touchS.forEach(x => strips.add(x)); this.touchS.clear(); }
     const diff = [];
     for (const s of strips) {
       const mx = this.mx[s], d = this.deriveStrip(st, s);
@@ -1494,8 +1504,8 @@ class App extends Component {
     else if (this.isLinked()) s.env = -80;
     else {
       s.t += dt;
-      if (s.t >= s.next) { s.env = Math.max(s.env, -6 - Math.random() * 12); s.next = s.t + 0.35 + Math.random() * 0.5; }
-      s.env = Math.max(-50 + Math.random() * 4, s.env - 40 * dt);
+      if (s.t >= s.next) { s.env = Math.max(s.env, -10 - Math.random() * 4); s.next = s.t + 1.2 + Math.random() * 0.3; }
+      s.env = Math.max(-46, s.env - 18 * dt);
     }
     const L = clamp(s.env, -80, 0), target = C.on ? Math.max(0, L - this.compOut(L, C)) : 0;
     if (target > s.gr) s.gr += (target - s.gr) * Math.min(1, dt * 1000 / Math.max(C.att, 0.3));
@@ -2017,7 +2027,7 @@ class App extends Component {
         </div>
         <div style="flex:1;min-height:0;display:flex;gap:14px">
           <nav style="width:190px;flex:none;display:flex;flex-direction:column;gap:4px;overflow-y:auto">
-            ${L.i.filter(g => g !== 'OFF').map(g => html`<button onClick=${() => this.setState({ pick: { ...pk, grp: g } })} aria-pressed=${String(g === pk.grp)}
+            ${(pk.groups || L.i).filter(g => g !== 'OFF').map(g => html`<button onClick=${() => this.setState({ pick: { ...pk, grp: g } })} aria-pressed=${String(g === pk.grp)}
               style=${`min-height:36px;padding:0 12px;border-radius:7px;cursor:pointer;font-weight:600;font-size:15px;text-align:left;${g === pk.grp ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>${L.li[L.i.indexOf(g)]}</button>`)}
           </nav>
           <div style="flex:1;min-width:0;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;align-content:start;overflow-y:auto">
@@ -2059,14 +2069,15 @@ class App extends Component {
       <header class="topbar" style="height:56px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
         <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
-        <span style="font-size:26px;font-weight:700;letter-spacing:.06em">OUTPUTS</span>
-        <span style="font-size:12px;letter-spacing:.14em;color:#9b927f">WHAT FEEDS EACH OUTPUT</span>
+        <span style="font-size:22px;font-weight:700;letter-spacing:.06em">ROUTING</span>
+        ${this.routeTabs()}
         <span style="flex:1"></span>
-        <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
+        <div style=${`display:${(st.routeTab || 'out') === 'out' ? 'flex' : 'none'};padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721`}>
           ${[['all', 'All'], ['used', 'In use'], ['free', 'Free']].map(([v, l]) => html`<button onClick=${() => this.setState({ routeFlt: v })} aria-pressed=${String(flt === v)} style=${`min-width:80px;height:38px;border-radius:7px;border:none;font-weight:700;font-size:15px;cursor:pointer;${flt === v ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>${l}</button>`)}
         </div>
         ${this.connPill()}
       </header>
+      ${(st.routeTab || 'out') === 'ch' ? this.renderRouteChannels(Hd) : (st.routeTab || 'out') === 'src' ? this.renderRouteSources(Hd) : html`
       <div style="flex:1;min-height:0;display:flex;gap:12px;padding:12px 14px">
         <nav style="width:200px;flex:none;display:flex;flex-direction:column;gap:5px;overflow-y:auto">
           ${OUTG.map(G => { const on = G.id === g, u = used(G.id); return html`<button onClick=${() => this.setState({ routeGrp: G.id })} aria-pressed=${String(on)}
@@ -2078,8 +2089,79 @@ class App extends Component {
           <span style="font-size:14px;color:#9b927f">${O.name} · tap an output to choose its source. Stereo sources can fill two outputs in one go.</span>
           <div style=${`flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:6px;align-content:start`}>${tiles}</div>
         </div>
-      </div>
+      </div>`}
       ${st.pick && this.renderPick(Hd)}`;
+  }
+
+  /* ---------- routing: Channels (what each channel takes in) ---------- */
+  routeTabs() {
+    const t = this.state.routeTab || 'out';
+    return html`<div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
+      ${[['out', 'Outputs'], ['ch', 'Channels'], ['src', 'Sources']].map(([v, l]) => html`<button onClick=${() => this.setState({ routeTab: v, pick: null })} aria-pressed=${String(t === v)}
+        style=${`min-width:118px;height:42px;border-radius:7px;border:none;font-weight:700;font-size:17px;letter-spacing:.06em;cursor:pointer;${t === v ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>${l}</button>`)}
+    </div>`;
+  }
+  touch(s) { (this.touchS || (this.touchS = new Set())).add(s); }
+  renderRouteChannels(Hd) {
+    const st = this.state, page = st.routeChPage || 0;
+    const pages = ['Ch 1–16', 'Ch 17–32', 'Ch 33–40 · Aux'], idx = page === 0 ? [...Array(16).keys()] : page === 1 ? [...Array(16).keys()].map(k => k + 16) : [...Array(16).keys()].map(k => k + 32);
+    const CH_GROUPS = WMAP.M['in/conn/grp'].i.filter(g => g !== 'OFF');
+    const pickFor = (i, which) => {
+      const cf = this.cfgOf(i), cur = cf[which];
+      this.setState({ pick: { title: st.chans[i].name + ' · ' + (which === 'main' ? 'Main' : 'Alt') + ' source', grp: cur ? wgrp(cur.grp) : 'A', cur: cur ? { grp: wgrp(cur.grp), n: cur.n } : null, groups: CH_GROUPS, canPair: false,
+        pick: x => { this.touch(i); this.updCfg(i, { [which]: x.grp === 'OFF' ? null : { grp: agrp(x.grp), n: x.n, mode: this.srcModeOf(agrp(x.grp), x.n) }, ...(which === 'alt' && x.grp === 'OFF' ? { altOn: false } : {}) }); } } });
+    };
+    const lbl = s => s ? this.srcText({ grp: wgrp(s.grp), n: s.n }) : 'None';
+    return html`
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:12px 14px">
+        <div style="display:flex;gap:8px">${pages.map((l, n) => html`<button class=${'pill' + (n === page ? ' on' : '')} style="flex:1;height:42px;font-size:16px" onClick=${() => this.setState({ routeChPage: n })}>${l}</button>`)}</div>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;align-content:start">
+          ${idx.map(i => { const c = st.chans[i], cf = this.cfgOf(i); return html`
+            <div style=${`display:flex;flex-direction:column;gap:4px;padding:6px;border-radius:8px;background:#161412;border:1px solid #2c2721`}>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style=${'width:6px;height:22px;border-radius:3px;background:' + c.color}></span>
+                <span style="font-family:var(--mono);font-size:12px;color:#8a8170">${i < 40 ? 'CH ' + pad2(i + 1) : 'AUX ' + (i - 39)}</span>
+                <span style="flex:1;min-width:0;font-size:15px;font-weight:600;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</span>
+              </div>
+              <button onClick=${() => pickFor(i, 'main')} style=${`height:38px;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:6px;cursor:pointer;text-align:left;background:#100f0d;border:1px solid ${!cf.altOn ? '#8a6a3a' : '#2c2721'}`}>
+                <span style=${`font-size:11px;font-weight:700;letter-spacing:.1em;color:${!cf.altOn ? '#62b85c' : '#6f675a'}`}>MAIN</span>
+                <span style="flex:1;min-width:0;font-size:14px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl(cf.main)}</span></button>
+              <button onClick=${() => pickFor(i, 'alt')} style=${`height:32px;display:flex;align-items:center;gap:6px;padding:0 8px;border-radius:6px;cursor:pointer;text-align:left;background:#100f0d;border:1px solid ${cf.altOn ? '#8a6a3a' : '#2c2721'}`}>
+                <span style=${`font-size:11px;font-weight:700;letter-spacing:.1em;color:${cf.altOn ? '#e8a33d' : '#6f675a'}`}>ALT</span>
+                <span style="flex:1;min-width:0;font-size:13px;color:#9b927f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lbl(cf.alt)}</span></button>
+            </div>`; })}
+        </div>
+      </div>`;
+  }
+  /* ---------- routing: Sources (the inputs themselves: name, gain, phantom) ---------- */
+  renderRouteSources(Hd) {
+    const st = this.state, g = st.routeSrc || 'LCL', G = GMAP[g], pre = PRE.has(g);
+    const n = Math.min(G.n, 64), tiles = [];
+    for (let k = 1; k <= n; k++) {
+      const s = { grp: g, n: k }, sv = this.srcOf(s), nm = st.srcNm[srcKey(s)] || (this.isLinked() ? '' : g === 'A' && k <= STAGE.length ? STAGE[k - 1] : ''), sp = gspec(g);
+      const used = st.chans.slice(0, 48).map((c, i) => [c, i]).filter(([c, i]) => { const cf = this.cfgOf(i); return cf.main && cf.main.grp === g && cf.main.n === k || cf.alt && cf.alt.grp === g && cf.alt.n === k; });
+      tiles.push(html`<div style="display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:8px;background:#161412;border:1px solid #2c2721">
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-family:var(--mono);font-size:13px;color:var(--brass-hi)">${G.short} ${pad2(k)}</span>
+          <span style="flex:1;min-width:0;font-size:14px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}</span></div>
+        <span style="font-size:11px;color:#8a8170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${used.length ? '→ ' + used.map(([c]) => c.name).join(', ') : 'not used by a channel'}</span>
+        ${pre ? html`<div style="display:flex;gap:4px">
+          <button class="panmini" aria-label=${G.short + ' ' + k + ' gain ' + sv.gain.toFixed(1) + ' dB, drag sideways'} style="flex:1;height:34px;border-radius:6px;cursor:ew-resize"
+            onPointerDown=${e => this.slDown(e, f => { const v = Math.round((sp.min + Math.round(f * sp.n) * sp.step) * 10) / 10; this.updSrc(s, { gain: v }); }, 0, 1)} onPointerMove=${e => this.slMove(e)} onPointerUp=${() => { this.sl = null; }} onPointerCancel=${() => { this.sl = null; }}>
+            <span style=${`position:absolute;left:0;top:0;bottom:0;width:${Math.round(clamp((sv.gain - sp.min) / (sp.step * sp.n), 0, 1) * 100)}%;border-radius:6px;background:#c9a25a;opacity:.25`}></span>
+            <span style="position:relative;font-family:var(--mono);font-size:14px;color:#e9dcc2">${(sv.gain > 0 ? '+' : '') + sv.gain.toFixed(1)} dB</span></button>
+          <button onClick=${() => this.updSrc(s, { ph: !sv.ph })} aria-pressed=${String(sv.ph)} style=${`width:52px;height:34px;border-radius:6px;font-weight:700;font-size:12px;cursor:pointer;${sv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#8a5a52;border:1px solid #4a2420'}`}>48V</button>
+        </div>` : html`<span style="height:34px;display:flex;align-items:center;font-size:12px;color:#6f675a">Digital, no preamp</span>`}
+      </div>`);
+    }
+    return html`
+      <div style="flex:1;min-height:0;display:flex;gap:12px;padding:12px 14px">
+        <nav style="width:200px;flex:none;display:flex;flex-direction:column;gap:5px;overflow-y:auto">
+          ${GROUPS.map(x => html`<button onClick=${() => this.setState({ routeSrc: x.id })} aria-pressed=${String(x.id === g)}
+            style=${`min-height:42px;display:flex;align-items:center;gap:8px;padding:0 12px;border-radius:8px;cursor:pointer;text-align:left;${x.id === g ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
+            <span style="flex:1;font-weight:600;font-size:16px">${x.name}</span>${PRE.has(x.id) && html`<span style="font-size:10px;letter-spacing:.1em;color:#9b927f">PRE</span>`}</button>`)}
+        </nav>
+        <div style=${`flex:1;min-width:0;overflow-y:auto;display:grid;grid-template-columns:repeat(${n <= 8 ? 4 : 6},minmax(0,1fr));gap:6px;align-content:start`}>${tiles}</div>
+      </div>`;
   }
 
   /* ---------- Main and bus screens: Outputs tab ---------- */
@@ -2563,9 +2645,9 @@ class App extends Component {
     else if (this.isLinked()) s.env = -80;
     else {
       s.t += dt;
-      if (s.t >= s.next) { s.env = Math.max(s.env, -8 - Math.random() * 10); s.next = s.t + 0.42 + Math.random() * 0.45; }
-      if (Math.random() < 0.05) s.env = Math.max(s.env, -52 + Math.random() * 10);
-      s.env = Math.max(-64 + Math.random() * 3, s.env - 75 * dt);
+      // demo: one calm hit a little over every second, slow decay
+      if (s.t >= s.next) { s.env = Math.max(s.env, -14 - Math.random() * 4); s.next = s.t + 1.1 + Math.random() * 0.3; }
+      s.env = Math.max(-62, s.env - 35 * dt);
     }
     const L = s.env, r = RATIO_N[G.ratio], over = L >= G.thr;
     s.hold = over ? G.hld / 1000 : Math.max(0, s.hold - dt);
