@@ -75,8 +75,13 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
-        runCatching { cm.registerNetworkCallback(req, netCallback) }
-            .onFailure { log("err", "network callback: ${it.message}") }
+        // requestNetwork (not just listening): this tells Android an app needs this Wi-Fi, so it
+        // keeps a Wi-Fi without internet up and usable next to mobile data instead of parking it.
+        runCatching { cm.requestNetwork(req, netCallback) }
+            .onFailure {
+                log("err", "network request: ${it.message}; listening only")
+                runCatching { cm.registerNetworkCallback(req, netCallback) }.onFailure { e -> log("err", "network callback: ${e.message}") }
+            }
     }
 
     fun stop() {
@@ -163,7 +168,9 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
                 val hintAddr = hint?.takeIf { it.isNotBlank() }?.let { runCatching { InetAddress.getByName(it) }.getOrNull() }
                 val workers = ifs.map { iface ->
                     thread(name = "wing-discover-${iface.addr.hostAddress}") {
-                        log("sys", "searching on ${iface.kind} ${iface.addr.hostAddress}/${iface.prefix}")
+                        val caps = cm.getNetworkCapabilities(iface.net)
+                        val net = if (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true) "with internet" else "without internet"
+                        log("sys", "searching on ${iface.kind} ${iface.addr.hostAddress}/${iface.prefix} ($net)")
                         runCatching { searchOn(iface, hintAddr, seen) }.onFailure { log("err", "search on ${iface.addr.hostAddress}: ${it.message}") }
                     }
                 }
@@ -192,6 +199,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             targets.add(broadcastOf(iface))
             runCatching { InetAddress.getByName("255.255.255.255") }.getOrNull()?.let { targets.add(it) }
             val buf = ByteArray(512)
+            val before = seen.size
             repeat(3) {
                 for (t in targets) runCatching {
                     s.send(DatagramPacket(probe, probe.size, t, DISCOVERY_PORT))
@@ -205,6 +213,33 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
                         val txt = String(p.data, 0, p.length, Charsets.US_ASCII).trim { it <= ' ' }
                         log("in", txt)
                         if (!txt.startsWith("WING,")) continue
+                        val f = txt.split(',')
+                        val ip = f.getOrNull(1)?.takeIf { it.isNotBlank() } ?: p.address.hostAddress ?: continue
+                        if (!seen.add(ip)) continue
+                        emit(JSONObject().put("type", "found").put("ip", ip)
+                            .put("name", f.getOrNull(2) ?: "").put("model", f.getOrNull(3) ?: "")
+                            .put("serial", f.getOrNull(4) ?: "").put("fw", f.getOrNull(5) ?: ""))
+                    } catch (_: SocketTimeoutException) { }
+                }
+            }
+            // Some routers drop broadcasts. Then ask every address of the network directly.
+            if (seen.size == before && iface.prefix >= 22) {
+                val base = ipInt(iface.addr) and maskOf(iface.prefix), count = (1 shl (32 - iface.prefix)) - 2
+                log("sys", "no answer to broadcast on ${iface.addr.hostAddress}; asking all $count addresses directly")
+                for (k in 1..count) {
+                    val a = InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(base + k).array())
+                    if (a == iface.addr) continue
+                    runCatching { s.send(DatagramPacket(probe, probe.size, a, DISCOVERY_PORT)) }
+                    if (k % 64 == 0) Thread.sleep(5)
+                }
+                val until = System.currentTimeMillis() + 1500
+                while (System.currentTimeMillis() < until) {
+                    try {
+                        val p = DatagramPacket(buf, buf.size)
+                        s.receive(p)
+                        val txt = String(p.data, 0, p.length, Charsets.US_ASCII).trim { it <= ' ' }
+                        if (!txt.startsWith("WING,")) continue
+                        log("in", txt)
                         val f = txt.split(',')
                         val ip = f.getOrNull(1)?.takeIf { it.isNotBlank() } ?: p.address.hostAddress ?: continue
                         if (!seen.add(ip)) continue

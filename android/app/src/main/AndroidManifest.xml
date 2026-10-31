@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- find the Wi-Fi network the mixer is on, even when it has no internet -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- lets the app ask Android to keep the mixer's Wi-Fi up even though it has no internet -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- receive the mixer's answer to the discovery broadcast -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
