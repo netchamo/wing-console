@@ -49,6 +49,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box em{white-space:nowrap}
 .tab{white-space:nowrap}
 .topbar .tag{white-space:nowrap;flex:none}
+.sofrow::-webkit-scrollbar{display:none}
 .cap{position:absolute;left:24px;width:40px;height:44px;border-radius:5px;background:linear-gradient(180deg,#f4ecda 0%,#ddd3bc 40%,#b9ad93 50%,#d6ccb4 60%,#ece4d0 100%);border:1px solid #6f6656;box-shadow:0 6px 8px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.7)}
 .cap::after{content:"";position:absolute;left:3px;right:3px;top:20px;height:2px;background:#1b1915}
 .layer{height:46px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px;border:1px solid #302b25;background:#1a1815;color:#e9dcc2;font-weight:600;font-size:19px;letter-spacing:.03em;cursor:pointer}
@@ -240,6 +241,8 @@ const UNITS = ['', 'dB', '%', 'ms', 'Hz', 'm', 's', 'oct'];
 const wid = (s, suf) => (DYNID[s] && DYNID[s][suf]) || (WSI[suf] === undefined ? 0 : WIDS[s * WN + WSI[suf]]);
 const gkey = p => p.replace(/^(\/io\/(?:in|out)\/[^/]+\/)\d+/, '$1*');
 const MD = WMAP.MD;
+/* sends on faders: target k (0–15 bus, 16–23 matrix) -> its strip */
+const sofIdx = k => k < 16 ? 49 + k : 65 + (k - 16);
 const MODEL_NAMES = {
   gate: Object.fromEntries(WMAP.M['gate/mdl'].i.map((k, n) => [k, WMAP.M['gate/mdl'].li[n]])),
   comp: Object.fromEntries(WMAP.M['dyn/mdl'].i.map((k, n) => [k, WMAP.M['dyn/mdl'].li[n]]))
@@ -331,7 +334,7 @@ class App extends Component {
   constructor() {
     super();
     this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', eqCh: 1,
-      chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]), cLv: [0, 0], cPk: [0, 0],
+      chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, sofOn: false, sof: 0, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]), cLv: [0, 0], cPk: [0, 0],
       panPop: null, sendPop: null, eq: makeEq(),
       lastTab: 'home', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
       otherModel: { gate: 'E88', comp: 'B160' }, dragPop: false, connPop: false,
@@ -375,6 +378,7 @@ class App extends Component {
 
   componentDidUpdate(pp, ps) {
     const st = this.state;
+    if (st.sofOn && !ps.sofOn) setTimeout(() => { const r = document.querySelector('.sofrow'), b = r && r.children[st.sof]; if (b) r.scrollLeft = Math.max(0, b.offsetLeft - 140); }, 30);
     if (st.eqCh !== ps.eqCh || st.eq.bands.length !== EQ_IDS(st.eqCh).length) { const nb = this.eqBands(st.eqCh, st.eq.bands); if (nb !== st.eq.bands) this.setState(s0 => ({ eq: { ...s0.eq, bands: this.eqBands(s0.eqCh, s0.eq.bands), sel: Math.min(s0.eq.sel, EQ_IDS(s0.eqCh).length - 1) } })); }
     if (this.isLinked()) {
       const chOpen = !['main', 'rec', 'routing', 'bus', 'settings'].includes(st.screen);
@@ -383,6 +387,11 @@ class App extends Component {
         if (this.sliceCh !== st.eqCh) setTimeout(() => this.setState(s2 => this.injectAll(s2, [s2.eqCh, -1])), 0);
       }
       if (st.sendPop && (!ps.sendPop || ps.sendPop.i !== st.sendPop.i)) this.reqStrip(st.sendPop.i, 'all');
+      if (st.sofOn && (!ps.sofOn || ps.sof !== st.sof || ps.bank !== st.bank)) {
+        const k = st.sof, key = k < 16 ? `send/${k + 1}/` : `send/MX${k - 15}/`, ids = [];
+        for (let j = 0; j < 8; j++) { const s0 = bankIdx(st.bank, j); if (s0 >= 0) ids.push(wid(s0, key + 'lvl'), wid(s0, key + 'on')); }
+        this.reqIds(ids.filter(Boolean)); this.reqStrip(sofIdx(k), 'core');
+      }
       if (chOpen && st.eqCh !== ps.eqCh) this.reqIds(['eq/STD/5g', 'eq/STD/5f', 'eq/STD/5q', 'eq/STD/6g', 'eq/STD/6f', 'eq/STD/6q'].map(k => wid(st.eqCh, k)));
       if ((st.screen === 'routing' || st.screen === 'bus') && ps.screen !== st.screen) this.reqG(['/io/out/']);
       if (st.screen === 'routing' && st.routeTab === 'ch' && (ps.routeTab !== 'ch' || ps.screen !== 'routing')) { const K = ['in/conn/grp', 'in/conn/in', 'in/conn/altgrp', 'in/conn/altin', 'in/set/altsrc']; const ids = []; for (let s = 0; s < 48; s++) K.forEach(k => ids.push(wid(s, k))); this.reqIds(ids); }
@@ -603,7 +612,7 @@ class App extends Component {
       : [t[0] > old[0] ? old[0] + (t[0] - old[0]) * 0.9 : old[0] + (t[0] - old[0]) * 0.5, t[1] > old[1] ? old[1] + (t[1] - old[1]) * 0.9 : old[1] + (t[1] - old[1]) * 0.5];
     const hold = (old, v) => [Math.max(v[0], old[0] - 0.012), Math.max(v[1], old[1] - 0.012)];
     this.setState(st => {
-      const lv = st.lv.map((old, j) => { const s0 = j < 8 ? bankIdx(st.bank, j) : 48; return s0 < 0 ? [0, 0] : fall(old, pair(st, s0)); });
+      const lv = st.lv.map((old, j) => { const s0 = j < 8 ? bankIdx(st.bank, j) : st.sofOn ? sofIdx(st.sof) : 48; return s0 < 0 ? [0, 0] : fall(old, pair(st, s0)); });
       const pk = st.pk.map((old, j) => hold(old, lv[j]));
       const cLv = fall(st.cLv, pair(st, st.eqCh)), cPk = hold(st.cPk, cLv);
       if (st.plPop) { const pl = fall(st.plLv || [0, 0], pair(st, this.playerCh())); setTimeout(() => this.setState({ plLv: pl }), 0); }
@@ -1004,6 +1013,7 @@ class App extends Component {
     const st = this.state, strips = new Set([st.eqCh, 48]);
     for (let j = 0; j < 8; j++) { const s0 = bankIdx(st.bank, j); if (s0 >= 0) strips.add(s0); }
     if (st.sendPop) strips.add(st.sendPop.i);
+    if (st.sofOn && st.screen === 'main') strips.add(sofIdx(st.sof));
     if (st.plPop) strips.add(this.playerCh());
     if (this.touchS) { this.touchS.forEach(x => strips.add(x)); this.touchS.clear(); }
     const diff = [];
@@ -1056,11 +1066,14 @@ class App extends Component {
       const chans = st.chans.slice(); chans[i] = { ...chans[i], ...patch }; return { chans };
     });
   }
+  /* in sends-on-faders mode a channel fader moves its send to the chosen bus/matrix */
+  sofK(i) { const st = this.state; if (!st.sofOn || st.screen !== 'main' || i < 0 || i === sofIdx(st.sof)) return null; return i; }
   faderDown(i, e, T, FH, noLong) {
     capture(e);
-    if (this.dbl('f' + i)) { this.upd(i, { v: 0.75 }); this.fd = null; return; }
+    const sk = noLong ? null : this.sofK(i), k = this.state.sof;
+    if (this.dbl('f' + i)) { if (sk !== null) this.setSend(i, k, 0.75); else this.upd(i, { v: 0.75 }); this.fd = null; return; }
     const r = e.currentTarget.getBoundingClientRect();
-    this.fd = { i, y: e.clientY, start: this.get(i).v, px: r.height * T / FH, moved: false };
+    this.fd = { i, y: e.clientY, start: sk !== null ? (this.state.chans[i].sends[k] || 0) : this.get(i).v, px: r.height * T / FH, moved: false, send: sk !== null ? k : null };
     clearTimeout(this.ft);
     if (i !== -1 && i < 48 && !noLong) this.ft = setTimeout(() => { if (this.fd && !this.fd.moved) { this.fd = null; this.setState({ sendPop: { i, bank: 0 } }); } }, 500);
   }
@@ -1068,7 +1081,7 @@ class App extends Component {
     const f = this.fd; if (!f) return;
     const dy = e.clientY - f.y;
     if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
-    if (f.moved) this.upd(f.i, { v: clamp(f.start - dy / f.px, 0, 1) });
+    if (f.moved) { if (f.send !== null && f.send !== undefined) this.setSend(f.i, f.send, clamp(f.start - dy / f.px, 0, 1)); else this.upd(f.i, { v: clamp(f.start - dy / f.px, 0, 1) }); }
   }
   faderUp() { clearTimeout(this.ft); this.fd = null; }
   panDown(i, e) {
@@ -1110,21 +1123,23 @@ class App extends Component {
     const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const segs = lv => { const o = []; for (let s = 17; s >= 0; s--) { const lit = lv > s / 18; o.push(s >= 16 ? (lit ? '#e0513f' : '#2f1714') : s >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); } return o; };
-    const strip = (i, c, j, isMain) => html`
-      <div class="strip" style=${isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
-        <button class="cname" style=${'background:' + (isMain ? '#d9b56a;font-size:15px;letter-spacing:.02em' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
-          onClick=${() => { const s0 = isMain || i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
-            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${isMain ? 'Main LR' : c.name}</button>
-        <button class="panmini" aria-label=${'Pan ' + panText(c.pan)}
+    const SO = st.sofOn, SK = st.sof, TI = sofIdx(SK), tcol = SK < 16 ? '#c9a25a' : '#4fc9b7';
+    const strip = (i, c0, j, isMain, tgt) => { const snd = SO && !tgt && i >= 0, c = snd ? { ...c0, v: c0.sends[SK] || 0, mute: (c0.sendOn || [])[SK] === false } : c0; return html`
+      <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
+        <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? '#d9b56a;font-size:15px;letter-spacing:.02em' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
+          onClick=${() => { const s0 = (isMain && !tgt) || i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
+            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${tgt ? c.name : isMain ? 'Main LR' : c.name}</button>
+        ${snd ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}><i style=${`width:7px;height:7px;border-radius:50%;background:${tcol}`}></i>→ ${this.busLabel(SK).toUpperCase().slice(0, 9)}</div>` : html`<button class="panmini" aria-label=${'Pan ' + panText(c.pan)}
           onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
           <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">
             <span class="knob" style=${`left:${(c.pan + 1) / 2 * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>
           </span>
-        </button>
+        </button>`}
         <div class="ms">
-          <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)}
-            style=${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>
+          ${snd ? html`<button onClick=${() => this.setSendArr(i, 'sendOn', SK, c.mute)} aria-pressed=${String(!c.mute)} aria-label=${'Send to ' + this.busLabel(SK) + (c.mute ? ' off' : ' on')}
+            style=${!c.mute ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>${c.mute ? 'OFF' : 'ON'}</button>` : html`<button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)}
+            style=${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>`}
           ${!isMain && html`<button onClick=${() => this.upd(i, { solo: !c.solo })} aria-pressed=${String(c.solo)}
             style=${c.solo ? 'background:#e8b93a;color:#1a1405;border:1px solid #4a3d1a;box-shadow:0 0 12px rgba(232,185,58,.5)' : 'background:#2a2410;color:#d9bd6a;border:1px solid #4a3d1a'}>SOLO</button>`}
         </div>
@@ -1136,44 +1151,49 @@ class App extends Component {
           ${this.mtr(st.lv[j][0], st.lv[j][1], T, st.pk[j][0], st.pk[j][1])}
           <span class="cap" style=${'top:' + Math.round((1 - c.v) * T) + 'px'}></span>
         </button>
-      </div>`;
+      </div>`; };
     const strips = [];
     for (let j = 0; j < 8; j++) { const s0 = bankIdx(b, j);
-      strips.push(s0 === -2 ? html`<div style="flex:1 1 0;min-width:0"></div>` : s0 === 48 ? strip(-1, { ...st.main, name: 'Main 1', color: '#d9b56a' }, j, false) : strip(s0, st.chans[s0], j, false)); }
-    strips.push(strip(-1, st.main, 8, true));
+      strips.push(s0 === -2 || (SO && (SK < 16 ? s0 >= 48 : s0 >= 65 && s0 <= 72)) ? html`<div style="flex:1 1 0;min-width:0"></div>` : s0 === 48 ? (SO ? strip(48, { ...st.chans[48], name: 'Main 1', color: '#d9b56a' }, j, false) : strip(-1, { ...st.main, name: 'Main 1', color: '#d9b56a' }, j, false)) : strip(s0, st.chans[s0], j, false)); }
+    strips.push(SO ? strip(TI, { ...st.chans[TI], name: this.busLabel(SK) }, 8, true, true) : strip(-1, st.main, 8, true));
     const banks = ['Ch 1–8','Ch 9–16','Ch 17–24','Ch 25–32','Ch 33–40','Aux 1–8','Bus 1–8','Bus 9–16','Matrix 1–8','Main 1–4'];
     /* a colour per kind of strip on the layer buttons */
     const bankCol = n => n < 5 ? '#7aa7e0' : n === 5 ? '#a993d9' : n < 8 ? '#c9a25a' : n === 8 ? '#4fc9b7' : '#e0513f';
 
     return html`
-      <header class="topbar" style="height:56px">
+      <header class="topbar" style="height:56px;position:relative;overflow:hidden">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <div style="display:flex;flex-direction:column;line-height:1;gap:2px">
-          <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
-          <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
+        <div style=${`flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;gap:12px;transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1);${SO ? 'opacity:0;transform:translateY(-14px);pointer-events:none' : ''}`}>
+          <div style="display:flex;flex-direction:column;line-height:1;gap:2px">
+            <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
+            <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
+          </div>
+          ${this.connPill()}
+          <div style="flex:1;min-width:0;display:flex;justify-content:center">
+            <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
+          </div>
+          <span style="width:156px;flex:none"></span>
+          <nav style="display:flex;gap:6px">
+            <button class="navbtn hot" aria-label="Player. Hold for its fader"
+              onPointerDown=${() => { this.plLong = false; clearTimeout(this.plT); this.plT = setTimeout(() => { this.plLong = true; this.setState({ plPop: true, plPick: false }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); }}
+              onPointerUp=${() => clearTimeout(this.plT)} onPointerCancel=${() => clearTimeout(this.plT)} onPointerLeave=${() => clearTimeout(this.plT)}
+              onClick=${() => { if (this.plLong) { this.plLong = false; return; } this.setState({ screen: 'rec' }); }}>${IC.player}<span>Player</span></button>
+            <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.fx}<span>FX</span></button>
+            <button class="navbtn" onClick=${() => this.setState({ screen: 'routing' })}>${IC.route}<span>Routing</span></button>
+            <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.scenes}<span>Scenes</span></button>
+            <button class="navbtn" onClick=${() => this.setState({ screen: 'settings' })}>${IC.gear}<span>הגדרות</span></button>
+            ${!NATIVE && html`<button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>`}
+          </nav>
         </div>
-        ${this.connPill()}
-        <div style="flex:1;display:flex;justify-content:center">
-          <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
-        </div>
-        <nav style="display:flex;gap:6px">
-          <button class="navbtn hot" aria-label="Player. Hold for its fader"
-            onPointerDown=${() => { this.plLong = false; clearTimeout(this.plT); this.plT = setTimeout(() => { this.plLong = true; this.setState({ plPop: true, plPick: false }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); }}
-            onPointerUp=${() => clearTimeout(this.plT)} onPointerCancel=${() => clearTimeout(this.plT)} onPointerLeave=${() => clearTimeout(this.plT)}
-            onClick=${() => { if (this.plLong) { this.plLong = false; return; } this.setState({ screen: 'rec' }); }}>${IC.player}<span>Player</span></button>
-          <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.fx}<span>FX</span></button>
-          <button class="navbtn" onClick=${() => this.setState({ screen: 'routing' })}>${IC.route}<span>Routing</span></button>
-          <button class="navbtn" onClick=${() => this.toast('עוד לא נבנה')}>${IC.scenes}<span>Scenes</span></button>
-          <button class="navbtn" onClick=${() => this.setState({ screen: 'settings' })}>${IC.gear}<span>הגדרות</span></button>
-          ${!NATIVE && html`<button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>`}
-        </nav>
+        ${this.sofRow()}
+        ${this.sofBtn()}
       </header>
       <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 0">
         <div class="wood" style="width:18px;flex:none;box-shadow:inset -2px 0 4px rgba(0,0,0,.5)"></div>
         <div style="flex:1;min-width:0;display:flex;gap:6px">${strips}</div>
         <div style="width:140px;flex:none;display:flex;flex-direction:column;gap:6px">
           <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase;padding:2px 4px">Layers</span>
-          ${banks.map((l, n) => html`<button class=${'layer' + (n === b ? ' on' : '')} onClick=${() => this.setState({ bank: n, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]) })}><i style=${`background:${bankCol(n)};opacity:${n === b ? 1 : 0.7};box-shadow:${n === b ? '0 0 8px ' + bankCol(n) : 'none'}`}></i>${l}</button>`)}
+          ${banks.map((l, n) => SO && (SK < 16 ? n > 5 : n === 8) ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${bankCol(n)}`}></i>${l}</button>` : html`<button class=${'layer' + (n === b ? ' on' : '')} onClick=${() => this.setState({ bank: n, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]) })}><i style=${`background:${bankCol(n)};opacity:${n === b ? 1 : 0.7};box-shadow:${n === b ? '0 0 8px ' + bankCol(n) : 'none'}`}></i>${l}</button>`)}
         </div>
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
       </div>
@@ -1191,6 +1211,45 @@ class App extends Component {
         </div>`}
       ${st.panPop && this.renderPan(Hd)}
       ${st.plPop && this.renderPlayerFader(Hd)}`;
+  }
+
+  /* ---------- sends on faders: the top row turns into bus/matrix picks ---------- */
+  sofToggle() {
+    const st = this.state, on = !st.sofOn;
+    const bank = on && st.sof < 16 && st.bank > 5 ? 0 : on && st.bank === 8 ? 0 : st.bank;
+    this.setState({ sofOn: on, bank, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]) });
+  }
+  sofPick(k) {
+    const st = this.state, bank = k < 16 && st.bank > 5 ? 0 : k >= 16 && st.bank === 8 ? 0 : st.bank;
+    this.setState({ sof: k, bank, pk: Array.from({ length: 9 }, () => [0, 0]) });
+  }
+  sofBtn() {
+    const on = this.state.sofOn, n = NATIVE ? 5 : 6, navW = 66 + 60 * (n - 1) + 6 * (n - 1), W = 140;
+    const left = on ? DW - 14 - W : DW - 14 - navW - 12 - W - 8;
+    return html`<button onClick=${() => this.sofToggle()} aria-pressed=${String(on)} aria-label=${on ? 'Leave sends on faders' : 'Sends on faders'}
+      style=${`position:absolute;top:5px;left:${left}px;width:${W}px;height:46px;z-index:2;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
+        font-weight:800;font-size:17px;letter-spacing:.14em;transition:left .5s cubic-bezier(.2,.8,.2,1),box-shadow .35s,background .35s,color .35s,border-color .35s;
+        ${on ? 'background:radial-gradient(ellipse at 50% 40%,#5a4320,#2a1f10 75%);color:#ffe3ad;border:1.5px solid #f3c27a;box-shadow:0 0 16px rgba(243,194,122,.6),inset 0 0 14px rgba(243,194,122,.45)'
+             : 'background:linear-gradient(180deg,#2e2924,#1a1714);color:var(--brass-hi);border:1.5px solid #8a6a3a;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)'}`}>
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h7M4 17h11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M16 9l4 3-4 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>SENDS</button>`;
+  }
+  sofRow() {
+    const st = this.state, on = st.sofOn, ks = [...Array(24).keys()];
+    const drag = {
+      onPointerDown: e => { if (e.pointerType !== 'mouse') return; this.rowDr = { x: e.clientX, sl: e.currentTarget.scrollLeft, moved: false }; },
+      onPointerMove: e => { const d = this.rowDr; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) e.currentTarget.scrollLeft = d.sl - dx / (this.dims().s || 1); },
+      onPointerUp: () => { setTimeout(() => { this.rowDr = null; }, 0); }, onPointerLeave: () => { this.rowDr = null; }
+    };
+    return html`<div class="sofrow" ...${drag} style=${`position:absolute;left:30px;right:${14 + 140 + 12}px;top:0;bottom:0;display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x;
+        transition:opacity .4s .08s,transform .5s cubic-bezier(.2,.8,.2,1);${on ? 'opacity:1;transform:none' : 'opacity:0;transform:translateX(60px);pointer-events:none'}`}>
+      ${ks.map(k => { const sel = k === st.sof, col = k < 16 ? '#c9a25a' : '#4fc9b7', ch = st.chans[sofIdx(k)];
+        return html`<button onClick=${() => { if (this.rowDr && this.rowDr.moved) return; this.sofPick(k); }} aria-pressed=${String(sel)}
+          style=${`flex:none;width:104px;height:44px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 9px;text-align:left;position:relative;overflow:hidden;
+            ${sel ? `background:${col}33;border:1.5px solid ${col};box-shadow:0 0 12px ${col}88,inset 0 0 10px ${col}55` : 'background:#161412;border:1px solid #302b25'}`}>
+          <i style=${`position:absolute;left:0;top:0;bottom:0;width:4px;background:${ch && ch.color || col}`}></i>
+          <span style=${`font-size:10px;font-weight:700;letter-spacing:.14em;color:${col}`}>${k < 16 ? 'BUS ' + (k + 1) : 'MTX ' + (k - 15)}</span>
+          <span style=${`max-width:100%;font-size:15px;font-weight:700;color:${sel ? '#fff3dc' : '#e9dcc2'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${this.busLabel(k)}</span></button>`; })}
+    </div>`;
   }
   /* the channel the USB player comes in on: the one set by hand, else the first fed by the player */
   playerCh() {
