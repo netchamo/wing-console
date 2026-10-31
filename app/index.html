@@ -1326,9 +1326,17 @@ class App extends Component {
     const st = this.state, v = st.monv[p], n = v === undefined ? 0 : this.monN(p, +v);
     return html`<div style="display:flex;flex-direction:column;gap:3px">
       <button class="box" aria-label=${label + ' ' + this.monFmt(p, v) + ', drag sideways'} style=${`height:${h}px;cursor:ew-resize;touch-action:none`}
-        onPointerDown=${e => { capture(e); this.mb = { p, sx: e.clientX, n0: n, w: e.currentTarget.getBoundingClientRect().width }; }}
-        onPointerMove=${e => { const d = this.mb; if (!d || d.p !== p) return; this.monSet(p, this.monV(p, d.n0 + (e.clientX - d.sx) / (d.w * 1.15))); }}
-        onPointerUp=${() => { this.mb = null; }} onPointerCancel=${() => { this.mb = null; }}>
+        onPointerDown=${e => { capture(e);
+          /* fader levels lean on 0 dB while dragging, like the pan centre */
+          const z = this.monMeta(p).t === 'fdr' ? posOf(0) : null, dz = 0.035;
+          const toRaw = q => z === null ? q : q < z - 1e-4 ? q : q > z + 1e-4 ? q + 2 * dz : z + dz;
+          const fromRaw = r => z === null ? r : r < z ? r : r <= z + 2 * dz ? z : r - 2 * dz;
+          this.mb = { p, sx: e.clientX, r0: toRaw(n), w: e.currentTarget.getBoundingClientRect().width, fromRaw, moved: false }; }}
+        onPointerMove=${e => { const d = this.mb; if (!d || d.p !== p) return; const dx = e.clientX - d.sx;
+          if (!d.moved && Math.abs(dx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.monFmt(p, this.state.monv[p]), () => this.monN(p, +(this.state.monv[p] ?? 0))); }
+          if (!d.moved) return; const nn = clamp(d.fromRaw(d.r0 + dx / (d.w * 1.15)), 0, 1);
+          this.monSet(p, this.monMeta(p).t === 'fdr' && Math.abs(nn - posOf(0)) < 1e-6 ? 0 : this.monV(p, nn)); }}
+        onPointerUp=${() => { this.mb = null; this.hideDragPop(); }} onPointerCancel=${() => { this.mb = null; this.hideDragPop(); }}>
         <b>${label}</b><em>${this.monFmt(p, v)}</em><s style=${`width:${Math.round(n * 100)}%;background:${color}`}></s></button>
       ${hint && html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:12.5px;line-height:1.3;color:#8f8676;padding:0 4px">${hint}</span>`}
     </div>`;
