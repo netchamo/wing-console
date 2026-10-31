@@ -224,7 +224,8 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             }
             // Some routers drop broadcasts. Then ask every address of the network directly.
             if (seen.size == before && iface.prefix >= 22) {
-                val base = ipInt(iface.addr) and maskOf(iface.prefix), count = (1 shl (32 - iface.prefix)) - 2
+                val base = ipInt(iface.addr) and maskOf(iface.prefix)
+                val count = (1 shl (32 - iface.prefix)) - 2
                 log("sys", "no answer to broadcast on ${iface.addr.hostAddress}; asking all $count addresses directly")
                 for (k in 1..count) {
                     val a = InetAddress.getByAddress(ByteBuffer.allocate(4).putInt(base + k).array())
