@@ -3,7 +3,8 @@ name: Android APK
 on:
   push:
     branches: [main]
-    paths: ["android/**", "app/index.html", ".github/workflows/android.yml"]
+    # only native changes need a new APK; interface changes reach the app as a web update
+    paths: ["android/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 permissions:
