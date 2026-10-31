@@ -740,6 +740,9 @@ class App extends Component {
   mxIn(e, dirty) {
     const r = WREV.get(e.id); if (!r) return false;
     const [s, k] = r; let v = e.s !== undefined ? e.s : e.v; if (v === undefined) return false;
+    /* remember the id the desk itself uses for this value: writes go back to the same id */
+    if (s >= 0 && /^(gate|dyn)\/\d+$/.test(k)) { const rx = this.rxId || (this.rxId = {}), key = s + '|' + k;
+      if (rx[key] !== e.id) { const d = DYNID[s] && DYNID[s][k]; if (d && d !== e.id && !(this.idLogged || (this.idLogged = {}))[key]) { this.idLogged[key] = true; this.logLine('sys', `${stripName(s)} ${k}: desk reports on id ${e.id}, definition id ${d}; writing to ${e.id}`); } rx[key] = e.id; } }
     const meta = metaOf(s, k, s >= 0 ? this.mx[s] : null);
     if (meta.t === 'fdr' && e.k === 'r') v = fdrDb(v);
     if (meta.t === 'enum' && typeof v === 'number' && meta.i) v = meta.i[v] !== undefined ? meta.i[v] : v;
@@ -1038,7 +1041,7 @@ class App extends Component {
   }
   mxSend(s, k, v) {
     const isG = s < 0, store = isG ? this.gx : this.mx[s];
-    const id = isG ? GID[k] : wid(s, k); if (!id) return;
+    const id = isG ? GID[k] : ((this.rxId && this.rxId[s + '|' + k]) || wid(s, k)); if (!id) return;
     const meta = metaOf(s, k, store), t = wtype(meta);
     let val = v;
     if (t === 'f') { val = +v; if (meta.a !== undefined && meta.b !== undefined) val = clamp(val, meta.a, meta.b); val = Math.round(val * 10000) / 10000; }
@@ -1051,6 +1054,7 @@ class App extends Component {
   slotsChanged(s, kind) {
     const store = this.mx[s];
     Object.keys(store).forEach(x => { if (new RegExp('^' + kind + '\\/\\d+$').test(x)) delete store[x]; });
+    if (this.rxId) Object.keys(this.rxId).forEach(x => { if (x.startsWith(s + '|' + kind + '/')) delete this.rxId[x]; });
     if (DEFM[s]) Object.keys(DEFM[s]).forEach(x => { if (x.startsWith(kind + '/')) delete DEFM[s][x]; });
     clearTimeout(this.scT); this.scT = setTimeout(() => { this.reqSlotDefs(s); this.reqStrip(s, 'slots'); }, 250);
   }
