@@ -1852,7 +1852,7 @@ class App extends Component {
       if (rows.length === 1 && sumW([...rows[0], ...wing]) > rowW0() * 1.1) rows.push(wing);
       else { let k = 0; rows.forEach((r, n) => { if (r.length < rows[k].length) k = n; }); rows[k] = [...rows[k], ...wing]; }
     }
-    const avail = Hd - 92 - 64 - 28; f = clamp(avail / (rows.length * 196 + 10), 0.5, 1.3);
+    const avail = Hd - 92 - 64 - 28 - 34; f = clamp(avail / (rows.length * 196 + 10), 0.5, 1.3);
     const rowW = rowW0();
     const fmt = (m, v) => {
       if (v === undefined) return '—';
@@ -1895,7 +1895,8 @@ class App extends Component {
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px 14px 12px">
             <div style=${`display:flex;align-items:center;gap:14px;padding-bottom:8px;border-bottom:1px solid ${P.line}`}>
               <span style=${`font:700 ${Math.round(28 * Math.min(1, f + 0.1))}px/1 var(--plate-font);letter-spacing:.22em;color:${P.ink};text-shadow:0 1px 0 rgba(0,0,0,.25)`}>${F.title}</span>
-              <span style=${`font:600 11px/1 var(--plate-font);letter-spacing:.24em;color:${P.sub}`}>${slot === 'gate' ? 'GATE SLOT' : 'DYNAMICS SLOT'}</span>
+              <span style="flex:1"></span>
+              ${this.faceScreen(mdl, k => byName[k] ? vals[byName[k][0]] : undefined, st.fsim ? st.fsim.env : -60, 300, 78, on)}
               <span style="flex:1"></span>
               ${!this.isLinked() && html`<span style="font:700 11px/1 var(--mono);letter-spacing:.16em;padding:4px 7px;border-radius:4px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
               ${powerSw}
@@ -1910,6 +1911,126 @@ class App extends Component {
           <div style="width:34px;flex:none;position:relative;border-left:1px solid rgba(0,0,0,.35)">${screw('right', 'top')}${screw('right', 'bottom')}</div>
         </div>
       </div>`;
+  }
+  /* ---------- the little screen on each faceplate: what the unit is doing ---------- */
+  faceCurve(mdl, g) {
+    const num = (k, d) => { const v = g(k); if (v === undefined || v === null) return d; const n = parseFloat(v); return isNaN(n) ? (/ALL/.test(v) ? 20 : /NUKE/.test(v) ? 50 : d) : n; };
+    const on = (k) => { const v = g(k); return v === 1 || v === '1' || v === true; };
+    const comp = (T, R, K = 4, extra) => ({ kind: 'comp', T, R, K, L: extra });
+    switch (mdl) {
+      case 'B160': return comp(20 * Math.log10(Math.max(num('thr', 0.2), 0.01)) - 10, num('comp', 3), 2);
+      case 'B560': return comp(num('thr', -10), num('ratio', 3), 2);
+      case 'D241': return g('lim') !== undefined || g('ratio') !== undefined ? comp(num('thr', -20), num('ratio', 3), 3, num('lim', 0)) : { kind: 'gate', T: num('thr', -40), range: 60, R: on('slow') ? 3 : 1e9 };
+      case 'ECL33': return comp(on('con') ? num('cthr', -20) : 99, num('ratio', 3), 3, on('lon') ? num('lthr', -6) : null);
+      case '9000C': case 'SBUS': case 'RED3': return comp(num('thr', -20), num('ratio', 4), mdl === 'SBUS' ? 2 : 4);
+      case 'BLISS': return comp(num('thr', -20), num('ratio', 4), 4, on('glon') ? num('glim', -3) : null);
+      case '2250': return comp(-num('thr', 5) * 5, 1 + num('ratio', 5) * 1.9, g('knee') === 'SOFT' ? 10 : 2);
+      case 'NSTR': return comp(-num('in', 5) * 4.5, num('ratio', 4), 3);
+      case 'F670': return comp(-num('thr', 5) * 4.5 - (num('in', -10) + 10), 5, 14);
+      case 'L100': return comp(-num('gr', 5) * 5 - num('ingain', 5) * 1.5, 4, 10);
+      case 'LA': return comp(-num('peak', 50) * 0.5, g('mode') === 'LIM' ? 10 : 3, 10);
+      case '76LA': return comp(-10 - (num('in', -24) + 48) * 0.8, num('ratio', 4), 2);
+      case 'CMB': return { kind: 'gate', T: num('thr', -40), range: num('depth', 20), R: 1e9, comp: comp(-num('cpeak', 50) * 0.5, g('cmode') === 'LIM' ? 10 : 3, 10) };
+      case 'E88': return { kind: 'gate', T: num('thr', -40), range: Math.min(num('range', 40), on('m40') ? 40 : 80), R: 1e9 };
+      case '9000G': return { kind: 'gate', T: num('thr', -40), range: num('range', 40), R: g('mode') === 'EXP' ? 2 : 1e9 };
+      case 'PSE': return { kind: 'gate', T: num('thr', -40), range: num('depth', 20), R: 1e9 };
+      case 'DUCK': return { kind: 'duck', T: num('thr', -30), range: num('range', 20) };
+      case 'RIDE': return { kind: 'ride', T: num('thr', -40), tgt: num('tgt', -18), range: num('range', 8) };
+      case 'WAVE': return { kind: 'trans', att: num('att', 0), sust: num('sust', 0) };
+      case 'WARM': return { kind: 'sat', drv: num('drv', 40), col: num('col', 0) };
+      case 'DS902': return { kind: 'ds', f: num('f', 4000), range: num('range', 6), full: g('mode') === 'FULL' };
+    }
+    if (g('thr') !== undefined && g('ratio') !== undefined) return comp(num('thr', -20), num('ratio', 3), 4);
+    if (g('thr') !== undefined && g('range') !== undefined) return { kind: 'gate', T: num('thr', -40), range: num('range', 40), R: 1e9 };
+    return { kind: 'level' };
+  }
+  curveOut(c, x) {
+    if (c.kind === 'comp') {
+      const R = c.R === 0 ? 1 : c.R, T = c.T, W = c.K, over = x - T;
+      let y;
+      if (R < 0) y = over > 0 ? T + over / R : x;   // negative ratio: louder in, quieter out
+      else if (2 * over < -W) y = x; else if (2 * over > W) y = T + over / R; else y = x + (1 / R - 1) * Math.pow(over + W / 2, 2) / (2 * W);
+      if (c.L !== null && c.L !== undefined && y > c.L) y = c.L;
+      return y;
+    }
+    if (c.kind === 'gate') { let y = x >= c.T ? x : x - Math.min(c.range, c.R > 1e8 ? c.range : (c.T - x) * (c.R - 1)); if (c.comp) y = this.curveOut(c.comp, y); return y; }
+    if (c.kind === 'duck') return x > c.T ? x - Math.min(c.range, (x - c.T) * 2) : x;
+    if (c.kind === 'ride') return x < c.T ? x : x + clamp(c.tgt - x, -c.range, c.range);
+    return x;
+  }
+  faceScreen(mdl, g, env, w, h, live = true) {
+    const c = this.faceCurve(mdl, g), bg = '#0b1015', grid = 'rgba(120,160,190,.13)', ink = '#5fd0ff', hot = '#ffb347';
+    const pad = 6, gw = c.kind === 'trans' || c.kind === 'sat' || c.kind === 'ds' || !live ? 0 : 34, pw = w - pad * 2 - gw, ph = h - pad * 2;
+    const box = (inner) => html`<svg width=${w} height=${h} viewBox=${`0 0 ${w} ${h}`} style="display:block;border-radius:5px;background:${bg};box-shadow:inset 0 1px 6px rgba(0,0,0,.9),0 0 0 2px rgba(0,0,0,.55),0 1px 0 3px rgba(255,255,255,.08)">${inner}</svg>`;
+    const lines = []; for (let k = 1; k < 4; k++) { lines.push(html`<line x1=${pad + pw * k / 4} y1=${pad} x2=${pad + pw * k / 4} y2=${pad + ph} stroke=${grid}/>`, html`<line x1=${pad} y1=${pad + ph * k / 4} x2=${pad + pw} y2=${pad + ph * k / 4} stroke=${grid}/>`); }
+    if (c.kind === 'trans') {
+      const A = Math.pow(10, c.att / 20), S = Math.pow(10, c.sust / 20), N = 60;
+      const base = t => t < 0.06 ? t / 0.06 : 0.35 + 0.65 * Math.exp(-(t - 0.06) * 14) - 0.35 * (t - 0.06) / 0.94;
+      const mod = t => { const b = base(t), wA = Math.exp(-Math.pow((t - 0.07) / 0.06, 2)), wS = clamp((t - 0.15) / 0.2, 0, 1); return b * Math.pow(A, wA) * Math.pow(S, wS); };
+      let mx = 0; for (let k = 0; k <= N; k++) mx = Math.max(mx, base(k / N), mod(k / N));
+      const pth = fn => Array.from({ length: N + 1 }, (_, k) => `${k ? 'L' : 'M'}${(pad + pw * k / N).toFixed(1)} ${(pad + ph - Math.max(0, fn(k / N)) / mx * ph).toFixed(1)}`).join(' ');
+      return box(html`${lines}<path d=${pth(base)} fill="none" stroke="rgba(160,190,210,.45)" stroke-width="1.4" stroke-dasharray="3 2"/><path d=${pth(mod) + ` L${pad + pw} ${pad + ph} L${pad} ${pad + ph}Z`} fill="rgba(95,208,255,.14)"/><path d=${pth(mod)} fill="none" stroke=${ink} stroke-width="2"/>
+        <text x=${pad + 4} y=${pad + 10} font-size="9" fill="#8fb3c9" style="font-family:var(--mono)">ATT ${c.att > 0 ? '+' : ''}${(+c.att).toFixed(1)}</text><text x=${pad + pw - 4} y=${pad + 10} text-anchor="end" font-size="9" fill="#8fb3c9" style="font-family:var(--mono)">SUS ${c.sust > 0 ? '+' : ''}${(+c.sust).toFixed(1)}</text>`);
+    }
+    if (c.kind === 'sat') {
+      const k = 0.6 + c.drv / 22, b = clamp(c.col, -1, 1) * 0.35, f0 = u => Math.tanh(k * (u + b)) - Math.tanh(k * b), n0 = Math.max(Math.abs(f0(1)), Math.abs(f0(-1)));
+      const N = 50, P = u => [pad + pw * (u + 1) / 2, pad + ph * (1 - (f0(u) / n0 + 1) / 2)];
+      const d = Array.from({ length: N + 1 }, (_, j) => { const [x, y] = P(-1 + 2 * j / N); return `${j ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`; }).join(' ');
+      const amp = clamp(Math.pow(10, (env + 6) / 20), 0, 1), [dx, dy] = P(amp);
+      return box(html`${lines}<line x1=${pad} y1=${pad + ph} x2=${pad + pw} y2=${pad} stroke="rgba(160,190,210,.35)" stroke-dasharray="3 2"/><path d=${d} fill="none" stroke=${ink} stroke-width="2"/>${live && html`<circle cx=${dx} cy=${dy} r="4" fill=${hot}/>`}`);
+    }
+    if (c.kind === 'ds') {
+      const act = live ? clamp((env + 34) / 22, 0, 1) : 0.7, red = c.range * act, lf = Math.log10(c.f / 20) / 3, N = 60;
+      const gain = u => { const fr = 20 * Math.pow(1000, u); return c.full ? -red * 0.6 * (1 / (1 + Math.exp(-Math.log2(fr / c.f) * 3)) * 0.5 + 0.5) : -red / (1 + Math.exp(-Math.log2(fr / c.f) * 3)); };
+      const Y = db => pad + ph * 0.25 - db / 14 * ph * 0.7;
+      const d = Array.from({ length: N + 1 }, (_, j) => `${j ? 'L' : 'M'}${(pad + pw * j / N).toFixed(1)} ${Y(gain(j / N)).toFixed(1)}`).join(' ');
+      return box(html`${lines}<line x1=${pad} y1=${Y(0)} x2=${pad + pw} y2=${Y(0)} stroke="rgba(160,190,210,.35)"/><line x1=${pad + pw * lf} y1=${pad} x2=${pad + pw * lf} y2=${pad + ph} stroke=${hot} stroke-dasharray="2 2" opacity=".7"/>
+        <path d=${d + ` L${pad + pw} ${Y(0)} L${pad} ${Y(0)}Z`} fill="rgba(95,208,255,.14)"/><path d=${d} fill="none" stroke=${ink} stroke-width="2"/>
+        <text x=${pad + pw * lf + 4} y=${pad + ph - 3} font-size="9" fill="#8fb3c9" style="font-family:var(--mono)">${c.f >= 1000 ? (c.f / 1000).toFixed(1) + 'k' : Math.round(c.f)}</text>`);
+    }
+    if (c.kind === 'level') {
+      const lv = clamp((env + 60) / 60, 0, 1);
+      return box(html`${lines}<rect x=${pad} y=${pad + ph * 0.35} width=${pw * lv} height=${ph * 0.3} fill=${ink} opacity=".8"/>`);
+    }
+    /* level curves: input across, output up, -60 … 0 dB */
+    const X = db => pad + pw * (clamp(db, -60, 0) + 60) / 60, Yc = db => pad + ph - ph * (clamp(db, -60, 0) + 60) / 60, N = 60;
+    const d = Array.from({ length: N + 1 }, (_, j) => { const x = -60 + j; return `${j ? 'L' : 'M'}${X(x).toFixed(1)} ${Yc(this.curveOut(c, x)).toFixed(1)}`; }).join(' ');
+    const T = c.kind === 'comp' ? c.T : c.T, e = clamp(env, -60, 0), out = this.curveOut(c, e), gr = Math.max(0, e - out);
+    const grH = clamp(gr / 24, 0, 1) * ph;
+    return box(html`${lines}<line x1=${pad} y1=${pad + ph} x2=${pad + pw} y2=${pad} stroke="rgba(160,190,210,.35)" stroke-dasharray="3 2"/>
+      ${T > -60 && T < 0 && html`<line x1=${X(T)} y1=${pad} x2=${X(T)} y2=${pad + ph} stroke=${hot} stroke-dasharray="2 2" opacity=".55"/>`}
+      ${c.kind === 'ride' && html`<line x1=${pad} y1=${Yc(c.tgt)} x2=${pad + pw} y2=${Yc(c.tgt)} stroke="#62b85c" stroke-dasharray="2 2" opacity=".7"/>`}
+      <path d=${d} fill="none" stroke=${ink} stroke-width="2"/>
+      ${live && html`<circle cx=${X(e)} cy=${Yc(out)} r="4" fill=${hot} style="filter:drop-shadow(0 0 3px #ffb347)"/>
+      <rect x=${w - pad - 24} y=${pad} width="12" height=${ph} rx="2" fill="rgba(255,255,255,.06)"/>
+      <rect x=${w - pad - 24} y=${pad} width="12" height=${grH} rx="2" fill=${hot}/>
+      <text x=${w - pad - 18} y=${pad + ph - 2} text-anchor="middle" font-size="8" fill="#8fb3c9" style="font-family:var(--mono)">GR</text>`}`);
+  }
+  /* a small picture of a unit for the model list */
+  miniFace(slot, code) {
+    const F = FACES[code], kind = SLOTK[slot], w = 196, h = 86;
+    if (!F || !isFaceModel(slot, code)) {
+      const L = MD[kind][code] || MD.gate[code] || MD.dyn[code] || [], by = Object.fromEntries(L.map(x => [x[1], x[2]]));
+      const g = k => { const m = by[k]; if (!m) return undefined; return m.t === 'enum' || m.t === 'fenum' ? m.i[Math.floor(m.i.length / 2)] : m.a !== undefined ? (m.a + m.b) / 2 : undefined; };
+      let scr;
+      if (isDeq(code)) scr = html`<svg width="150" height="52" viewBox="0 0 150 52"><path d="M4 30 C40 30 46 12 62 12 S84 30 100 30 S118 40 126 40 S140 30 146 30" fill="none" stroke="#5fd0ff" stroke-width="2"/><line x1="4" y1="30" x2="146" y2="30" stroke="rgba(160,190,210,.3)" stroke-dasharray="3 2"/></svg>`;
+      else scr = this.faceScreen(code === 'GATE' ? 'E88' : code === 'EXP' ? '9000G' : code === 'COMP' ? '9000C' : code, code === 'GATE' || code === 'EXP' || code === 'COMP' ? (() => undefined) : g, -20, 150, 52, false);
+      return html`<span style=${`width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:linear-gradient(180deg,#24272b,#16181b);border:1px solid #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)`}>${scr}</span>`;
+    }
+    const P = PLATES[F.plate] || PLATES.black, rows = Array.isArray(F.rows) ? F.rows : (F.rows[kind] || F.rows.dyn || F.rows.gate || []);
+    const body = F.knob === 'silver' ? 'radial-gradient(circle at 38% 32%,#fff,#b9b9b6 55%,#6d6d6a)' : F.knob === 'cream' ? 'radial-gradient(circle at 38% 32%,#fffaf0,#dccfa9 55%,#8f8160)' : 'radial-gradient(circle at 38% 32%,#666,#1d1d1d 55%,#050505)';
+    let ci = 0;
+    const el = c => { const sz = { S: 13, M: 16, L: 19, XL: 23 }[c[3] || 'M'] || 16, cap = F.caps ? F.caps[ci++ % F.caps.length] : null;
+      if (c[2] === 'sw') return html`<span style=${`width:6px;height:14px;border-radius:3px;background:linear-gradient(90deg,#888,#fff,#777);box-shadow:0 0 0 2px ${P.line}`}></span>`;
+      if (c[2] === 'btns') return html`<span style="display:flex;gap:2px">${[0, 1, 2].map(() => html`<span style="width:9px;height:9px;border-radius:1.5px;background:#e6e4dc"></span>`)}</span>`;
+      return html`<span style=${`width:${sz}px;height:${sz}px;border-radius:50%;background:${F.knob === 'cap' ? `radial-gradient(circle,${cap} 0 55%,#2a2c2e 58%)` : body};box-shadow:0 1px 2px rgba(0,0,0,.6)`}></span>`; };
+    return html`<span style=${`width:${w}px;height:${h}px;display:flex;flex-direction:column;gap:4px;padding:6px 10px;box-sizing:border-box;border-radius:4px;background:${P.bg};border:1px solid #000;box-shadow:inset 0 1px 0 rgba(255,255,255,.2)`}>
+      <span style=${`font:700 9px/1 'Futura','Arial Narrow',sans-serif;letter-spacing:.16em;color:${P.ink};white-space:nowrap;overflow:hidden;text-align:left`}>${F.title}</span>
+      <span style="flex:1;display:flex;align-items:center;gap:8px">
+        ${F.meter === 'vu' && html`<span style="width:34px;height:22px;border-radius:2px;background:linear-gradient(180deg,#fff2c4,#e3c477);box-shadow:0 0 0 2px #151515"></span>`}
+        ${F.meter === 'leds' && html`<span style="display:flex;flex-direction:column;gap:2px;padding:3px;background:rgba(0,0,0,.4);border-radius:2px">${[0, 1, 2, 3, 4].map(k => html`<span style=${`width:7px;height:4px;border-radius:1px;background:${k === 0 ? '#ff3b26' : k === 1 ? '#ffc23a' : '#47e05a'};opacity:${k > 1 ? 1 : .35}`}></span>`)}</span>`}
+        <span style="flex:1;display:flex;flex-direction:column;gap:5px;justify-content:center">${rows.slice(0, 2).map(r => html`<span style="display:flex;align-items:center;justify-content:space-evenly">${r.map(el)}</span>`)}</span>
+      </span></span>`;
   }
   lever(up, P, k = 1) {
     const w = Math.round(30 * k), h = Math.round(44 * k);
@@ -1970,10 +2091,14 @@ class App extends Component {
           ${st === 'cap' && html`<circle cx=${c} cy=${c} r=${R * 0.62} fill=${capCol || '#c8c8c8'} stroke="rgba(0,0,0,.5)"/><circle cx=${c - R * .15} cy=${c - R * .18} r=${R * 0.35} fill="rgba(255,255,255,.18)"/>`}
           ${st !== 'cap' && html`<circle cx=${c} cy=${c} r=${R * 0.7} fill="none" stroke="rgba(255,255,255,.12)"/>`}
           <g transform=${`rotate(${ang} ${c} ${c})`}><line x1=${c} y1=${c - R * (st === 'cap' ? 0.66 : 0.3)} x2=${c} y2=${c - R + 4} stroke=${st === 'cap' ? '#f4f1e8' : ptr} stroke-width="3" stroke-linecap="round"/></g></g>`;
-    const down = e => { capture(e); this.fk = { sx: e.clientX, sy: e.clientY, n0: n, moved: false }; this.fkV = v; this.fkN = n; };
+    /* centre detents, like the pan control: the knob rests a moment at the middle (and at 0 on a ± scale) */
+    const DT = step ? [] : [0.5, ...(!lg && a < 0 && b > 0 && Math.abs(-a / (b - a) - 0.5) > 0.06 ? [-a / (b - a)] : [])].sort((x, y) => x - y), dz = 0.045;
+    const toRaw = q => { let o = 0; for (const c0 of DT) { if (Math.abs(q - c0) < 1e-4) return c0 + o + dz; if (q < c0) break; o += 2 * dz; } return q + o; };
+    const fromRaw = r => { let o = 0; for (const c0 of DT) { const st0 = c0 + o; if (r < st0) return r - o; if (r <= st0 + 2 * dz) return c0; o += 2 * dz; } return r - o; };
+    const down = e => { capture(e); this.fk = { sx: e.clientX, sy: e.clientY, r0: toRaw(n), moved: false }; this.fkV = v; this.fkN = n; };
     const move = e => { const d = this.fk; if (!d) return; const dd = (e.clientX - d.sx) - (e.clientY - d.sy);
       if (!d.moved && Math.abs(dd) > 3) { d.moved = true; this.showDragPop(label.charAt(0) + label.slice(1).toLowerCase(), '#c9a25a', () => fmt(m, this.fkV), () => this.fkN); }
-      if (!d.moved) return; const nn = clamp(d.n0 + dd / 240, 0, 1), x = dn(nn); this.fkV = x; this.fkN = en ? Math.round(nn * (N - 1)) / Math.max(1, N - 1) : nn; put(x); };
+      if (!d.moved) return; const nn = clamp(fromRaw(d.r0 + dd / 240), 0, 1), x = DT.some(c0 => c0 === nn) && !en && m.t !== 'int' ? (lg ? a * Math.pow(b / a, nn) : a + nn * (b - a)) : dn(nn); this.fkV = x; this.fkN = en ? Math.round(nn * (N - 1)) / Math.max(1, N - 1) : nn; put(x); };
     const up = () => { this.fk = null; this.hideDragPop(); };
     return html`<div style="display:flex;flex-direction:column;align-items:center;gap:0">
       <span style=${`font:700 ${Math.max(11, Math.round(D / 7.5))}px/1.1 var(--plate-font);letter-spacing:.15em;color:${P.ink};text-align:center;max-width:${W + 20}px`}>${label}</span>
@@ -3027,19 +3152,19 @@ class App extends Component {
     const st = this.state, cur = st.slots[st.dynSlot], close = () => this.setState({ modelPop: false });
     return html`
       <button class="scrim" aria-label="Close model list" onClick=${close}></button>
-      <div class="pop" style=${`left:60px;top:${Math.max(16, Math.round((Hd - 420) / 2))}px;width:1060px;padding:18px 20px;gap:14px;border-color:#8a6a3a`}>
+      <div class="pop" style=${`left:40px;top:10px;width:1100px;height:${Hd - 20}px;padding:14px 18px;gap:12px;border-color:#8a6a3a`}>
         <div style="display:flex;align-items:center;gap:12px">
           <span style="font-size:24px;font-weight:600;letter-spacing:.04em">${st.dynSlot === 'gate' ? 'Gate' : 'Comp'} slot model</span>
           <span style="flex:1"></span>
           <button class="small" onClick=${close}>CLOSE</button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+        <div style="flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-content:start">
           ${MODEL_ORDER[st.dynSlot].map(code => { const on = code === cur, sl = st.dynSlot; return html`
             <button onClick=${() => this.setState(s => ({ slots: { ...s.slots, [sl]: code }, modelPop: false, otherModel: code !== this.dualDeq(sl) && code !== (sl === 'gate' ? 'GATE' : 'COMP') ? { ...s.otherModel, [sl]: code } : s.otherModel }))} aria-pressed=${String(on)}
-              style=${`height:62px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 14px;border-radius:8px;cursor:pointer;text-align:left;
+              style=${`display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 6px 7px;border-radius:8px;cursor:pointer;
                 ${on ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : isDeq(code) ? 'background:#121c1f;border:1px solid #3b5258;color:#cfe0e5' : 'background:#141210;border:1px solid #2c2721;color:#e9dcc2'}`}>
-              <span style="font-size:18px;font-weight:700;letter-spacing:.03em">${mName(sl, code)}</span>
-              <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.7">${(MD[SLOTK[sl]][code] || MD.gate[code] || MD.dyn[code] || []).map(x => x[1]).slice(0, 5).join(' · ') || code}</span>
+              ${this.miniFace(sl, code)}
+              <span style="font-size:15px;font-weight:700;letter-spacing:.03em;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${mName(sl, code)}</span>
             </button>`; })}
         </div>
         <span style="font-size:13px;color:#9b927f">Runs inside the channel's ${st.dynSlot === 'gate' ? 'Gate' : 'Comp'} slot. It does not use any of the 16 FX rack slots.</span>
