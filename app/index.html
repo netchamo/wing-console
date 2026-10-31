@@ -779,6 +779,9 @@ class App extends Component {
       for (let k = 0; k < 24; k++) { const key = (k < 16 ? `send/${k + 1}` : `send/MX${k - 15}`) + '/on'; if (has(key)) { on[k] = +mx[key] === 1; so = true; } }
       for (let k = 0; k < 16; k++) { const key = `send/${k + 1}/mode`; if (has(key)) { md[k] = mx[key]; so = true; } }
       if (so) { c.sendOn = on; c.sendMode = md; }
+      const sp = (c.sendPan || Array(16).fill(0)).slice(); let spc = false;
+      for (let k = 0; k < 16; k++) { const key = `send/${k + 1}/pan`; if (has(key)) { sp[k] = clamp(+mx[key] / 100, -1, 1); spc = true; } }
+      if (spc) c.sendPan = sp;
     }
     if (isMain) {
       o.main = c;
@@ -944,6 +947,7 @@ class App extends Component {
     for (let k = 0; k < 24; k++) d[k < 16 ? `send/${k + 1}/lvl` : `send/MX${k - 15}/lvl`] = fdrDb(cs.sends[k]);
     if (cs.sendOn) for (let k = 0; k < 24; k++) d[(k < 16 ? `send/${k + 1}` : `send/MX${k - 15}`) + '/on'] = cs.sendOn[k] === false ? 0 : 1;
     if (c.sendMode) for (let k = 0; k < 16; k++) d[`send/${k + 1}/mode`] = c.sendMode[k] || 'POST';
+    if (c.sendPan) for (let k = 0; k < 16; k++) d[`send/${k + 1}/pan`] = (c.sendPan[k] || 0) * 100;
     const cf = st.cfg[s];
     if (cf && this.cfgSeen.has(s)) {
       d['in/conn/grp'] = cf.main ? wgrp(cf.main.grp) : 'OFF'; if (cf.main) d['in/conn/in'] = cf.main.n;
@@ -1087,15 +1091,16 @@ class App extends Component {
   panDown(i, e) {
     capture(e);
     const r = e.currentTarget.getBoundingClientRect();
-    this.pd = { i, x: e.clientX, start: this.get(i).pan, w: r.width, moved: false };
+    const sk = this.sofK(i), K = this.state.sof;
+    this.pd = { i, x: e.clientX, start: sk !== null && K < 16 ? ((this.state.chans[i].sendPan || [])[K] || 0) : this.get(i).pan, w: r.width, moved: false, send: sk !== null && K < 16 ? K : null };
     clearTimeout(this.pt);
-    this.pt = setTimeout(() => { if (this.pd && !this.pd.moved) { this.pd = null; this.setState({ panPop: { i, pinned: true } }); } }, 450);
+    if (this.pd.send === null) this.pt = setTimeout(() => { if (this.pd && !this.pd.moved) { this.pd = null; this.setState({ panPop: { i, pinned: true } }); } }, 450);
   }
   panMove(e) {
     const p = this.pd; if (!p) return;
     const dx = e.clientX - p.x;
-    if (!p.moved && Math.abs(dx) > 4) { p.moved = true; clearTimeout(this.pt); this.setState({ panPop: { i: p.i, pinned: false } }); }
-    if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6) * 2, -1, 1); if (Math.abs(v) < 0.03) v = 0; this.upd(p.i, { pan: v }); }
+    if (!p.moved && Math.abs(dx) > 4) { p.moved = true; clearTimeout(this.pt); if (p.send === null) this.setState({ panPop: { i: p.i, pinned: false } }); }
+    if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6) * 2, -1, 1); if (Math.abs(v) < 0.03) v = 0; if (p.send !== null) this.setSendArr(p.i, 'sendPan', p.send, v); else this.upd(p.i, { pan: v }); }
   }
   panUp() { clearTimeout(this.pt); if (this.pd && this.pd.moved) this.setState({ panPop: null }); this.pd = null; }
   bigSet(x) {
@@ -1124,12 +1129,12 @@ class App extends Component {
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const segs = lv => { const o = []; for (let s = 17; s >= 0; s--) { const lit = lv > s / 18; o.push(s >= 16 ? (lit ? '#e0513f' : '#2f1714') : s >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); } return o; };
     const SO = st.sofOn, SK = st.sof, TI = sofIdx(SK), tcol = SK < 16 ? '#c9a25a' : '#4fc9b7';
-    const strip = (i, c0, j, isMain, tgt) => { const snd = SO && !tgt && i >= 0, c = snd ? { ...c0, v: c0.sends[SK] || 0, mute: (c0.sendOn || [])[SK] === false } : c0; return html`
+    const strip = (i, c0, j, isMain, tgt) => { const snd = SO && !tgt && i >= 0, c = snd ? { ...c0, v: c0.sends[SK] || 0, mute: (c0.sendOn || [])[SK] === false, pan: SK < 16 ? ((c0.sendPan || [])[SK] || 0) : 0 } : c0; return html`
       <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
         <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? '#d9b56a;font-size:15px;letter-spacing:.02em' : c.color)} aria-label=${'Open ' + (isMain ? 'Main LR' : c.name)}
           onClick=${() => { const s0 = (isMain && !tgt) || i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
             this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${tgt ? c.name : isMain ? 'Main LR' : c.name}</button>
-        ${snd ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}><i style=${`width:7px;height:7px;border-radius:50%;background:${tcol}`}></i>→ ${this.busLabel(SK).toUpperCase().slice(0, 9)}</div>` : html`<button class="panmini" aria-label=${'Pan ' + panText(c.pan)}
+        ${snd && SK >= 16 ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${this.busLabel(SK).toUpperCase().slice(0, 9)}</div>` : html`<button class="panmini" aria-label=${(snd ? 'Send pan ' : 'Pan ') + panText(c.pan)} style=${snd ? `border-color:${tcol}88;box-shadow:inset 0 0 8px ${tcol}33` : ''}
           onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
           <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">
@@ -1161,9 +1166,9 @@ class App extends Component {
     const bankCol = n => n < 5 ? '#7aa7e0' : n === 5 ? '#a993d9' : n < 8 ? '#c9a25a' : n === 8 ? '#4fc9b7' : '#e0513f';
 
     return html`
-      <header class="topbar" style="height:56px;position:relative;overflow:hidden">
+      <header class="topbar" style="height:56px;position:relative;overflow:hidden;isolation:isolate;z-index:0">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <div style=${`flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;gap:12px;transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1);${SO ? 'opacity:0;transform:translateY(-14px);pointer-events:none' : ''}`}>
+        <div style=${`flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;gap:12px;transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1);padding-right:${140 + 14}px;${SO ? 'opacity:0;transform:translateX(-40px);pointer-events:none' : ''}`}>
           <div style="display:flex;flex-direction:column;line-height:1;gap:2px">
             <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Mixer · Main</span>
             <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
@@ -1172,7 +1177,6 @@ class App extends Component {
           <div style="flex:1;min-width:0;display:flex;justify-content:center">
             <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;padding:6px 14px;border:1px solid #3a342c;border-radius:999px;background:#151311">SCENE · [SCENE NAME]</span>
           </div>
-          <span style="width:156px;flex:none"></span>
           <nav style="display:flex;gap:6px">
             <button class="navbtn hot" aria-label="Player. Hold for its fader"
               onPointerDown=${() => { this.plLong = false; clearTimeout(this.plT); this.plT = setTimeout(() => { this.plLong = true; this.setState({ plPop: true, plPick: false }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); }}
@@ -1191,8 +1195,8 @@ class App extends Component {
       <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 0">
         <div class="wood" style="width:18px;flex:none;box-shadow:inset -2px 0 4px rgba(0,0,0,.5)"></div>
         <div style="flex:1;min-width:0;display:flex;gap:6px">${strips}</div>
-        <div style="width:140px;flex:none;display:flex;flex-direction:column;gap:6px">
-          <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase;padding:2px 4px">Layers</span>
+        <div style=${`width:140px;flex:none;display:flex;flex-direction:column;gap:6px;border-radius:10px;transition:box-shadow .45s,background .45s,outline-color .45s;outline:1.5px solid ${SO ? tcol : 'transparent'};outline-offset:3px;${SO ? `box-shadow:0 0 22px ${tcol}66,inset 0 0 26px ${tcol}22;background:${tcol}10` : ''}`}>
+          <span style=${`font-size:11px;letter-spacing:.16em;color:${SO ? tcol : '#b8a78a'};text-transform:uppercase;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${SO ? 700 : 400}`}>${SO ? 'Sends → ' + this.busLabel(SK) : 'Layers'}</span>
           ${banks.map((l, n) => SO && (SK < 16 ? n > 5 : n === 8) ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${bankCol(n)}`}></i>${l}</button>` : html`<button class=${'layer' + (n === b ? ' on' : '')} onClick=${() => this.setState({ bank: n, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]) })}><i style=${`background:${bankCol(n)};opacity:${n === b ? 1 : 0.7};box-shadow:${n === b ? '0 0 8px ' + bankCol(n) : 'none'}`}></i>${l}</button>`)}
         </div>
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
@@ -1225,7 +1229,7 @@ class App extends Component {
   }
   sofBtn() {
     const on = this.state.sofOn, n = NATIVE ? 5 : 6, navW = 66 + 60 * (n - 1) + 6 * (n - 1), W = 140;
-    const left = on ? DW - 14 - W : DW - 14 - navW - 12 - W - 8;
+    const left = DW - 14 - W;
     return html`<button onClick=${() => this.sofToggle()} aria-pressed=${String(on)} aria-label=${on ? 'Leave sends on faders' : 'Sends on faders'}
       style=${`position:absolute;top:5px;left:${left}px;width:${W}px;height:46px;z-index:2;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;
         font-weight:800;font-size:17px;letter-spacing:.14em;transition:left .5s cubic-bezier(.2,.8,.2,1),box-shadow .35s,background .35s,color .35s,border-color .35s;
@@ -1241,7 +1245,7 @@ class App extends Component {
       onPointerUp: () => { setTimeout(() => { this.rowDr = null; }, 0); }, onPointerLeave: () => { this.rowDr = null; }
     };
     return html`<div class="sofrow" ...${drag} style=${`position:absolute;left:30px;right:${14 + 140 + 12}px;top:0;bottom:0;display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x;
-        transition:opacity .4s .08s,transform .5s cubic-bezier(.2,.8,.2,1);${on ? 'opacity:1;transform:none' : 'opacity:0;transform:translateX(60px);pointer-events:none'}`}>
+        background:linear-gradient(180deg,#2b2723,#1a1815);transition:clip-path .55s cubic-bezier(.2,.8,.2,1),opacity .3s;${on ? 'clip-path:inset(0 0 0 0);opacity:1' : 'clip-path:inset(0 0 0 100%);opacity:.4;pointer-events:none'}`}>
       ${ks.map(k => { const sel = k === st.sof, col = k < 16 ? '#c9a25a' : '#4fc9b7', ch = st.chans[sofIdx(k)];
         return html`<button onClick=${() => { if (this.rowDr && this.rowDr.moved) return; this.sofPick(k); }} aria-pressed=${String(sel)}
           style=${`flex:none;width:104px;height:44px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 9px;text-align:left;position:relative;overflow:hidden;
