@@ -93,13 +93,19 @@ for p, r in by.items():
         G[p] = r
     elif (p.startswith('/play/') or p.startswith('/rec/')) and r.get('type') != 'node':
         G[p] = r
+    elif p.split('/')[1:2] == ['fx'] and len(parts) == 4 and parts[3] in ('mdl', 'fxmix', '$a_chn', '$a_pos'):
+        G[p] = r
+    elif p.startswith('/$syscfg/') and parts[2] in ('consolename', '$firmware', '$serial', '$cnsmdl', '$hwversion', 'ipmode', 'ip0', 'ip1', 'ip2', 'ip3', 'opt_mod'):
+        G[p] = r
+    elif p in ('/cards/$type', '/cards/$ver') or (p.startswith('/$ctl/cfg/lights/') and r.get('type') != 'node'):
+        G[p] = r
     elif (p.startswith('/cfg/mon/1/') or p.startswith('/cfg/mon/2/')) and r.get('type') != 'node' and p.split('/')[-1] not in ('tags', '$lvlact'):
         G[p] = r
 GIDS = {p: b36(r['id']) for p, r in G.items()}
 GMETA = {}
 for p, r in G.items():
     pp = p.split('/')
-    key = '/'.join(pp[:4] + ['*', pp[5]]) if p.startswith('/io/') else p
+    key = '/'.join(pp[:4] + ['*', pp[5]]) if p.startswith('/io/') else ('/fx/*/' + pp[3]) if p.startswith('/fx/') else p
     GMETA.setdefault(key, meta(r))
 INCOUNT = {}
 for p in by:
