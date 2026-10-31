@@ -57,15 +57,34 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         override fun onAvailable(network: Network) {
             wifiNet = network
             pickedAt = 0L
+            pinIfLocalOnly(network)
             emit(JSONObject().put("type", "net").put("wifi", true))
             log("sys", "Wi-Fi network available: " + wifiAddress())
+        }
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            if (network == wifiNet) pinIfLocalOnly(network)
         }
         override fun onLost(network: Network) {
             pickedAt = 0L
             if (network == wifiNet) wifiNet = null
+            if (network == pinned) { runCatching { cm.bindProcessToNetwork(null) }; pinned = null; log("sys", "app no longer pinned to the mixer Wi-Fi") }
             val any = localIfaces().isNotEmpty()
             emit(JSONObject().put("type", "net").put("wifi", any))
             log("sys", "a network went away; local networks now: " + wifiAddress().ifEmpty { "none" })
+        }
+    }
+
+    /** When the Wi-Fi has no internet, Android sends the app's traffic over mobile data. Pin the whole app to that
+     *  Wi-Fi instead (the way smart-home apps reach a device's own hotspot); unpin once the Wi-Fi has internet. */
+    @Volatile private var pinned: Network? = null
+    private fun pinIfLocalOnly(network: Network) {
+        val caps = cm.getNetworkCapabilities(network) ?: return
+        val validated = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        if (!validated && pinned != network) {
+            if (runCatching { cm.bindProcessToNetwork(network) }.getOrDefault(false)) { pinned = network; pickedAt = 0L; log("sys", "Wi-Fi has no internet: app pinned to it (" + wifiAddress() + ")") }
+            else log("err", "could not pin the app to the Wi-Fi")
+        } else if (validated && pinned == network) {
+            runCatching { cm.bindProcessToNetwork(null) }; pinned = null; log("sys", "Wi-Fi has internet: app unpinned")
         }
     }
 
@@ -88,6 +107,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         meters.stop()
         running = false
         runCatching { cm.unregisterNetworkCallback(netCallback) }
+        if (pinned != null) { runCatching { cm.bindProcessToNetwork(null) }; pinned = null }
         closeSocket()
         sendQueue.shutdownNow()
     }
