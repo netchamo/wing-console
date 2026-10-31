@@ -1099,7 +1099,7 @@ class App extends Component {
   }
   busSend(k, y) {
     const sp = this.state.sendPop; if (!sp || !this.sr) return;
-    const v = clamp(1 - ((y - this.sr.top) / this.sr.height * 200 - 26) / 148, 0, 1);
+    const v = clamp(1 - (y - this.sr.top - 26) / Math.max(40, this.sr.height - 52), 0, 1);
     const idx = sp.bank * 8 + k, i = sp.i;
     this.setState(st => { const chans = st.chans.slice(); const s = chans[i].sends.slice(); s[idx] = v; chans[i] = { ...chans[i], sends: s }; return { chans }; });
   }
@@ -1242,12 +1242,13 @@ class App extends Component {
     const close = () => this.setState({ sendPop: null });
     return html`
       <button class="scrim" aria-label="Close sends" onClick=${close}></button>
-      <div class="pop" style=${`left:150px;top:${Math.max(8, Math.round((Hd - 480) / 2))}px;width:880px;height:480px;padding:18px 20px;gap:14px`}>
-        <div style="height:32px;display:flex;align-items:center;gap:12px">
-          <span class="tag" style=${'background:' + sc.color}>${sc.name}</span>
-          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Sends · ${bl[sb]}</span>
+      <div class="pop" style=${`left:110px;top:8px;width:960px;height:${Hd - 16}px;padding:12px 14px;gap:12px;flex-direction:row`}>
+        <div style="width:150px;flex:none;display:flex;flex-direction:column;gap:8px">
+          <span style=${`padding:10px 8px;border-radius:8px;background:${sc.color};color:#121110;font-size:19px;font-weight:800;letter-spacing:.03em;text-align:center;word-break:break-word;line-height:1.15`}>${sc.name}</span>
+          <span style="font-size:13px;font-weight:700;letter-spacing:.16em;color:#9b927f;text-align:center">SENDS</span>
+          ${bl.map((l, n) => html`<button class=${'pill' + (n === sb ? ' on' : '')} style="height:54px;font-size:16px" onClick=${() => this.setState({ sendPop: { i: sp.i, bank: n } })}>${l}</button>`)}
           <span style="flex:1"></span>
-          <button class="small" style="border-color:#5a4630" onClick=${close}>DONE</button>
+          <button class="small" style="height:50px;font-size:16px;border-color:#5a4630" onClick=${close}>DONE</button>
         </div>
         <div style="flex:1;min-height:0;display:flex;gap:10px">
           ${lbls[sb].map((l, k) => { const v = sc.sends[sb * 8 + k]; return html`
@@ -1256,17 +1257,14 @@ class App extends Component {
               ${(() => { const kk = sb * 8 + k, isOn = (sc.sendOn || [])[kk] !== false; return html`<button aria-pressed=${String(isOn)} aria-label=${l + ' send ' + (isOn ? 'on' : 'off')} onClick=${() => this.setSendArr(sp.i, 'sendOn', kk, !isOn)}
                 style=${`width:100%;height:32px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>`; })()}
               <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(v)}</span>
-              <button class="fader" style="width:60px;height:200px" aria-label=${l + ' send ' + dbText(v)}
+              <button class="fader" style="width:60px;flex:1;min-height:0" aria-label=${l + ' send ' + dbText(v)}
                 onPointerDown=${e => { capture(e); this.sr = e.currentTarget.getBoundingClientRect(); this.busSend(k, e.clientY); }}
                 onPointerMove=${e => this.busSend(k, e.clientY)} onPointerUp=${() => { this.sr = null; }} onPointerCancel=${() => { this.sr = null; }}>
                 <span style="position:absolute;left:27px;width:6px;top:12px;bottom:12px;border-radius:3px;background:#070606;box-shadow:0 0 0 1px #2c2721"></span>
-                <span style=${`position:absolute;left:27px;width:6px;bottom:12px;height:${Math.round(v * 148 + 2)}px;border-radius:3px;background:#c9a25a;opacity:.55`}></span>
-                <span class="cap" style=${`left:12px;width:36px;height:28px;top:${Math.round((1 - v) * 148 + 12)}px`}></span>
+                <span style=${`position:absolute;left:27px;width:6px;bottom:12px;height:calc(${v.toFixed(4)} * (100% - 52px) + 2px);border-radius:3px;background:#c9a25a;opacity:.55`}></span>
+                <span class="cap" style=${`left:12px;width:36px;height:28px;top:calc(${(1 - v).toFixed(4)} * (100% - 52px) + 12px)`}></span>
               </button>
             </div>`; })}
-        </div>
-        <div style="height:48px;display:flex;gap:10px">
-          ${bl.map((l, n) => html`<button class=${'pill' + (n === sb ? ' on' : '')} style="flex:1;height:48px;font-size:18px" onClick=${() => this.setState({ sendPop: { i: sp.i, bank: n } })}>${l}</button>`)}
         </div>
       </div>`;
   }
