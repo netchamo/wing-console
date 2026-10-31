@@ -1244,7 +1244,12 @@ class App extends Component {
       <button class="scrim" aria-label="Close sends" onClick=${close}></button>
       <div class="pop" style=${`left:110px;top:8px;width:960px;height:${Hd - 16}px;padding:12px 14px;gap:12px;flex-direction:row`}>
         <div style="width:150px;flex:none;display:flex;flex-direction:column;gap:8px">
-          <span style=${`padding:10px 8px;border-radius:8px;background:${sc.color};color:#121110;font-size:19px;font-weight:800;letter-spacing:.03em;text-align:center;word-break:break-word;line-height:1.15`}>${sc.name}</span>
+          ${sp.i < 48 && (() => { const go = d => this.setState({ sendPop: { i: (sp.i + d + 48) % 48, bank: sb } }); const ab = 'flex:1;height:58px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#2e2924,#1a1714);border:1px solid #5a4630;color:var(--brass-hi)';
+            return html`<div style="display:flex;gap:8px">
+              <button aria-label="Previous channel" style=${ab} onClick=${() => go(-1)}><svg width="30" height="30" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button aria-label="Next channel" style=${ab} onClick=${() => go(1)}><svg width="30" height="30" viewBox="0 0 24 24"><path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`; })()}
+          <span style=${`padding:10px 8px;border-radius:8px;background:${sc.color};color:#121110;font-size:19px;font-weight:800;letter-spacing:.03em;text-align:center;word-break:break-word;line-height:1.15`}>${sc.name}
+            <span style="display:block;font-family:var(--mono);font-size:11px;font-weight:600;opacity:.7;margin-top:3px">${sp.i < 40 ? 'CH ' + pad2(sp.i + 1) : sp.i < 48 ? 'AUX ' + (sp.i - 39) : ''}</span></span>
           <span style="font-size:13px;font-weight:700;letter-spacing:.16em;color:#9b927f;text-align:center">SENDS</span>
           ${bl.map((l, n) => html`<button class=${'pill' + (n === sb ? ' on' : '')} style="height:54px;font-size:16px" onClick=${() => this.setState({ sendPop: { i: sp.i, bank: n } })}>${l}</button>`)}
           <span style="flex:1"></span>
