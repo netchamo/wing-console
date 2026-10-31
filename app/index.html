@@ -247,6 +247,52 @@ const MODEL_NAMES = {
 const SLOTK = { gate: 'gate', comp: 'dyn' };
 const MODEL_ORDER = { gate: WMAP.M['gate/mdl'].i.slice(), comp: WMAP.M['dyn/mdl'].i.slice() };
 const isDeq = code => /DEQ/i.test(code || '') || /DYNAMIC EQ/i.test(MODEL_NAMES.gate[code] || MODEL_NAMES.comp[code] || '');
+/* ===== hardware faceplates for the dynamics models =====
+   Each model gets a plate in the spirit of the classic unit it is modelled on (colours, knob kind,
+   switches, meter), drawn our own way and without any maker's logo. Controls are bound by the
+   parameter names the WING uses for that model. */
+const PLATES = {
+  black:  { bg: 'linear-gradient(180deg,#2a2826,#151413 55%,#0f0e0d)', ink: '#e9e2d0', sub: '#9d958a', line: '#4a4540' },
+  silver: { bg: 'linear-gradient(180deg,#d9d6cf,#bdb8ad 60%,#a9a396)', ink: '#1d1b18', sub: '#4a463f', line: '#8e887c' },
+  grey:   { bg: 'linear-gradient(180deg,#5b5f63,#45494d 60%,#3a3d40)', ink: '#eef0f1', sub: '#b9bec2', line: '#2b2e30' },
+  blue:   { bg: 'linear-gradient(180deg,#3d6a9a,#2c5582 60%,#244a73)', ink: '#f1f5fa', sub: '#c3d4e6', line: '#1d3b5c' },
+  bluegrey: { bg: 'linear-gradient(180deg,#7d8b98,#66737f 60%,#5a6772)', ink: '#f4f6f8', sub: '#d6dde3', line: '#46525c' },
+  red:    { bg: 'linear-gradient(180deg,#9c2a26,#7f1f1c 60%,#6a1916)', ink: '#f8ece6', sub: '#e6b7ae', line: '#4e1210' },
+  cream:  { bg: 'linear-gradient(180deg,#e8dcc0,#d6c7a3 60%,#c6b58e)', ink: '#2a2116', sub: '#5a4a33', line: '#a99872' },
+  steel:  { bg: 'linear-gradient(180deg,#9aa0a6,#80878d 60%,#71777d)', ink: '#101214', sub: '#2c3135', line: '#5d6368' },
+  green:  { bg: 'linear-gradient(180deg,#38524a,#2a423b 60%,#223731)', ink: '#eaf2ee', sub: '#b4cbc2', line: '#17271f' },
+  wine:   { bg: 'linear-gradient(180deg,#5a2a33,#47212a 60%,#3b1b22)', ink: '#f6e9ea', sub: '#d8b5ba', line: '#2a1216' }
+};
+/* controls: [param, label, kind?, size?]  kind: knob (default), step (labelled positions), sw (toggle), btns (push buttons) */
+const FACES = {
+  DUCK:  { plate: 'grey', knob: 'black', title: 'DUCKER', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['range', 'DEPTH', 0, 'L']], [['att', 'ATTACK'], ['hld', 'HOLD'], ['rel', 'RELEASE']]] },
+  E88:   { plate: 'bluegrey', knob: 'cap', caps: ['#2f6fb0', '#5a5f66', '#c0392b', '#5a5f66'], title: 'EVEN 88 GATE', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['hyst', 'HYSTERESIS'], ['range', 'RANGE', 0, 'L'], ['rel', 'RELEASE']], [['fast', 'FAST ATTACK', 'sw'], ['m40', '−40 dB RANGE', 'sw']]] },
+  '9000G': { plate: 'grey', knob: 'cap', caps: ['#2e8b57', '#2e8b57', '#c8c8c8', '#c8c8c8'], title: 'SOUL 9000 GATE', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['range', 'RANGE', 0, 'L'], ['hld', 'HOLD'], ['rel', 'RELEASE']], [['fast', 'FAST', 'sw'], ['mode', 'MODE', 'btns']]] },
+  D241:  { plate: 'black', knob: 'silver', title: 'DRAW MORE 241', meter: 'leds', rows: { gate: [[['thr', 'GATE THRESHOLD', 0, 'L'], ['slow', 'SLOW', 'sw']]],
+          dyn: [[['thr', 'THRESHOLD'], ['ratio', 'RATIO', 'step'], ['att', 'ATTACK'], ['rel', 'RELEASE']], [['lim', 'LIMIT'], ['lrel', 'LIMIT REL'], ['auto', 'AUTO', 'sw']]] } },
+  DS902: { plate: 'silver', knob: 'black', title: 'BDX 902 DE-ESSER', meter: 'leds', rows: [[['f', 'FREQUENCY', 0, 'L'], ['range', 'RANGE', 0, 'L'], ['mode', 'MODE', 'btns']]] },
+  WAVE:  { plate: 'blue', knob: 'cream', title: 'WAVE DESIGNER', rows: [[['att', 'ATTACK', 0, 'XL'], ['sust', 'SUSTAIN', 0, 'XL'], ['g', 'OUTPUT', 0, 'L']]] },
+  WARM:  { plate: 'wine', knob: 'cap', caps: ['#d9b56a', '#d9b56a', '#c8c8c8', '#c8c8c8', '#c8c8c8'], title: 'SOUL WARMTH PRE', rows: [[['drv', 'DRIVE', 0, 'XL'], ['hrm', 'HARMONICS', 0, 'L'], ['col', 'COLOUR', 0, 'L']], [['trim', 'TRIM'], ['mix', 'MIX']]] },
+  '76LA': { plate: 'black', knob: 'silver', title: '76 LIMITER AMP', meter: 'vu', rows: [[['in', 'INPUT', 0, 'XL'], ['out', 'OUTPUT', 0, 'XL']], [['att', 'ATTACK', 0, 'S'], ['rel', 'RELEASE', 0, 'S'], ['ratio', 'RATIO', 'btns']]] },
+  LA:    { plate: 'silver', knob: 'black', title: 'LA LEVELER', meter: 'vu', rows: [[['ingain', 'GAIN', 0, 'XL'], ['peak', 'PEAK REDUCTION', 0, 'XL'], ['mode', 'COMPRESS · LIMIT', 'sw']]] },
+  RIDE:  { plate: 'green', knob: 'silver', title: 'AUTO RIDER', meter: 'vu', rows: [[['tgt', 'TARGET', 0, 'XL'], ['thr', 'THRESHOLD', 0, 'L'], ['range', 'RANGE', 0, 'L']], [['spd', 'SPEED'], ['ratio', 'RATIO', 'step'], ['hld', 'HOLD']]] },
+  PSE:   { plate: 'steel', knob: 'black', title: 'SOURCE EXTRACTOR', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'XL'], ['depth', 'DEPTH', 0, 'XL']], [['fast', 'FAST', 'sw'], ['peak', 'PEAK', 'sw']]] },
+  CMB:   { plate: 'steel', knob: 'black', title: 'PSE · LA COMBO', meter: 'vu', rows: [[['thr', 'PSE THRESHOLD'], ['depth', 'PSE DEPTH'], ['fast', 'FAST', 'sw'], ['peak', 'PEAK', 'sw']], [['ingain', 'LA GAIN', 0, 'L'], ['cpeak', 'PEAK REDUCTION', 0, 'L'], ['cmode', 'COMPRESS · LIMIT', 'sw']]] },
+  B160:  { plate: 'cream', knob: 'black', title: 'BDX 160', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'XL'], ['comp', 'COMPRESSION', 'step', 'XL']]] },
+  B560:  { plate: 'silver', knob: 'black', title: 'BDX 560 EASY', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'XL'], ['ratio', 'RATIO', 'step', 'XL'], ['easy', 'EASY', 'sw']]] },
+  ECL33: { plate: 'bluegrey', knob: 'cap', caps: ['#c8c8c8', '#c8c8c8', '#c8c8c8', '#c0392b', '#c0392b', '#c0392b', '#c0392b'], title: 'EVEN COMP · LIMITER', meter: 'vu',
+           rows: [[['lon', 'LIMITER', 'sw'], ['lthr', 'LIMIT LEVEL'], ['lrec', 'RECOVERY', 'step'], ['lfast', 'FAST', 'sw']], [['con', 'COMPRESSOR', 'sw'], ['cthr', 'THRESHOLD'], ['ratio', 'RATIO', 'step'], ['crec', 'RECOVERY', 'step'], ['cfast', 'FAST', 'sw'], ['cgain', 'GAIN']]] },
+  '9000C': { plate: 'grey', knob: 'cap', caps: ['#c0392b', '#c0392b', '#c8c8c8'], title: 'SOUL 9000 COMP', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['ratio', 'RATIO', 'step', 'L'], ['rel', 'RELEASE', 0, 'L']], [['fast', 'FAST ATTACK', 'sw'], ['peak', 'PEAK', 'sw']]] },
+  SBUS:  { plate: 'grey', knob: 'black', title: 'SOUL BUS COMP', meter: 'vu', rows: [[['thr', 'THRESHOLD', 0, 'XL'], ['ratio', 'RATIO', 'step', 'L'], ['att', 'ATTACK', 'step', 'L'], ['rel', 'RELEASE', 'step', 'L']]] },
+  RED3:  { plate: 'red', knob: 'silver', title: 'RED 3 COMPRESSOR', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['ratio', 'RATIO', 'step', 'L'], ['att', 'ATTACK'], ['rel', 'RELEASE'], ['auto', 'AUTO RELEASE', 'sw']]] },
+  F670:  { plate: 'black', knob: 'black', title: 'FAIR KID', meter: 'vu', rows: [[['in', 'INPUT', 0, 'XL'], ['thr', 'THRESHOLD', 0, 'XL'], ['time', 'TIME CONSTANT', 'step', 'L'], ['bias', 'BIAS', 0, 'S']]] },
+  BLISS: { plate: 'silver', knob: 'cap', caps: ['#2b5d9a', '#2b5d9a', '#5a5f66', '#5a5f66', '#c8c8c8'], title: 'ETERNAL BLISS', meter: 'leds', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['ratio', 'RATIO', 'step', 'L'], ['att', 'ATTACK'], ['rel', 'RELEASE']], [['afast', 'ATTACK FAST', 'sw'], ['alog', 'LOG RELEASE', 'sw'], ['glon', 'LIMIT', 'sw'], ['glim', 'LIMIT LEVEL']]] },
+  NSTR:  { plate: 'black', knob: 'black', title: 'NO-STRESSOR', meter: 'leds', rows: [[['in', 'INPUT', 0, 'XL'], ['att', 'ATTACK'], ['rel', 'RELEASE'], ['out', 'OUTPUT', 0, 'XL']], [['ratio', 'RATIO', 'btns']]] },
+  '2250': { plate: 'bluegrey', knob: 'black', title: 'PIA 2250', meter: 'vu', rows: [[['thr', 'THRESHOLD', 0, 'L'], ['ratio', 'RATIO', 0, 'L'], ['rel', 'RELEASE', 0, 'L']], [['att', 'ATTACK', 'btns'], ['knee', 'KNEE', 'btns'], ['type', 'TYPE', 'btns']]] },
+  L100:  { plate: 'cream', knob: 'black', title: 'LTA 100 LEVELER', meter: 'vu', rows: [[['ingain', 'INPUT GAIN', 0, 'XL'], ['gr', 'GAIN REDUCTION', 0, 'XL']], [['att', 'ATTACK', 'btns'], ['rel', 'RELEASE', 'btns']]] }
+};
+const KNOB_D = { S: 60, M: 78, L: 98, XL: 122 };
+const isFaceModel = (slot, m) => !!m && !isDeq(m) && !(slot === 'gate' && m === 'GATE') && !(slot === 'comp' && (m === 'COMP' || m === 'EXP'));
 /* metadata for one strip parameter; model slots need the model the strip runs right now */
 function metaOf(s, suf, mx) {
   if (s < 0) return WMAP.GM[gkey(suf)] || {};
@@ -317,7 +363,7 @@ class App extends Component {
     const gone = e => { if (this.ptrs && this.ptrs[e.pointerId]) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; } };
     ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, gone, true));
     this.iv = setInterval(() => this.tick(), 110);
-    this.gv = setInterval(() => { this.gateSim(); this.compSim(); }, 50);
+    this.gv = setInterval(() => { this.gateSim(); this.compSim(); this.faceSim(); }, 50);
     if (NATIVE) {
       window.__wingNative = list => this.onNative(list);
       try { NATIVE.ready(); } catch (e) {}
@@ -1770,58 +1816,204 @@ class App extends Component {
       ${st.chPick && this.renderChPick(Hd)}`;
   }
 
-  /* ---------- any other model: a panel built from the WING's own parameter list ---------- */
+  /* ---------- any other model: a hardware faceplate ---------- */
+  faceSim() {
+    const st = this.state, slot = st.dynSlot;
+    if (st.screen !== 'dyn' || !isFaceModel(slot, st.slots[slot])) return;
+    const f = { ...(st.fsim || { t: 0, next: 0.3, env: -60, vu: -20 }) }, dt = 0.05, real = this.realLv(st.eqCh);
+    if (real !== null) f.env = clamp(real, -80, 6);
+    else if (this.isLinked()) f.env = -80;
+    else { f.t += dt; if (f.t >= f.next) { f.env = Math.max(f.env, -10 - Math.random() * 6); f.next = f.t + 0.6 + Math.random() * 0.25; } f.env = Math.max(-60, f.env - 38 * dt); }
+    f.vu += (f.env - f.vu) * (f.env > f.vu ? 0.35 : 0.12);   // needle: quick up, slow back
+    if (!(this.slotOn(slot))) f.vu += (-60 - f.vu) * 0.2;
+    this.setState({ fsim: f });
+  }
   renderModel(Hd) {
     const st = this.state, slot = st.dynSlot, kind = SLOTK[slot], mdl = st.slots[slot], s = st.eqCh;
     const own = DEFM[s] ? Object.entries(DEFM[s]).filter(([k]) => k.startsWith(kind + '/')).map(([k, m]) => [+k.split('/')[1], m.name, m]).sort((a, b) => a[0] - b[0]) : [];
     const L = own.length ? own : (MD[kind][mdl] || MD.gate[mdl] || MD.dyn[mdl] || []);
-    const vals = st.mdlv[slot], on = slot === 'gate' ? st.gate.on : st.comp.on;
-    const setV = (k, v) => this.setState(s => ({ mdlv: { ...s.mdlv, [slot]: { ...s.mdlv[slot], [k]: v } } }));
+    const byName = Object.fromEntries(L.map(x => [x[1], x]));
+    const F = FACES[mdl] || { plate: 'black', knob: 'black', title: mName(slot, mdl).toUpperCase(), meter: 'leds', rows: null };
+    const P = PLATES[F.plate] || PLATES.black, vals = st.mdlv[slot], on = this.slotOn(slot);
+    const setV = (k, v) => this.setState(s0 => ({ mdlv: { ...s0.mdlv, [slot]: { ...s0.mdlv[slot], [k]: v } } }));
+    /* rows from the spec; any parameter the spec does not show joins the last row so nothing is lost */
+    let rows = F.rows ? (Array.isArray(F.rows) ? F.rows : (F.rows[kind] || [])) : [];
+    rows = rows.map(r => r.filter(c => byName[c[0]])).filter(r => r.length);
+    const used = new Set(rows.flat().map(c => c[0]));
+    const rest = L.filter(x => !used.has(x[1])).map(x => [x[1], String(x[2].l || x[1]).toUpperCase()]);
+    if (rest.length) { if (!rows.length) for (let k = 0; k < rest.length; k += 4) rows.push(rest.slice(k, k + 4)); else if (rows[rows.length - 1].length + rest.length <= 6) rows[rows.length - 1] = [...rows[rows.length - 1], ...rest]; else rows.push(rest); }
+    const wing = slot === 'comp' ? [['__mix', 'MIX', 0, 'S'], ['__gain', 'MAKE-UP', 0, 'S']] : [];
+    let f = 1, rf = 1;
+    const meterW = () => F.meter === 'vu' ? Math.round(230 * clamp(f, .7, 1.15)) + 16 + 22 * f : F.meter ? 70 + 22 * f : 0;
+    const estW = c => { const r = byName[c[0]], m = r ? r[2] : null, nI = m && m.i ? m.i.length : 0;
+      if (m && ((m.t === 'int' && m.a === 0 && m.b === 1) || (nI === 2 && c[2] !== 'btns'))) return 96;
+      if (m && nI && c[2] === 'btns') return nI * 52 * Math.max(f, .85) + 26;
+      return (KNOB_D[c[3] || 'M'] || 78) * f * 1.72 + 6; };
+    const sumW = r => r.reduce((w, c) => w + estW(c), 0), rowW0 = () => DW - 24 - 68 - 28 - meterW() - 10;
+    if (wing.length && rows.length) {
+      if (rows.length === 1 && sumW([...rows[0], ...wing]) > rowW0() * 1.1) rows.push(wing);
+      else { let k = 0; rows.forEach((r, n) => { if (r.length < rows[k].length) k = n; }); rows[k] = [...rows[k], ...wing]; }
+    }
+    const avail = Hd - 92 - 64 - 28; f = clamp(avail / (rows.length * 196 + 10), 0.5, 1.3);
+    const rowW = rowW0();
     const fmt = (m, v) => {
       if (v === undefined) return '—';
       if (m.t === 'enum') { const k = m.i.indexOf(v); return (m.li && m.li[k]) || String(v); }
-      if (m.t === 'fenum') return (Math.round(+v * 10) / 10) + '';
+      if (m.t === 'fenum') { const n = +v; return (n >= 10 ? Math.round(n) : Math.round(n * 10) / 10) + (m.u ? ' ' + m.u : ''); }
       if (m.t === 'int') return String(Math.round(+v));
       const n = +v, a = Math.abs(n);
       return (a >= 100 ? Math.round(n) : a >= 10 ? n.toFixed(1) : n.toFixed(2)) + (m.u ? ' ' + m.u.replace('meters', 'm') : '');
     };
-    const ctl = ([idx, name, m]) => {
-      const v = vals[idx], label = (m.l || name).toLowerCase().replace(/(^|\s)([a-z])/g, (x, a, b) => a + b.toUpperCase());
-      if ((m.t === 'int' && m.a === 0 && m.b === 1)) return html`<button class="pill" aria-pressed=${String(+v === 1)} onClick=${() => setV(idx, +v === 1 ? 0 : 1)}
-        style=${`height:64px;border-radius:8px;font-size:16px;${+v === 1 ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : 'background:#141210'}`}>${label}<br/><span style="font-size:13px;opacity:.8">${+v === 1 ? 'ON' : 'OFF'}</span></button>`;
-      if (m.t === 'enum' || m.t === 'fenum') return html`<div class="box" style="height:auto;min-height:64px;cursor:default;gap:6px"><b>${label}</b>
-        <span style="display:flex;flex-wrap:wrap;gap:4px">${m.i.map((it, k) => html`<button onClick=${() => setV(idx, it)} aria-pressed=${String(v !== undefined && near(it, v))}
-          style=${`height:32px;padding:0 9px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${v !== undefined && near(it, v) ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#141210;border:1px solid #2c2721;color:#cbbd9f'}`}>${m.t === 'fenum' ? fmt(m, it) : (m.li ? m.li[k] : it)}</button>`)}</span></div>`;
-      const a = m.a !== undefined ? m.a : 0, b = m.b !== undefined ? m.b : 1, lg = m.t === 'log';
-      const nrm = x => clamp(lg ? Math.log(x / a) / Math.log(b / a) : (x - a) / (b - a), 0, 1);
-      const dn = n => { n = clamp(n, 0, 1); const x = lg ? a * Math.pow(b / a, n) : a + n * (b - a); if (m.t === 'int') return Math.round(x); const st2 = m.n ? (b - a) / (m.n - 1) : 0; return st2 && !lg ? Math.round(x / st2) * st2 : Math.round(x * 100) / 100; };
-      const cur = v === undefined ? a : +v;
-      return html`<button class="box big" aria-label=${label + ' ' + fmt(m, v) + ', drag sideways'}
-        onPointerDown=${e => { capture(e); this.mnd = { sx: e.clientX, n0: nrm(cur), w: e.currentTarget.getBoundingClientRect().width, moved: false }; }}
-        onPointerMove=${e => { const d = this.mnd; if (!d) return;
-          if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, '#c9a25a', () => fmt(m, this.state.mdlv[slot][idx]), () => nrm(+(this.state.mdlv[slot][idx] ?? a))); }
-          setV(idx, dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-        onPointerUp=${() => { this.mnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.mnd = null; this.hideDragPop(); }}>
-        <b>${label}</b><em>${fmt(m, v)}</em><s style=${`width:${Math.round(nrm(cur) * 100)}%;background:#c9a25a`}></s></button>`;
+    const short = (m, v) => { const t = fmt(m, v).replace(/ (dB|ms|Hz|%)$/, ''); return t.length > 5 && /^-?\d/.test(t) ? String(Math.round(+v)) : t; };
+    let ci = 0;
+    const ctl = (c) => {
+      const [name, label, kind0, size] = c;
+      const capCol = F.caps ? F.caps[ci % F.caps.length] : null; ci++;
+      let idx, m, v, put;
+      if (name === '__mix') { m = { t: 'lin', a: 0, b: 100, n: 101, u: '%' }; v = st.comp.mix; put = x => this.updComp({ mix: Math.round(x) }); }
+      else if (name === '__gain') { m = { t: 'lin', a: -6, b: 12, n: 37, u: 'dB' }; v = st.comp.gain; put = x => this.updComp({ gain: Math.round(x * 2) / 2 }); }
+      else { [idx, , m] = byName[name]; v = vals[idx]; put = x => setV(idx, x); }
+      const sw2 = (m.t === 'int' && m.a === 0 && m.b === 1) || ((m.t === 'enum' || m.t === 'fenum') && m.i.length === 2 && kind0 !== 'btns');
+      const kind = sw2 ? 'sw' : (m.t === 'enum' || m.t === 'fenum') ? (kind0 === 'btns' ? 'btns' : 'step') : 'knob';
+      if (kind === 'sw') return this.faceSwitch(P, label, m, v, put, f);
+      if (kind === 'btns') return this.faceBtns(P, label, m, v, put, f);
+      return this.faceKnob(P, F, label, m, v, put, Math.round((KNOB_D[size || 'M'] || 78) * f * rf), kind === 'step', capCol, fmt, short);
     };
-    const setOn = () => slot === 'gate' ? this.updGate({ on: !on }) : this.updComp({ on: !on });
+    const sigLv = st.fsim ? st.fsim.vu : -60;
+    const screw = (x, y) => html`<span style=${`position:absolute;${x}:9px;${y}:12px;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f2f2f2,#8d8d8d 60%,#4a4a4a);box-shadow:0 1px 1px rgba(0,0,0,.6)`}><i style="position:absolute;left:2px;right:2px;top:6px;height:1.5px;background:#3a3a3a;transform:rotate(35deg)"></i></span>`;
+    const powerSw = html`<button onClick=${() => this.setSlotOn(slot, !on)} aria-pressed=${String(on)} aria-label=${'Unit ' + (on ? 'in' : 'out')}
+        style="display:flex;align-items:center;gap:10px;background:none;border:none;cursor:pointer;padding:4px 6px">
+        <span style=${`width:20px;height:20px;border-radius:50%;border:2px solid ${P.line};background:${on ? 'radial-gradient(circle at 40% 35%,#ffd2c8,#ff3b26 45%,#9c1206)' : 'radial-gradient(circle at 40% 35%,#6a3a35,#3a1512)'};box-shadow:${on ? '0 0 14px 3px rgba(255,70,40,.55)' : 'inset 0 1px 2px rgba(0,0,0,.6)'}`}></span>
+        <span style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <span style=${`font:700 11px/1 var(--plate-font);letter-spacing:.18em;color:${P.ink}`}>IN</span>
+          ${this.lever(on, P, 1.15)}
+          <span style=${`font:700 11px/1 var(--plate-font);letter-spacing:.18em;color:${P.sub}`}>OUT</span></span></button>`;
     return html`
       ${this.chanHeader(slot === 'gate' ? 'Gate' : 'Comp', this.modelBtn())}
-      <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 14px">
-        <div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:10px;border:1px solid #3a342c;background:linear-gradient(180deg,#2a2622,#191714)">
-          <span style="width:14px;height:14px;border-radius:50%;background:${on ? '#62b85c' : '#2c2721'};box-shadow:${on ? '0 0 10px #62b85c' : 'none'}"></span>
-          <span style="font-size:30px;font-weight:700;letter-spacing:.05em;color:var(--brass-hi)">${mName(slot, mdl)}</span>
-          <span style="font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#9b927f">${slot === 'gate' ? 'Gate slot' : 'Dynamics slot'} · ${mdl}</span>
-          <span style="flex:1"></span>
-          <button class="pill" aria-pressed=${String(on)} onClick=${setOn} style=${`width:96px;height:48px;${on ? 'background:#1d2a19;color:#a6e39c;border-color:#62b85c' : 'background:#141210;color:#8a8170'}`}>${on ? 'ON' : 'OFF'}</button>
+      <div style="flex:1;min-height:0;display:flex;padding:10px 12px 12px">
+        <div class="plate" style=${`--plate-font:'Futura','Avenir Next Condensed','Arial Narrow','Helvetica Neue',sans-serif;flex:1;min-width:0;position:relative;display:flex;border-radius:6px;background:${P.bg};box-shadow:inset 0 1px 0 rgba(255,255,255,.25),inset 0 -2px 0 rgba(0,0,0,.35),0 6px 22px rgba(0,0,0,.6);border:1px solid #000`}>
+          <div style="position:absolute;inset:0;border-radius:6px;pointer-events:none;background:repeating-linear-gradient(90deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px)"></div>
+          <div style="width:34px;flex:none;position:relative;border-right:1px solid rgba(0,0,0,.35)">${screw('left', 'top')}${screw('left', 'bottom')}</div>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;padding:10px 14px 12px">
+            <div style=${`display:flex;align-items:center;gap:14px;padding-bottom:8px;border-bottom:1px solid ${P.line}`}>
+              <span style=${`font:700 ${Math.round(28 * Math.min(1, f + 0.1))}px/1 var(--plate-font);letter-spacing:.22em;color:${P.ink};text-shadow:0 1px 0 rgba(0,0,0,.25)`}>${F.title}</span>
+              <span style=${`font:600 11px/1 var(--plate-font);letter-spacing:.24em;color:${P.sub}`}>${slot === 'gate' ? 'GATE SLOT' : 'DYNAMICS SLOT'}</span>
+              <span style="flex:1"></span>
+              ${!this.isLinked() && html`<span style="font:700 11px/1 var(--mono);letter-spacing:.16em;padding:4px 7px;border-radius:4px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
+              ${powerSw}
+            </div>
+            <div style="flex:1;min-height:0;display:flex;align-items:center;gap:${Math.round(22 * f)}px;padding-top:6px">
+              ${F.meter && html`<div style="flex:none;display:flex;flex-direction:column;align-items:center;gap:8px">${F.meter === 'vu' ? this.vuMeter(sigLv, f) : this.ledMeter(sigLv, P, f)}</div>`}
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:space-evenly;height:100%">
+                ${rows.map(r => { rf = Math.min(1, rowW / r.reduce((w, c) => w + estW(c), 0)); return html`<div style="display:flex;align-items:flex-end;justify-content:space-evenly;gap:6px">${r.map(ctl)}</div>`; })}
+              </div>
+            </div>
+          </div>
+          <div style="width:34px;flex:none;position:relative;border-left:1px solid rgba(0,0,0,.35)">${screw('right', 'top')}${screw('right', 'bottom')}</div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-content:start">
-          ${L.map(ctl)}
-          ${slot === 'comp' && this.cbox('mix', 'Mix', this.fmtComp('mix'), [0, 100], '#7aa7e0', '', null, v => Math.round(v))}
-          ${slot === 'comp' && this.cbox('gain', 'Gain', this.fmtComp('gain'), [-6, 12], '#7aa7e0', '', null, v => Math.round(v * 2) / 2)}
-        </div>
-        ${!this.isLinked() && html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#9b927f">הערכים יופיעו כשהאפליקציה מחוברת למיקסר. הפאנל נבנה מרשימת הפרמטרים של ה־WING עצמו לכל דגם.</span>`}
       </div>`;
+  }
+  lever(up, P, k = 1) {
+    const w = Math.round(30 * k), h = Math.round(44 * k);
+    return html`<svg width=${w} height=${h} viewBox="0 0 30 44" aria-hidden="true">
+      <circle cx="15" cy="22" r="11" fill="#bdbdbd" stroke="#555" stroke-width="1"/><circle cx="15" cy="22" r="7.5" fill="#2a2a2a"/>
+      <g transform=${`rotate(${up ? 0 : 180} 15 22)`}><path d="M12.6 22 L13.4 4 Q15 1.5 16.6 4 L17.4 22 Z" fill="url(#lvG)" stroke="#666" stroke-width=".6"/><ellipse cx="15" cy="4" rx="2.6" ry="2" fill="#f4f4f4"/></g>
+      <defs><linearGradient id="lvG" x1="0" x2="1"><stop offset="0" stop-color="#8c8c8c"/><stop offset=".45" stop-color="#ffffff"/><stop offset="1" stop-color="#7a7a7a"/></linearGradient></defs></svg>`;
+  }
+  faceSwitch(P, label, m, v, put, f) {
+    const two = m.t !== 'int', isUp = two ? (v !== undefined && near(m.i[1], v)) : +v === 1;
+    const top = two ? (m.li ? m.li[1] : String(m.i[1])) : 'ON', bot = two ? (m.li ? m.li[0] : String(m.i[0])) : 'OFF';
+    const flip = () => put(two ? m.i[isUp ? 0 : 1] : (isUp ? 0 : 1));
+    return html`<button onClick=${flip} aria-pressed=${String(isUp)} aria-label=${label + ' ' + (isUp ? top : bot)}
+      style="display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:6px 10px;min-width:74px">
+      <span style=${`font:700 ${Math.round(12 * Math.max(f, .85))}px/1.1 var(--plate-font);letter-spacing:.14em;color:${P.ink};text-align:center;max-width:120px`}>${label}</span>
+      <span style=${`font:700 11px/1 var(--plate-font);letter-spacing:.12em;color:${isUp ? P.ink : P.sub};opacity:${isUp ? 1 : .7}`}>${top}</span>
+      ${this.lever(isUp, P, Math.max(1, f * 1.15))}
+      <span style=${`font:700 11px/1 var(--plate-font);letter-spacing:.12em;color:${!isUp ? P.ink : P.sub};opacity:${!isUp ? 1 : .7}`}>${bot}</span></button>`;
+  }
+  faceBtns(P, label, m, v, put, f) {
+    const h = Math.round(46 * Math.max(f, .85));
+    return html`<div style="display:flex;flex-direction:column;align-items:center;gap:7px">
+      <span style=${`font:700 ${Math.round(12 * Math.max(f, .85))}px/1 var(--plate-font);letter-spacing:.16em;color:${P.ink}`}>${label}</span>
+      <div style="display:flex;gap:6px;padding:6px;border-radius:5px;background:rgba(0,0,0,.28);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)">
+        ${m.i.map((it, k) => { const sel = v !== undefined && near(it, v); return html`<button onClick=${() => put(it)} aria-pressed=${String(sel)}
+          style=${`min-width:${h}px;height:${h}px;padding:0 6px;border-radius:4px;cursor:pointer;font:700 13px/1 var(--plate-font);letter-spacing:.04em;
+            ${sel ? 'background:linear-gradient(180deg,#fff3d6,#ffd27a);color:#3a2400;border:1px solid #c9952e;box-shadow:0 0 12px rgba(255,190,80,.55),inset 0 -2px 0 rgba(0,0,0,.15)' : 'background:linear-gradient(180deg,#efefea,#c9c7bf);color:#2a2824;border:1px solid #6e6b64;box-shadow:inset 0 -3px 0 rgba(0,0,0,.18)'}`}>${m.li ? m.li[k] : (m.t === 'fenum' ? (Math.round(it * 10) / 10) : it)}</button>`; })}
+      </div></div>`;
+  }
+  faceKnob(P, F, label, m, v, put, D, step, capCol, fmt, short) {
+    const en = m.t === 'enum' || m.t === 'fenum', N = en ? m.i.length : 0;
+    const a = m.a !== undefined ? m.a : 0, b = m.b !== undefined ? m.b : 1, lg = m.t === 'log' && a > 0;
+    const nrm = x => en ? Math.max(0, m.i.findIndex(it => near(it, x))) / Math.max(1, N - 1) : clamp(lg ? Math.log(x / a) / Math.log(b / a) : (x - a) / (b - a), 0, 1);
+    const dn = n => { n = clamp(n, 0, 1); if (en) return m.i[Math.round(n * (N - 1))]; const x = lg ? a * Math.pow(b / a, n) : a + n * (b - a); if (m.t === 'int') return Math.round(x); const s2 = m.n > 1 ? (b - a) / (m.n - 1) : 0; return s2 && !lg ? Math.round(x / s2) * s2 : Math.round(x * 100) / 100; };
+    const n = v === undefined ? (en ? 0 : 0.5) : nrm(v), ang = -135 + 270 * n;
+    const R = D / 2, pad = Math.round(D * 0.36), W = D + pad * 2, c = W / 2, rt = R + pad * 0.42;
+    const pos = (t, r) => { const A = (-135 + 270 * t - 90) * Math.PI / 180; return [c + r * Math.cos(A), c + r * Math.sin(A)]; };
+    /* the scale printed on the plate */
+    const ticks = [], labels = [];
+    const nT = en ? N : 11;
+    for (let k = 0; k < nT; k++) { const t = nT > 1 ? k / (nT - 1) : 0, [x1, y1] = pos(t, R + 4), [x2, y2] = pos(t, R + (k % 5 === 0 || en ? 10 : 7)); ticks.push(html`<line x1=${x1} y1=${y1} x2=${x2} y2=${y2} stroke=${P.ink} stroke-width=${en || k % 5 === 0 ? 1.6 : 1} opacity=".85"/>`); }
+    const lblAt = (t, txt) => { const [x, y] = pos(t, rt + 6); labels.push(html`<text x=${x} y=${y + 4} text-anchor="middle" font-size=${Math.max(9, Math.round(D / 9))} font-weight="700" fill=${P.sub} style="font-family:var(--plate-font)">${txt}</text>`); };
+    if (en) { const every = N <= 9 ? 1 : Math.ceil(N / 8); m.i.forEach((it, k) => { if (k % every === 0 || k === N - 1) lblAt(k / (N - 1), m.li ? m.li[k] : (m.t === 'fenum' ? (it >= 10 ? Math.round(it) : Math.round(it * 10) / 10) : it)); }); }
+    else { lblAt(0, short(m, a)); lblAt(1, short(m, b)); if (D >= 90) lblAt(0.5, short(m, dn(0.5))); }
+    /* knob body */
+    const st = F.knob, body = st === 'silver' ? ['#f6f6f4', '#b9b9b6', '#6d6d6a'] : st === 'cream' ? ['#fbf3df', '#dccfa9', '#8f8160'] : st === 'cap' ? ['#5a5d61', '#36393c', '#1c1e20'] : ['#555', '#1d1d1d', '#050505'];
+    const ptr = st === 'silver' || st === 'cream' ? '#1a1a1a' : '#f4f1e8';
+    const id = 'k' + label.replace(/\W/g, '') + D;
+    const knob = step
+      ? html`<g transform=${`rotate(${ang} ${c} ${c})`}>
+          <circle cx=${c} cy=${c} r=${R * 0.78} fill=${`url(#${id})`} stroke="#000" stroke-width="1"/>
+          <path d=${`M${c - R * 0.22} ${c + R * 0.55} L${c - R * 0.16} ${c - R * 0.96} Q${c} ${c - R * 1.08} ${c + R * 0.16} ${c - R * 0.96} L${c + R * 0.22} ${c + R * 0.55} Z`} fill=${`url(#${id})`} stroke="#000" stroke-width="1"/>
+          <line x1=${c} y1=${c - R * 0.25} x2=${c} y2=${c - R * 0.92} stroke=${ptr} stroke-width="2.4" stroke-linecap="round"/></g>`
+      : html`<g>
+          <circle cx=${c} cy=${c + 2} r=${R} fill="rgba(0,0,0,.45)"/>
+          <circle cx=${c} cy=${c} r=${R} fill=${`url(#${id})`} stroke="#000" stroke-width="1"/>
+          ${st === 'black' && html`<circle cx=${c} cy=${c} r=${R - 1.5} fill="none" stroke="#3a3a3a" stroke-width="3" stroke-dasharray="1.2 2.2"/>`}
+          ${st === 'cap' && html`<circle cx=${c} cy=${c} r=${R * 0.62} fill=${capCol || '#c8c8c8'} stroke="rgba(0,0,0,.5)"/><circle cx=${c - R * .15} cy=${c - R * .18} r=${R * 0.35} fill="rgba(255,255,255,.18)"/>`}
+          ${st !== 'cap' && html`<circle cx=${c} cy=${c} r=${R * 0.7} fill="none" stroke="rgba(255,255,255,.12)"/>`}
+          <g transform=${`rotate(${ang} ${c} ${c})`}><line x1=${c} y1=${c - R * (st === 'cap' ? 0.66 : 0.3)} x2=${c} y2=${c - R + 4} stroke=${st === 'cap' ? '#f4f1e8' : ptr} stroke-width="3" stroke-linecap="round"/></g></g>`;
+    const down = e => { capture(e); this.fk = { sx: e.clientX, sy: e.clientY, n0: n, moved: false }; this.fkV = v; this.fkN = n; };
+    const move = e => { const d = this.fk; if (!d) return; const dd = (e.clientX - d.sx) - (e.clientY - d.sy);
+      if (!d.moved && Math.abs(dd) > 3) { d.moved = true; this.showDragPop(label.charAt(0) + label.slice(1).toLowerCase(), '#c9a25a', () => fmt(m, this.fkV), () => this.fkN); }
+      if (!d.moved) return; const nn = clamp(d.n0 + dd / 240, 0, 1), x = dn(nn); this.fkV = x; this.fkN = en ? Math.round(nn * (N - 1)) / Math.max(1, N - 1) : nn; put(x); };
+    const up = () => { this.fk = null; this.hideDragPop(); };
+    return html`<div style="display:flex;flex-direction:column;align-items:center;gap:0">
+      <span style=${`font:700 ${Math.max(11, Math.round(D / 7.5))}px/1.1 var(--plate-font);letter-spacing:.15em;color:${P.ink};text-align:center;max-width:${W + 20}px`}>${label}</span>
+      <button aria-label=${label + ' ' + fmt(m, v) + ', drag up or right to raise'} style="background:none;border:none;padding:0;cursor:grab;touch-action:none;line-height:0"
+        onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>
+        <svg width=${W} height=${W - pad * 0.55} viewBox=${`0 0 ${W} ${W - pad * 0.55}`}>
+          <defs><radialGradient id=${id} cx="38%" cy="32%" r="75%"><stop offset="0" stop-color=${body[0]}/><stop offset=".55" stop-color=${body[1]}/><stop offset="1" stop-color=${body[2]}/></radialGradient></defs>
+          ${ticks}${labels}${knob}</svg></button></div>`;
+  }
+  vuMeter(db, f) {
+    const w = Math.round(230 * clamp(f, .7, 1.15)), h = Math.round(w * 0.62), cx = w / 2, cy = h * 0.98, r = w * 0.44;
+    const vu = clamp(db + 18, -20, 3);   // 0 VU = -18 dBFS
+    const t = x => { const k = clamp((Math.pow(10, x / 20) - 0.1) / (Math.pow(10, 3 / 20) - 0.1), 0, 1); return -50 + 100 * k; };
+    const p = (deg, rr) => { const A = (deg - 90) * Math.PI / 180; return [cx + rr * Math.cos(A), cy + rr * Math.sin(A)]; };
+    const marks = [-20, -10, -7, -5, -3, -2, -1, 0, 1, 2, 3];
+    const [nx, ny] = p(t(vu), r * 1.02);
+    const arc = (d0, d1, rr) => { const [x0, y0] = p(d0, rr), [x1, y1] = p(d1, rr); return `M${x0} ${y0} A${rr} ${rr} 0 0 1 ${x1} ${y1}`; };
+    return html`<div style=${`padding:8px;border-radius:6px;background:linear-gradient(180deg,#2b2b2b,#111);box-shadow:inset 0 2px 6px rgba(0,0,0,.8),0 1px 0 rgba(255,255,255,.15)`}>
+      <svg width=${w} height=${h} viewBox=${`0 0 ${w} ${h}`} style="display:block;border-radius:3px">
+        <defs><radialGradient id="vuBg" cx="50%" cy="100%" r="100%"><stop offset="0" stop-color="#fff2c4"/><stop offset=".7" stop-color="#f1d98e"/><stop offset="1" stop-color="#d9b968"/></radialGradient></defs>
+        <rect width=${w} height=${h} fill="url(#vuBg)"/>
+        <path d=${arc(t(-20), t(0), r * 0.86)} stroke="#2a2216" stroke-width="1.6" fill="none"/>
+        <path d=${arc(t(0), t(3), r * 0.86)} stroke="#c0281b" stroke-width="5" fill="none"/>
+        ${marks.map(x => { const [x1, y1] = p(t(x), r * 0.86), [x2, y2] = p(t(x), r * (x === 0 || x === -20 || x === -10 || x === 3 ? 0.97 : 0.93)), [lx, ly] = p(t(x), r * 1.06);
+          return html`<line x1=${x1} y1=${y1} x2=${x2} y2=${y2} stroke=${x > 0 ? '#c0281b' : '#2a2216'} stroke-width="1.4"/>
+            ${[-20, -10, -5, -3, 0, 3].includes(x) && html`<text x=${lx} y=${ly + 3} text-anchor="middle" font-size=${Math.round(w / 21)} font-weight="700" fill=${x > 0 ? '#c0281b' : '#2a2216'} style="font-family:var(--plate-font)">${x > 0 ? '+' + x : x}</text>`}`; })}
+        <text x=${cx} y=${cy - r * 0.38} text-anchor="middle" font-size=${Math.round(w / 9)} font-weight="700" fill="#2a2216" style="font-family:Georgia,serif;font-style:italic">VU</text>
+        <line x1=${cx} y1=${cy} x2=${nx} y2=${ny} stroke="#1a1410" stroke-width="1.8"/>
+        <circle cx=${cx} cy=${cy} r=${w / 16} fill="#1a1410"/>
+      </svg></div>`;
+  }
+  ledMeter(db, P, f) {
+    const n = 10, hgt = Math.round(22 * clamp(f, .7, 1.2)), steps = [-40, -30, -24, -18, -12, -9, -6, -3, 0, 3];
+    return html`<div style="display:flex;flex-direction:column-reverse;align-items:center;gap:${Math.round(hgt * 0.32)}px;padding:12px 10px;border-radius:5px;background:rgba(0,0,0,.35);box-shadow:inset 0 1px 4px rgba(0,0,0,.6)">
+      ${steps.map((x, k) => { const lit = db + 18 >= x, col = k >= 8 ? '#ff3b26' : k >= 6 ? '#ffc23a' : '#47e05a';
+        return html`<span style="display:flex;align-items:center;gap:7px"><span style=${`width:${hgt}px;height:${Math.round(hgt * 0.62)}px;border-radius:3px;background:${lit ? col : 'rgba(255,255,255,.08)'};box-shadow:${lit ? '0 0 9px ' + col : 'inset 0 1px 2px rgba(0,0,0,.6)'}`}></span>
+          <span style=${`width:24px;font:700 10px/1 var(--plate-font);color:${P.sub}`}>${x > 0 ? '+' + x : x}</span></span>`; })}
+    </div>`;
   }
 
   /* ---------- recorder and player (USB on the WING) ---------- */
@@ -2827,8 +3019,9 @@ class App extends Component {
       <button onClick=${() => pick(def)} aria-pressed=${String(cur === def)} style=${b + 'border-radius:7px;' + (cur === def ? on : off)}>${slot === 'gate' ? 'GATE' : 'COMP'}</button>
       ${html`<button onClick=${() => pick(dq)} aria-pressed=${String(isDeq(cur))} style=${b + 'border-radius:7px;' + (isDeq(cur) ? on : off)}>DYN EQ</button>`}
       <span style="display:flex">
-        <button onClick=${() => pick(isOther ? cur : other)} aria-pressed=${String(isOther)} style=${b + 'max-width:116px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
-        <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:34px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;' + (isOther ? on : off)}>▾</button>
+        <button onClick=${() => isOther ? this.setState({ modelPop: true }) : pick(other)} aria-pressed=${String(isOther)} style=${b + 'max-width:116px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
+        <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:58px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;display:flex;align-items:center;justify-content:center;' + (isOther ? on : off)}>
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8.5 L12 16 L19 8.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </span>
     </div>`;
   }
