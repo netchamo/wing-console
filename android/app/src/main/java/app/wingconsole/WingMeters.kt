@@ -160,6 +160,9 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         thread(name = "wing-meters") { run(ip, netFor, my) }
     }
 
+    /** the full link is up and its loop is the current one */
+    fun isOpen() = running && nout != null
+
     fun stop() {
         gen++
         running = false

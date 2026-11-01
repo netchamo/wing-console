@@ -293,6 +293,8 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     // ------------------------------------------------------------ OSC (queries only)
 
     fun connect(ip: String) {
+        // Same mixer and the link is healthy: keep it (a second connect used to tear down a working link).
+        if (running && target?.hostAddress == ip && meters.isOpen()) { live = false; status("connecting", ip); log("sys", "already linked to $ip, keeping the open link"); return }
         live = false
         pickedAt = 0L
         target = runCatching { InetAddress.getByName(ip) }.getOrNull()
