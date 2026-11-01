@@ -500,10 +500,13 @@ class App extends Component {
       if (st.screen === 'rec' && ps.screen !== 'rec') this.reqStrip(this.playerCh(), 'all');
       if (st.screen === 'lib' && ps.screen !== 'lib') { this.reqG(['/$ctl/lib/']); this.reqDef([GID['/$ctl/lib/$scenes']]); }
       if (st.screen === 'settings' && ps.screen !== 'settings') this.reqG(['/$syscfg/', '/cards/', '/$ctl/cfg/lights/', '/$stat/', '/$globals/', '/$ctl/$globals/']);
-      if (st.screen === 'mon' && ps.screen !== 'mon') { this.reqG(['/cfg/mon/']); this.reqDef(Object.values(GNID)); }
+      if (st.screen === 'mon' && ps.screen !== 'mon') { this.reqG(['/cfg/mon/']); this.reqDef(Object.values(GNID));
+        clearTimeout(this.monLogT); this.monLogT = setTimeout(() => { const all = Object.keys(GID).filter(p => p.startsWith('/cfg/mon/')), got = all.filter(p => p in this.gx); this.logLine('sys', `monitor: desk reported ${got.length} of ${all.length} values` + (got.length < all.length ? ' · missing e.g. ' + all.filter(p => !(p in this.gx)).slice(0, 4).join(', ') : '')); }, 2500); }
       if (st.screen === 'rec' && ps.screen !== 'rec') { this.reqG(['/rec/', '/play/', '/io/out/REC/']); this.reqDef([GID['/play/$songs']]); }
       if (st.srcPop && (!ps.srcPop || ps.srcPop.grp !== st.srcPop.grp)) this.reqG([`/io/in/${wgrp(st.srcPop.grp)}/`]);
     }
+    /* global values the user just changed (monitor, lights, oscillator…) */
+    if (st.monv !== ps.monv && Date.now() - (this.uAct || 0) < 1500) { const T = this.touchG || (this.touchG = new Set()); for (const k in st.monv) if (st.monv[k] !== (ps.monv || {})[k]) T.add(k); }
     this.syncCheck();
   }
   /* ---------- mixer link (Android app only, read-only) ---------- */
@@ -1181,6 +1184,8 @@ class App extends Component {
     }
     const dg = this.deriveG(st);
     for (const p in dg) if (p in this.gx && !near(dg[p], this.gx[p])) diff.push([-1, p, dg[p]]);
+    /* a value the desk has not reported yet, changed by hand: send it too (only with live control on) */
+    if (this.touchG && this.touchG.size) { for (const p of this.touchG) if (!(p in this.gx) && GID[p] !== undefined && st.monv[p] !== undefined) { diff.push([-1, p, st.monv[p]]); if (!(this.unrep || (this.unrep = {}))[p]) { this.unrep[p] = 1; this.logLine('sys', 'desk has not reported ' + p + ' yet; sending the change anyway'); } } this.touchG.clear(); }
     if (!diff.length) return;
     if (!st.conn.live) {
       if (Date.now() - (this.roT || 0) > 2500) { this.roT = Date.now(); this.toast('קריאה בלבד: הדלק Live control כדי לשנות את המיקסר'); }
