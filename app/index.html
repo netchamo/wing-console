@@ -4037,7 +4037,14 @@ class App extends Component {
       </div>`;
     const me = this.myAddr(), myIp = me ? me.split(',').map(x => x.trim().split('/')[0]).join(', ') : '', same = me && c.ip ? this.sameNet(me, c.ip) : null;
     const net3 = myIp ? myIp.split(',')[0].split('.').slice(0, 3).join('.') : '';
+    let NI = []; try { NI = JSON.parse(NATIVE.netInfo ? NATIVE.netInfo() : '[]'); } catch (e) {}
+    /* a router outside the tablet's own range: the address was typed in by hand (static) on this Wi-Fi */
+    const badGw = NI.find(n => n.gw && this.sameNet(n.addr + '/' + n.prefix, n.gw) === false);
     const help = (() => {
+      if (badGw && !linked) return ['bad', 'בטאבלט מוגדרת כתובת קבועה שגויה לרשת הזו', `הראוטר של הרשת הוא ${badGw.gw}, אבל לטאבלט מוגדרת ידנית הכתובת ${badGw.addr}, מטווח אחר. בגלל זה אין לו גישה לראוטר, לא לאינטרנט ולא למיקסר. מכשירים אחרים מקבלים כתובת אוטומטית ולכן עובדים.`, [
+        'לוחצים על כפתור ה־Wi-Fi למעלה.',
+        'לוחצים על גלגל השיניים ליד הרשת המחוברת, ואז "מתקדם" או "הגדרות IP".',
+        'משנים את הגדרות ה־IP מ"סטטי" ל־DHCP ושומרים. הטאבלט יקבל כתובת נכונה, והאפליקציה תתחבר לבד.']];
       if (c.wifi === false) return ['bad', 'הטאבלט לא מחובר ל־Wi-Fi', 'בלי רשת אין דרך להגיע למיקסר.', ['לחצו על כפתור ה־Wi-Fi ובחרו את הרשת שהמיקסר מחובר אליה.']];
       if (linked) return ['ok', 'מחובר למיקסר', c.live ? 'שליטה חיה דלוקה: כל שינוי באפליקציה נשלח למיקסר.' : 'קריאה בלבד: רואים את המיקסר, ושום דבר לא נשלח אליו עד שמדליקים שליטה חיה.', []];
       if (same === false) return ['bad', 'הכתובת של המיקסר בטווח אחר מזה של הטאבלט', `לפי אנדרואיד, הטאבלט קיבל כתובת ${myIp.split(',')[0]} והמיקסר בכתובת ${c.ip}. זה עובד רק אם הראוטר מעביר בין שני הטווחים, והאפליקציה מנסה דרכו.${c.searching ? ' מחפש עכשיו ברשת…' : ''}`, [
