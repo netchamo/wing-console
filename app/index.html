@@ -2812,12 +2812,35 @@ class App extends Component {
     const L = WMAP.GM['/$globals/clksrc'];
     const icon = k => k === 'INT' ? html`<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`
       : html`<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h5l2-5 4 10 2-5h5"/></svg>`;
+    const open = !!st.clkOpen, unlocked = open && st.clkUnlock;
+    const lockBtn = html`<button onClick=${() => this.setState({ clkUnlock: !st.clkUnlock })} aria-pressed=${String(!unlocked)} aria-label=${unlocked ? 'Lock clock settings' : 'Unlock clock settings'}
+      style=${`height:44px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:10px;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:.1em;${unlocked ? 'background:#2a1513;border:1.5px solid #e0513f;color:#ff9a8a' : 'background:#141210;border:1.5px solid #5a4630;color:var(--brass-hi)'}`}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/>${unlocked ? html`<path d="M8 11V7a4 4 0 0 1 7.5-2"/>` : html`<path d="M8 11V7a4 4 0 0 1 8 0v4"/>`}</svg>${unlocked ? 'UNLOCKED' : 'LOCKED'}</button>`;
+    const srcName = L.li[L.i.indexOf(src)] || src;
+    if (!open) return html`<section dir="ltr" class="sec" style="gap:0;padding:12px 16px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <span style="font-size:20px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">CLOCK</span>
+        <span style=${`display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font:700 13px/1 var(--mono);letter-spacing:.12em;border:1px solid ${locked ? '#62b85c' : '#d0392b'};color:${locked ? '#a6e39c' : '#ff8a7a'}`}>
+          <i style=${`width:10px;height:10px;border-radius:50%;background:${locked ? '#62e07a' : '#ff3b26'};box-shadow:0 0 10px ${locked ? '#62e07a' : '#ff3b26'}`}></i>${locked ? 'LOCKED' : 'NOT LOCKED'}</span>
+        <span style="font:800 18px/1 var(--mono);color:${src === 'INT' ? '#ffd99a' : '#9fe4ff'}">${srcName}</span>
+        <span style="font:700 16px/1 var(--mono);color:#cbbd9f">${rate === 44100 ? '44.1' : '48'} kHz</span>
+        <span style="flex:1"></span>
+        <button onClick=${() => this.setState({ clkOpen: true, clkUnlock: false })} aria-label="Show clock settings" style="height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:9px;cursor:pointer;background:#141210;border:1px solid #3a342c;color:#cbbd9f;font-weight:700;font-size:13px;letter-spacing:.1em">SETTINGS
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div></section>`;
     return html`<section dir="ltr" class="sec" style="gap:12px;padding:16px">
       <div style="display:flex;align-items:center;gap:14px">
         <span style="font-size:20px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">CLOCK</span>
         <span style=${`display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;font:700 13px/1 var(--mono);letter-spacing:.12em;border:1px solid ${locked ? '#62b85c' : '#d0392b'};color:${locked ? '#a6e39c' : '#ff8a7a'}`}>
           <i style=${`width:10px;height:10px;border-radius:50%;background:${locked ? '#62e07a' : '#ff3b26'};box-shadow:0 0 10px ${locked ? '#62e07a' : '#ff3b26'}`}></i>${locked ? 'LOCKED' : 'NOT LOCKED'}${ppm !== undefined && ppm !== '' ? ' · ' + ppm + ' PPM' : ''}</span>
         <span style="flex:1"></span>
+        ${lockBtn}
+        <button onClick=${() => this.setState({ clkOpen: false, clkUnlock: false })} aria-label="Hide clock settings" style="width:44px;height:44px;border-radius:9px;cursor:pointer;background:#141210;border:1px solid #3a342c;color:#cbbd9f">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </div>
+      ${!unlocked && html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f;text-align:right">ההגדרות נעולות. כדי לשנות, שחרר את המנעול. שינוי שעון בזמן הופעה עלול לגרום לקפיצה בסאונד.</span>`}
+      <div style=${`display:flex;flex-direction:column;gap:12px;${unlocked ? '' : 'opacity:.45;pointer-events:none'}`}>
+      <div style="display:flex;align-items:center;gap:14px;justify-content:flex-end">
         <span style="font-size:13px;font-weight:700;letter-spacing:.14em;color:#9b927f">SAMPLE RATE</span>
         <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#0c0b0a;border:1px solid #2c2721">
           ${[[48000, '48 kHz'], [44100, '44.1 kHz']].map(([v, l]) => html`<button onClick=${() => this.monSet('/$globals/clkrate', v)} aria-pressed=${String(rate === v)} style=${`height:44px;min-width:110px;border-radius:7px;border:none;font:800 17px/1 var(--mono);cursor:pointer;${rate === v ? 'background:#c9a25a;color:#1a1405;box-shadow:0 0 14px rgba(232,163,61,.4)' : 'background:transparent;color:#cbbd9f'}`}>${l}</button>`)}
@@ -2830,7 +2853,7 @@ class App extends Component {
               ${on ? `background:radial-gradient(circle at 50% 30%,${ext ? '#173040' : '#3a2a12'},#100f0d 80%);border:2px solid ${ext ? '#5fd0ff' : '#f3c27a'};color:${ext ? '#9fe4ff' : '#ffd99a'};box-shadow:0 0 18px ${ext ? 'rgba(95,208,255,.35)' : 'rgba(243,194,122,.35)'}` : 'background:#141210;border:1px solid #2c2721;color:#9b927f'}`}>
             ${icon(k)}<span style="font-size:${k === 'INT' ? 18 : 15}px;font-weight:800;letter-spacing:.08em">${L.li[n]}</span>
             <span style="font-size:10px;font-weight:700;letter-spacing:.18em;opacity:.7">${ext ? 'EXTERNAL' : 'THIS CONSOLE'}</span></button>`; })}
-      </div></section>`;
+      </div></div></section>`;
   }
   /* a button that acts only after it is held until its box fills */
   holdBtn(id, label, sub, col, act) {
@@ -2849,11 +2872,28 @@ class App extends Component {
     return html`<section class="sec" style="gap:12px;padding:16px">
       <span style="font-size:18px;font-weight:700;color:#e9dcc2">כיבוי ואיפוס</span>
       <div style="display:flex;gap:14px">
-        ${this.holdBtn('off', 'SHUT DOWN', 'החזק עד שהריבוע מתמלא', '#e0513f', () => {
-          if (this.isLinked() && this.state.conn.live) this.mxAction('/$ctl/$globals/$savenow', 1, 'i');
-          this.setState({ powerMsg: 'off' }); })}
-        ${this.holdBtn('init', 'INITIALIZE CONSOLE', 'החזק עד שהריבוע מתמלא', '#e8a33d', () => this.setState({ powerMsg: 'init' }))}
+        ${this.holdBtn('off', 'SHUT DOWN', 'החזק עד שהריבוע מתמלא', '#e0513f', () => this.setState({ powerAsk: 'off' }))}
+        ${this.holdBtn('init', 'INITIALIZE CONSOLE', 'החזק עד שהריבוע מתמלא', '#e8a33d', () => this.setState({ powerAsk: 'init' }))}
       </div></section>`;
+  }
+  renderPowerAsk(Hd) {
+    const k = this.state.powerAsk, close = () => this.setState({ powerAsk: null }), col = k === 'off' ? '#e0513f' : '#e8a33d';
+    const yes = () => { if (k === 'off' && this.isLinked() && this.state.conn.live) this.mxAction('/$ctl/$globals/$savenow', 1, 'i'); this.setState({ powerAsk: null, powerMsg: k }); };
+    return html`<button class="scrim" style="z-index:20" aria-label="Cancel" onClick=${close}></button>
+      <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:21;left:250px;top:${Math.max(16, Math.round((Hd - 400) / 2))}px;width:680px;padding:22px 24px;gap:14px;border-color:${col};font-family:'Heebo',sans-serif`}>
+        <span style=${`font-size:24px;font-weight:800;color:${col}`}>${k === 'off' ? 'לכבות את המיקסר?' : 'לאפס את הקונסולה?'}</span>
+        ${k === 'off' ? html`<span style="font-size:18px;line-height:1.6;color:#e9dcc2">הסאונד ייפסק בכל היציאות עד שהמיקסר יידלק שוב. ודא שהמגברים והרמקולים כבויים או מונמכים לפני כן, כדי שלא יהיה פיצוץ.</span>`
+          : html`<span style="font-size:18px;line-height:1.6;color:#e9dcc2">איפוס מחזיר את הקונסולה להגדרות היצרן:</span>
+            <div style="display:flex;flex-direction:column;gap:6px;font-size:17px;color:#e9dcc2">
+              ${['כל המיקס הנוכחי נמחק: פיידרים, איקיו, דינמיקה, אפקטים, שליחות ושמות ערוצים', 'כל הניתובים חוזרים לברירת המחדל, כולל כניסות ויציאות', 'הגדרות הרשת עלולות להתאפס, ואז האפליקציה תצטרך להתחבר מחדש', 'סצנות ששמורות בספרייה בדרך כלל נשארות, אבל מה שלא נשמר כסצנה הולך לאיבוד']
+                .map(t => html`<span style="display:flex;gap:10px"><i style=${`flex:none;width:8px;height:8px;margin-top:9px;border-radius:50%;background:${col}`}></i>${t}</span>`)}
+            </div>
+            <span style="font-size:16px;color:#cbbd9f">כדאי לשמור קודם את המצב הנוכחי כסצנה.</span>`}
+        <div style="display:flex;gap:12px;margin-top:4px">
+          <button class="pill" style="flex:1;height:54px;font-size:18px" onClick=${close}>ביטול</button>
+          <button onClick=${yes} style=${`flex:1;height:54px;border-radius:10px;cursor:pointer;font-weight:800;font-size:18px;background:${col};color:#1a0d05;border:none;font-family:'Heebo',sans-serif`}>${k === 'off' ? 'כן, לכבות' : 'כן, לאפס'}</button>
+        </div>
+      </div>`;
   }
   renderPowerMsg(Hd) {
     const k = this.state.powerMsg, close = () => this.setState({ powerMsg: null }), live = this.isLinked() && this.state.conn.live;
@@ -3602,7 +3642,7 @@ class App extends Component {
         </section>
         ${this.renderPower()}
       </div>
-      ${this.state.powerMsg && this.renderPowerMsg(Hd)}`;
+      ${this.state.powerAsk && this.renderPowerAsk(Hd)}${this.state.powerMsg && this.renderPowerMsg(Hd)}`;
   }
 
   /* ---------- drag value pop-up (shown only while a value box is dragged) ---------- */
