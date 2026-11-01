@@ -67,7 +67,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.tab{height:36px;display:flex;align-items:center;gap:4px;padding:0 9px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.tab{height:36px;display:flex;align-items:center;gap:3px;padding:0 6px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
 .gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
@@ -1791,6 +1791,21 @@ class App extends Component {
       </div>`;
   }
 
+  /* a lying fader: moved only by its knob (no jumps), double tap returns it home */
+  hslide(id, n, set, home, col, H = 44, mid) {
+    const kn = clamp(n, 0, 1);
+    return html`<div style=${`position:relative;height:${H}px;width:100%;border-radius:${H / 2}px;background:linear-gradient(180deg,#0c0b0a,#16130f);box-shadow:inset 0 2px 6px rgba(0,0,0,.8),0 0 0 1px #2c2721;touch-action:pan-y`}>
+      <span style=${`position:absolute;left:${H / 2}px;right:${H / 2}px;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#2c2721`}></span>
+      ${mid !== undefined && html`<span style=${`position:absolute;left:calc(${H / 2}px + (100% - ${H}px) * ${mid});top:8px;bottom:8px;width:2px;margin-left:-1px;background:#6a5a40`}></span>`}
+      <span style=${`position:absolute;left:${mid !== undefined ? `calc(${H / 2}px + (100% - ${H}px) * ${Math.min(mid, kn)})` : H / 2 + 'px'};width:calc((100% - ${H}px) * ${Math.abs(kn - (mid ?? 0))});top:50%;height:4px;margin-top:-2px;border-radius:2px;background:${col};opacity:.75`}></span>
+      <span role="slider" aria-valuenow=${Math.round(kn * 100)} aria-label=${id} onPointerDown=${e => { e.stopPropagation(); capture(e); if (this.dbl('hs' + id)) { set(home); this.hs = null; return; }
+          const tr = e.currentTarget.parentElement.getBoundingClientRect(); this.hs = { id, x: e.clientX, n0: kn, w: tr.width - H * tr.width / e.currentTarget.parentElement.offsetWidth }; }}
+        onPointerMove=${e => { const d = this.hs; if (!d || d.id !== id) return; set(clamp(d.n0 + (e.clientX - d.x) / d.w, 0, 1)); }}
+        onPointerUp=${() => { this.hs = null; }} onPointerCancel=${() => { this.hs = null; }}
+        style=${`position:absolute;top:50%;left:calc(${H / 2}px + (100% - ${H}px) * ${kn});width:${H - 6}px;height:${H - 6}px;margin:${-(H - 6) / 2}px 0 0 ${-(H - 6) / 2}px;border-radius:50%;cursor:grab;touch-action:none;
+          background:radial-gradient(circle at 38% 32%,#f6ecd6,#c9b48a 55%,#8a7652);box-shadow:0 3px 8px rgba(0,0,0,.6),0 0 0 2px ${col}66`}></span>
+    </div>`;
+  }
   renderPan(Hd) {
     const st = this.state, pp = st.panPop, pi = pp.i, c = this.get(pi);
     const name = pi === -1 ? this.state.chans[48].name : c.name, color = pi === -1 ? '#d9b56a' : c.color;
@@ -1831,17 +1846,9 @@ class App extends Component {
             </svg>
             <div style="flex:1;display:flex;flex-direction:column;gap:12px">
               <div style="display:flex;justify-content:space-between;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#e9dcc2"><span>Stereo width</span><span style="font-family:var(--mono);color:var(--brass-hi)">${Math.round(c.width * 100)}%</span></div>
-              <button class="panmini" style="height:40px;width:100%;border-radius:20px" aria-label=${'Stereo width ' + Math.round(c.width * 100) + '%'}
-                onPointerDown=${e => { capture(e); this.wr = e.currentTarget.getBoundingClientRect(); this.wSet(e.clientX); }}
-                onPointerMove=${e => this.wSet(e.clientX)} onPointerUp=${() => { this.wr = null; }} onPointerCancel=${() => { this.wr = null; }}>
-                <span style="position:absolute;left:20px;right:20px;top:0;bottom:0">
-                  <span style=${`position:absolute;left:0;top:50%;height:4px;margin-top:-2px;width:${c.width / 1.5 * 100}%;border-radius:2px;background:#c9a25a;opacity:.6`}></span>
-                  <span style="position:absolute;left:66.7%;top:8px;bottom:8px;width:1px;background:#4a4339"></span>
-                  <span class="knob" style=${`left:${c.width / 1.5 * 100}%;width:26px;height:26px;margin:-13px 0 0 -13px`}></span>
-                </span>
-              </button>
+              ${this.hslide('Stereo width', c.width / 1.5, n => { let w = n * 1.5; if (Math.abs(w - 1) < 0.04) w = 1; this.upd(pi, { width: w }); }, 1 / 1.5, '#c9a25a', 40, 1 / 1.5)}
               <div style="display:flex;gap:10px">
-                <button class=${'pill' + (c.swap ? ' on' : '')} style="flex:1" onClick=${() => this.upd(pi, { swap: !c.swap })}>Swap L ⇄ R</button>
+                <button class=${'pill' + (c.swap ? ' on' : '')} style="flex:1;white-space:nowrap" onClick=${() => this.upd(pi, { swap: !c.swap })}>L ⇄ R</button>
                 <button class="pill" style="flex:1" onClick=${() => this.upd(pi, { pan: 0 })}>Center</button>
                 <button class="pill on" style="flex:1" onClick=${close}>Done</button>
               </div>
@@ -4002,6 +4009,14 @@ class App extends Component {
             ${opt(P.back === 'last', 'המסך האחרון שהייתי בו', 'למשל, אם יצאת מהגייט, תחזור לגייט.', () => this.setPref({ back: 'last' }))}
           </div>
         </section>
+        <section class="sec" style="gap:12px;padding:16px">
+          <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">כפתורים בראש מסכי הערוץ</span>
+          <span style="font-size:15px;color:#9b927f;text-align:center">איפה החיצים שעוברים לערוץ הבא, ואיפה הכפתור שחוזר למסך הראשי.</span>
+          <div style="display:flex;gap:12px">
+            ${opt(!P.navSwap, 'חיצים משמאל, חזרה מימין', 'החיצים בפינה השמאלית העליונה, החזרה למיקסר בפינה הימנית.', () => this.setPref({ navSwap: false }))}
+            ${opt(!!P.navSwap, 'חזרה משמאל, חיצים מימין', 'החזרה למיקסר בפינה השמאלית העליונה, החיצים בפינה הימנית.', () => this.setPref({ navSwap: true }))}
+          </div>
+        </section>
         ${this.renderPower()}
       </div>
       ${this.state.clkHelp && this.renderClockHelp(Hd)}${this.state.dtEdit && this.renderDtEdit(Hd)}
@@ -4551,17 +4566,17 @@ class App extends Component {
     const dq = this.dualDeq(slot), isOther = cur !== def && cur !== dq;
     const pick = name => this.setState(s => ({ slots: { ...s.slots, [slot]: name } }));
     const on = 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)', off = 'background:#141210;border:1px solid #3a342c;color:#cbbd9f';
-    const b = 'height:40px;padding:0 10px;font-weight:700;font-size:13px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;';
+    const b = 'height:40px;padding:0 7px;font-weight:700;font-size:13px;letter-spacing:.02em;cursor:pointer;white-space:nowrap;';
     const isOn = this.slotOn(slot);
     return html`<div style="display:flex;align-items:center;gap:4px" role="group" aria-label="Slot model">
       ${!isFaceModel(slot, cur) && html`<button onClick=${() => this.setState({ infoPop: true })} aria-label="About this unit" style="width:40px;height:40px;margin-right:2px;border-radius:50%;border:1.5px solid #8a6a3a;background:#1a1714;color:var(--brass-hi);font:italic 700 20px/1 Georgia,serif;cursor:pointer">i</button>`}
       <button onClick=${() => this.setSlotOn(slot, !isOn)} aria-pressed=${String(isOn)} aria-label=${(slot === 'gate' ? 'Gate' : 'Comp') + ' slot ' + (isOn ? 'on' : 'off')}
-        style=${`height:40px;min-width:58px;padding:0 10px;margin-right:4px;border-radius:7px;font-weight:800;font-size:15px;letter-spacing:.08em;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c;box-shadow:0 0 10px rgba(98,184,92,.35)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>
+        style=${`height:40px;min-width:48px;padding:0 8px;margin-right:2px;border-radius:7px;font-weight:800;font-size:15px;letter-spacing:.08em;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c;box-shadow:0 0 10px rgba(98,184,92,.35)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>
       <button onClick=${() => pick(def)} aria-pressed=${String(cur === def)} style=${b + 'border-radius:7px;' + (cur === def ? on : off)}>${slot === 'gate' ? 'GATE' : 'COMP'}</button>
       ${html`<button onClick=${() => pick(dq)} aria-pressed=${String(isDeq(cur))} style=${b + 'border-radius:7px;' + (isDeq(cur) ? on : off)}>DYN EQ</button>`}
       <span style="display:flex">
-        <button onClick=${() => isOther ? this.setState({ modelPop: true }) : pick(other)} aria-pressed=${String(isOther)} style=${b + 'max-width:116px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
-        <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:58px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;display:flex;align-items:center;justify-content:center;' + (isOther ? on : off)}>
+        <button onClick=${() => isOther ? this.setState({ modelPop: true }) : pick(other)} aria-pressed=${String(isOther)} style=${b + 'max-width:100px;font-size:13px;overflow:hidden;text-overflow:ellipsis;border-radius:7px 0 0 7px;' + (isOther ? on : off)}>${mName(slot, isOther ? cur : other)}</button>
+        <button aria-label="Choose another model" onClick=${() => this.setState({ modelPop: true })} style=${b + 'width:44px;padding:0;border-radius:0 7px 7px 0;margin-left:-1px;display:flex;align-items:center;justify-content:center;' + (isOther ? on : off)}>
           <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8.5 L12 16 L19 8.5" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </span>
     </div>`;
@@ -4603,16 +4618,37 @@ class App extends Component {
     if (this.capHdr) { this.hdrOut = this.chanHeader0(activeTab, right, ch, tabs); return ''; }
     return this.chanHeader0(activeTab, right, ch, tabs);
   }
+  /* the next strip of the same kind: channels+aux, buses, matrices, mains */
+  stripStep(s, d) {
+    const G = [Array.from({ length: 48 }, (_, k) => k), Array.from({ length: 16 }, (_, k) => 49 + k), Array.from({ length: 8 }, (_, k) => 65 + k), [48, 73, 74, 75]];
+    const g = G.find(x => x.includes(s)) || G[0], k = g.indexOf(s);
+    return g[(k + d + g.length) % g.length];
+  }
+  goStrip(d) {
+    const st = this.state, n = this.stripStep(st.eqCh, d), tabs = tabsOf(n);
+    const cur = st.screen === 'home' ? 'Home' : st.screen === 'config' ? 'Config' : st.screen === 'eq' ? 'EQ' : st.screen === 'dyn' ? (st.dynSlot === 'gate' ? 'Gate' : 'Comp') : st.screen === 'sends' ? 'Sends' : st.screen === 'chain' ? 'Chain' : st.screen === 'bus' ? 'Outputs' : 'Home';
+    const ok = tabs.includes(cur);
+    this.setState({ eqCh: n, ...(ok ? {} : { screen: 'home' }), ...(st.screen === 'bus' && ok ? { busCh: n } : {}), ...(n >= 48 ? { dynSlot: 'comp' } : {}) });
+  }
+  chanNav() {
+    const ab = 'width:46px;height:42px;flex:none;padding:0;border-radius:9px;border:1px solid #5a4630;background:linear-gradient(180deg,#2a241d,#17140f);color:var(--brass-hi);cursor:pointer;display:flex;align-items:center;justify-content:center';
+    const arrows = html`<div style="display:flex;gap:4px;flex:none">
+      <button aria-label="Previous channel" style=${ab} onClick=${() => this.goStrip(-1)}><svg width="24" height="24" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button aria-label="Next channel" style=${ab} onClick=${() => this.goStrip(1)}><svg width="24" height="24" viewBox="0 0 24 24"><path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>`;
+    const back = html`<button aria-label="Back to the mixer" onClick=${() => this.setState({ screen: 'main' })}
+      style="height:42px;flex:none;display:flex;align-items:center;gap:6px;padding:0 12px 0 8px;border-radius:9px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em">${IC.back}MIX</button>`;
+    return this.state.prefs.navSwap ? { L: back, R: arrows } : { L: arrows, R: back };
+  }
   chanHeader0(activeTab, right, ch, tabs) {
+    const N = this.chanNav();
     return html`
-      <header class="topbar" style="height:52px;gap:10px">
+      <header class="topbar" style="height:52px;gap:6px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
-        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
-        <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
+        ${N.L}
+        <nav style="display:flex;gap:3px;margin-left:2px">
+          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${t}</button>`)}
         </nav>
-        <span style="flex:1"></span>${right}
+        <span style="flex:1"></span><div style="min-width:0;flex-shrink:1;display:flex;align-items:center;gap:8px;overflow:hidden">${right}</div>${N.R}
       </header>`;
   }
   updGate(p) { this.setState(st => ({ gate: { ...st.gate, ...(typeof p === 'function' ? p(st.gate) : p) } })); }
@@ -4955,7 +4991,7 @@ class App extends Component {
 
   renderDyn(Hd) {
     const st = this.state, slot = st.dynSlot, model = st.slots[slot];
-    if (st.eqCh >= 40) return this.renderNoDyn(Hd);
+    if (st.eqCh >= 40 && st.eqCh < 48) return this.renderNoDyn(Hd);
     const kd = SLOTK[slot];
     if (isDeq(model) && (!this.isLinked() || this.deqLayout(st.eqCh, kd).length || !this.mx[st.eqCh][kd + '/mdl'])) { this.ek = slot === 'gate' ? 'deq' : 'cdeq'; return html`${this.renderEQ(Hd)}${st.modelPop && this.renderModelPop(Hd)}`; }
     if (slot === 'gate' && model === 'GATE') return html`${this.renderGate(Hd)}${st.modelPop && this.renderModelPop(Hd)}`;
@@ -4966,15 +5002,7 @@ class App extends Component {
     const st = this.state, ch = st.chans[st.eqCh], m = null, model = '', activeTab = st.dynSlot === 'gate' ? 'Gate' : 'Comp';
     const tabs = tabsOf(this.state.eqCh);
     return html`
-      <header class="topbar" style="height:52px;gap:10px">
-        <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
-        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
-        <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === activeTab ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
-        </nav>
-        <span style="flex:1"></span>
-      </header>
+      ${this.chanHeader(activeTab, '')}
       <div style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:20px">
         <div class="sec" style="width:620px;align-items:center;gap:12px;padding:30px;text-align:center">
           <span style="font-size:13px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#b8a78a">${activeTab}</span>
@@ -5146,26 +5174,23 @@ class App extends Component {
     const tabs = tabsOf(this.state.eqCh);
 
     return html`
-      <header class="topbar" style="height:52px;gap:10px">
-        <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
-        <span class="tag" style=${'height:28px;background:' + ch.color}>${ch.name}</span>
-        <nav style="display:flex;gap:4px;margin-left:6px">
-          ${tabs.map(t => html`<button class=${'tab' + (t === 'Config' ? ' on' : '')} onClick=${() => this.goTab(t)}>${!NOGRIP.has(t) ? IC.grip : ''}${t}</button>`)}
-        </nav>
-        <span style="flex:1"></span>
-        <span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">CH ${pad2(i + 1)}</span>
-      </header>
+      ${this.chanHeader('Config', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">${stripName(i)}</span>`)}
 
       <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
           <div style=${`height:${H1}px;display:flex;gap:10px`}>
             ${card('main')}${card('alt')}
 
-            <section class="sec" style="flex:1;min-width:200px;align-items:center;justify-content:space-around;padding:8px 10px">
-              ${this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a')}
-              ${this.knob('bal', 'Balance', cf.bal, 9, balText, '#7aa7e0')}
-              <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a8170">Hold balance for stereo</span>
+            <section class="sec" style="flex:1;min-width:0;justify-content:space-between;gap:8px;padding:8px 12px 12px">
+              <div style="display:flex;justify-content:center">${this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a')}</div>
+              <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:14px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">BALANCE</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:17px;color:#7aa7e0">${balText}</span></div>
+              ${this.hslide('Balance', (cf.bal + 9) / 18, n => { let v = Math.round((n * 18 - 9) * 10) / 10; if (Math.abs(v) < 0.3) v = 0; this.updCfg(i, { bal: v }); }, 0.5, '#7aa7e0', 44, 0.5)}
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px"><span style="font-size:14px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">STEREO WIDTH</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:17px;color:#c9a25a">${ch.width < 0.01 ? 'MONO' : Math.round(ch.width * 100) + '%'}</span></div>
+              ${this.hslide('Width', ch.width / 1.5, n => { let w = n * 1.5; if (Math.abs(w - 1) < 0.04) w = 1; if (w < 0.03) w = 0; this.upd(i, { width: w }); }, 1 / 1.5, '#c9a25a', 44, 1 / 1.5)}
+              <div style="display:flex;gap:6px">
+                ${[['MONO', ch.width < 0.01, () => this.upd(i, { width: 0 })], ['STEREO', Math.abs(ch.width - 1) < 0.01, () => this.upd(i, { width: 1 })], ['L ⇄ R', !!ch.swap, () => this.upd(i, { swap: !ch.swap })]].map(([t, on, fn]) => html`<button onClick=${fn} aria-pressed=${String(on)}
+                  style=${`flex:1;height:40px;border-radius:8px;font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.08em;cursor:pointer;${on ? 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass);box-shadow:0 0 10px rgba(201,162,90,.3)' : 'background:#141210;color:#cbbd9f;border:1px solid #2c2721'}`}>${t}</button>`)}
+              </div>
             </section>
 
             <div style="width:262px;flex:none;display:flex;flex-direction:column;gap:10px">
