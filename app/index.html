@@ -949,6 +949,8 @@ class App extends Component {
       o.main = c;
       const m = { ...st.chans[48] }, sends = m.sends.slice(), on = (m.sendOn || Array(24).fill(true)).slice(); let ch2 = false;
       for (let k = 16; k < 24; k++) { const b = `send/MX${k - 15}/`; if (has(b + 'lvl')) { sends[k] = posOf(+mx[b + 'lvl']); ch2 = true; } if (has(b + 'on')) { on[k] = +mx[b + 'on'] === 1; ch2 = true; } }
+      if (has('name') && String(mx.name).trim()) { m.name = String(mx.name).trim(); ch2 = true; }
+      if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) { m.color = WING_COLORS[k - 1]; ch2 = true; } }
       if (ch2) { const chans = st.chans.slice(); chans[48] = { ...m, sends, sendOn: on }; o.chans = chans; }
     } else { const chans = st.chans.slice(); chans[s] = c; o.chans = chans; }
     if (isMain && s !== st.eqCh) return o;
@@ -1312,10 +1314,10 @@ class App extends Component {
     const lpEnd = () => clearTimeout(this.lpT);
     const strip = (i, c0, j, isMain, tgt) => { const snd = SO && !tgt && i >= 0, c = snd ? { ...c0, v: c0.sends[SK] || 0, mute: (c0.sendOn || [])[SK] === false, pan: SK < 16 ? ((c0.sendPan || [])[SK] || 0) : 0 } : c0; return html`
       <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
-        <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? (i >= 65 && i < 73 ? '#4fc9b7' : '#d9b56a') + ';font-size:15px;letter-spacing:.02em' : c.color) + (SI ? ';height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px 4px' : '')} aria-label=${'Open ' + (isMain && i === -1 ? 'Main LR' : c.name) + '. Hold to ' + (isMain ? 'choose this fader' : 'edit name')}
+        <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? (i >= 65 && i < 73 ? '#4fc9b7' : '#d9b56a') + ';font-size:15px;letter-spacing:.02em' : c.color) + (SI ? ';height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px 4px' : '')} aria-label=${'Open ' + (i === -1 ? st.chans[48].name : c.name) + '. Hold to ' + (isMain ? 'choose this fader' : 'edit name')}
           onPointerDown=${() => { if (tgt) return; if (isMain) lpDown(() => this.setState({ mainPick: true })); else if (i >= 0 && i < 48) lpDown(() => this.setState({ nameEdit: { i } })); }} onPointerUp=${lpEnd} onPointerCancel=${lpEnd} onPointerLeave=${lpEnd}
           onClick=${() => { if (this.lpDone) { this.lpDone = false; return; } const s0 = i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
-            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${SI ? html`<span style="width:40px;height:40px;flex:none;color:#121110;opacity:.85">${i === -1 || i === 48 || i >= 73 ? STRIPICON.main : i >= 65 ? STRIPICON.mtx : i >= 49 ? STRIPICON.bus : CHICON[this.iconOf(i)]}</span><span style="max-width:100%;overflow:hidden;text-overflow:ellipsis">${tgt ? c.name : isMain && i === -1 ? 'Main LR' : c.name}</span>` : tgt ? c.name : isMain && i === -1 ? 'Main LR' : c.name}</button>
+            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${SI ? html`<span style="width:40px;height:40px;flex:none;color:#121110;opacity:.85">${i === -1 || i === 48 || i >= 73 ? STRIPICON.main : i >= 65 ? STRIPICON.mtx : i >= 49 ? STRIPICON.bus : CHICON[this.iconOf(i)]}</span><span style="max-width:100%;overflow:hidden;text-overflow:ellipsis">${tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</span>` : tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</button>
         ${snd && SK >= 16 ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${this.busLabel(SK).toUpperCase().slice(0, 9)}</div>` : html`<button class="panmini" aria-label=${(snd ? 'Send pan ' : 'Pan ') + panText(c.pan)} style=${snd ? `border-color:${tcol}88;box-shadow:inset 0 0 8px ${tcol}33` : ''}
           onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
@@ -1341,7 +1343,7 @@ class App extends Component {
       </div>`; };
     const strips = [];
     for (let j = 0; j < 8; j++) { const s0 = bankIdx(b, j);
-      strips.push(s0 === -2 || (SO && (SK < 16 ? s0 >= 48 : s0 >= 65 && s0 <= 72)) ? html`<div style="flex:1 1 0;min-width:0"></div>` : s0 === 48 ? (SO ? strip(48, { ...st.chans[48], name: 'Main 1', color: '#d9b56a' }, j, false) : strip(-1, { ...st.main, name: 'Main 1', color: '#d9b56a' }, j, false)) : strip(s0, st.chans[s0], j, false)); }
+      strips.push(s0 === -2 || (SO && (SK < 16 ? s0 >= 48 : s0 >= 65 && s0 <= 72)) ? html`<div style="flex:1 1 0;min-width:0"></div>` : s0 === 48 ? (SO ? strip(48, { ...st.chans[48], color: '#d9b56a' }, j, false) : strip(-1, { ...st.main, name: st.chans[48].name, color: '#d9b56a' }, j, false)) : strip(s0, st.chans[s0], j, false)); }
     strips.push(SO ? strip(TI, { ...st.chans[TI], name: this.busLabel(SK) }, 8, true, true) : MS === 48 ? strip(-1, st.main, 8, true) : strip(MS, st.chans[MS], 8, true));
     const banks = ['Ch 1–8','Ch 9–16','Ch 17–24','Ch 25–32','Ch 33–40','Aux 1–8','Bus 1–8','Bus 9–16','Matrix 1–8','Main 1–4'];
     /* a colour per kind of strip on the layer buttons */
@@ -1653,7 +1655,11 @@ class App extends Component {
           ${card('DIRECT IN', hasDir ? html`<div style="display:flex;gap:8px;align-items:stretch">
               <div style="flex:1;min-width:0">${bigBtn('Direct in', this.dirText(M[PD('in')] ?? 'OFF'), pickDir, '#4fc9b7')}</div>
               <button onClick=${() => this.monSet(PD('on'), dirOn ? 0 : 1)} aria-pressed=${String(dirOn)} style=${`width:64px;border-radius:9px;font-weight:800;font-size:15px;cursor:pointer;${dirOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${dirOn ? 'ON' : 'OFF'}</button></div>
-            ${!this.isLinked() || GID[PD('lvl')] !== undefined ? this.mbar(PD('lvl'), 'Direct level', 'ערוץ אחד שנכנס ישר בנוסף למקור, בלי לבזבז באס', '#4fc9b7', 46) : ''}`
+            ${(() => { if (!this.isLinked()) return this.mbar(PD('lvl'), 'Direct level', 'ערוץ אחד שנכנס ישר בנוסף למקור, בלי לבזבז באס', '#4fc9b7', 46);
+              /* every level-like setting the desk reports for its direct input */
+              const L = Object.keys(GID).filter(p => p.startsWith(`/cfg/mon/${m}/dir`) && !/dir\/?(in|on)$/.test(p) && ['lin', 'log', 'fdr'].includes(this.monMeta(p).t));
+              return L.length ? L.map(p => this.mbar(p, 'Direct ' + (t => t === 'lvl' ? 'level' : t)((this.monMeta(p).l || p.split('/').pop()).replace(/^dir\/?\s*/i, '').toLowerCase()), '', '#4fc9b7', 46))
+                : html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:13px;line-height:1.4;color:#8f8676">המיקסר לא מדווח על ווליום נפרד לכניסה הישירה.</span>`; })()}`
             : html`<div dir="rtl" style="display:flex;align-items:center;gap:10px;font-family:'Heebo',sans-serif">
               <span style="flex:1;font-size:14px;line-height:1.4;color:#a89d88">${(this.dirTry || 0) > 4 ? 'המיקסר עוד לא תיאר את הכניסה הישירה לאפליקציה.' : 'קורא את הכניסה הישירה מהמיקסר…'}</span>
               <button onClick=${() => { this.dirTry = 0; this.reqDef(Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).map(p => GNID[p])); this.dirRetry(); this.setState({ modelsV: Date.now() }); }}
@@ -1787,7 +1793,7 @@ class App extends Component {
 
   renderPan(Hd) {
     const st = this.state, pp = st.panPop, pi = pp.i, c = this.get(pi);
-    const name = pi === -1 ? 'Main LR' : c.name, color = pi === -1 ? '#d9b56a' : c.color;
+    const name = pi === -1 ? this.state.chans[48].name : c.name, color = pi === -1 ? '#d9b56a' : c.color;
     const R = 90, CX = 110, CY = 112, ang = c.pan * 80, spread = Math.min(80, c.width * 38);
     const P = a => { const r = a * Math.PI / 180; return { x: +(CX + R * Math.sin(r)).toFixed(1), y: +(CY - R * Math.cos(r)).toFixed(1) }; };
     const p1 = P(clamp(ang - spread, -88, 88)), p2 = P(clamp(ang + spread, -88, 88)), pc = P(ang);
@@ -2635,7 +2641,7 @@ class App extends Component {
     const st = this.state, M = st.monv, mdlMeta = WMAP.GM['/fx/*/mdl'];
     const lname = m => { const k = mdlMeta.i.indexOf(m); return k >= 0 ? (mdlMeta.li[k] || m) : (m || '—'); };
     const tile = n => {
-      const P = k => `/fx/${n}/${k}`, m = M[P('mdl')] || 'NONE', si = this.fxStrip(M[P('$a_chn')]), c = si >= 0 ? (si === 48 ? { name: 'Main 1', color: '#d9b56a' } : st.chans[si]) : null;
+      const P = k => `/fx/${n}/${k}`, m = M[P('mdl')] || 'NONE', si = this.fxStrip(M[P('$a_chn')]), c = si >= 0 ? (si === 48 ? { name: st.chans[48].name, color: '#d9b56a' } : st.chans[si]) : null;
       const post = +M[P('$a_pos')] === 1, mix = +(M[P('fxmix')] ?? 100);
       return html`<div style="min-height:0;display:flex;gap:8px;padding:8px;border-radius:9px;background:linear-gradient(180deg,#1c1916,#121110);border:1px solid #2f2a24;position:relative">
         <div style="width:96px;flex:none;display:flex;flex-direction:column;gap:5px">
@@ -3620,7 +3626,7 @@ class App extends Component {
     const st = this.state, P = { MAIN: ['Main', 48], BUS: ['Bus', 49], MTX: ['Mtx', 65] };
     if (P[x.grp]) {
       const n = Math.ceil(x.n / 2), side = x.n % 2 ? 'L' : 'R';
-      if (x.grp === 'MAIN') { const mc = n > 1 ? st.chans[71 + n] : null, nm = mc && mc.name && !/^Main \d$/.test(mc.name) ? mc.name : (n === 1 ? 'Main LR' : 'Main ' + n); return nm + ' ' + side; }
+      if (x.grp === 'MAIN') { const mc = n > 1 ? st.chans[71 + n] : null, nm = mc && mc.name && !/^Main \d$/.test(mc.name) ? mc.name : (n === 1 ? st.chans[48].name : 'Main ' + n); return nm + ' ' + side; }
       const c = st.chans[P[x.grp][1] + n - 1], nm = c && c.name && !/^(Bus|Mtx) \d+$/.test(c.name) ? c.name : P[x.grp][0] + ' ' + n;
       return nm + ' ' + side;
     }
@@ -3896,7 +3902,7 @@ class App extends Component {
 
   /* ---------- Main and bus screens: Outputs tab ---------- */
   renderBus(Hd) {
-    const st = this.state, s = st.busCh, isMain = s === 48 || s >= 73, isMtx = s >= 65 && s < 73, c = s === 48 ? { ...st.main, name: 'Main LR', color: '#d9b56a' } : st.chans[s];
+    const st = this.state, s = st.busCh, isMain = s === 48 || s >= 73, isMtx = s >= 65 && s < 73, c = s === 48 ? { ...st.main, name: st.chans[48].name, color: '#d9b56a' } : st.chans[s];
     const grp = isMain ? 'MAIN' : isMtx ? 'MTX' : 'BUS', num = s === 48 ? 1 : s >= 73 ? s - 71 : isMtx ? s - 64 : s - 48;
     const L = { grp, n: num * 2 - 1 }, R = { grp, n: num * 2 };
     const fed = [];
@@ -4326,7 +4332,7 @@ class App extends Component {
     return html`<button class="scrim" style="z-index:20" aria-label="Close" onClick=${close}></button>
       <div class="pop" style=${`z-index:21;left:190px;top:${Math.max(16, Math.round((Hd - 380) / 2))}px;width:800px;padding:18px 20px;gap:12px;border-color:#8a6a3a`}>
         <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:21px;font-weight:800;color:#f3e6cc">איזה פיידר יופיע קבוע בצד ימין של המסך הראשי?</span>
-        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">${opts.map(s => { const on = s === cur, nm = s === 48 ? 'Main LR' : st.chans[s].name, col = s >= 65 && s < 73 ? '#4fc9b7' : '#d9b56a';
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">${opts.map(s => { const on = s === cur, nm = st.chans[s].name, col = s >= 65 && s < 73 ? '#4fc9b7' : '#d9b56a';
           return html`<button onClick=${() => { this.setPref({ mainStrip: s }); close(); }} aria-pressed=${String(on)}
             style=${`height:70px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 14px;border-radius:10px;cursor:pointer;text-align:left;${on ? `background:${col}33;border:2px solid ${col}` : 'background:#141210;border:1px solid #2c2721'}`}>
             <span style=${`font-size:11px;font-weight:700;letter-spacing:.14em;color:${col}`}>${stripName(s)}</span><span style="font-size:18px;font-weight:700;color:#e9dcc2">${nm}</span></button>`; })}</div>
@@ -4378,7 +4384,7 @@ class App extends Component {
           <div style="width:170px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:6px">
             <span style="font-size:15px;font-weight:800;letter-spacing:.16em;color:#e9dcc2">TO THE MAINS</span>
             <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f">כמה מהערוץ נשלח לכל אחד מארבעת המאסטרים, ו־ON לכל אחד.</span></div>
-          ${[0, 1, 2, 3].map(k => { const nm = k === 0 ? 'Main LR' : (st.chans[72 + k] || {}).name || 'Main ' + (k + 1);
+          ${[0, 1, 2, 3].map(k => { const nm = k === 0 ? st.chans[48].name : (st.chans[72 + k] || {}).name || 'Main ' + (k + 1);
             return html`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
               <span style="font-size:14px;font-weight:800;color:#d9b56a">${nm}</span>
               <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${dbText(mlv[k])}</span>
