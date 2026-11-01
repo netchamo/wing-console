@@ -42,7 +42,7 @@ ins = ['preins/on', 'preins/ins', 'postins/on', 'postins/ins']
 sends = [f'send/{n}/{k}' for n in range(1, 17) for k in ['on', 'lvl', 'mode', 'pan']] + \
         [f'send/MX{n}/{k}' for n in range(1, 9) for k in ['on', 'lvl']]
 SUF = []
-for s in core + inp + flt + eq + gate + gsc + dyn + dsc + ins + sends + ['gate', 'dyn', 'main/1/on', 'main/2/on', 'main/3/on', 'main/4/on', 'main/1/lvl', 'main/2/lvl', 'main/3/lvl', 'main/4/lvl', 'proc']:
+for s in core + inp + flt + eq + gate + gsc + dyn + dsc + ins + sends + ['gate', 'dyn', 'icon', 'main/1/on', 'main/2/on', 'main/3/on', 'main/4/on', 'main/1/lvl', 'main/2/lvl', 'main/3/lvl', 'main/4/lvl', 'proc']:
     if s not in SUF: SUF.append(s)
 
 bases = [f'/ch/{n}/' for n in range(1, 41)] + [f'/aux/{n}/' for n in range(1, 9)] + ['/main/1/'] + \
