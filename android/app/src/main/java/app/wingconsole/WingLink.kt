@@ -300,7 +300,8 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         closeSocket()
         running = true
         status("connecting", ip)
-        thread(name = "wing-rx") { receiveLoop() }
+        val my = ++rxGen
+        thread(name = "wing-rx") { receiveLoop(my) }
         val t = target
         meters.start(ip) {
             pickedAt = 0L
@@ -447,9 +448,10 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         socket = null; socketNet = null
     }
 
-    private fun receiveLoop() {
+    @Volatile private var rxGen = 0
+    private fun receiveLoop(my: Int) {
         val buf = ByteArray(4096)
-        while (running) {
+        while (running && rxGen == my) {
             val s = ensureSocket()
             if (s == null) { Thread.sleep(500); continue }
             try {

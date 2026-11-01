@@ -151,13 +151,17 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     }
 
     /** netFor: returns the local network that reaches the mixer right now (null = none yet). */
+    /** each start gets its own generation: an older loop still unwinding stops itself and never touches the new link */
+    @Volatile private var gen = 0
     fun start(ip: String, netFor: () -> Network?) {
         stop()
         running = true
-        thread(name = "wing-meters") { run(ip, netFor) }
+        val my = gen
+        thread(name = "wing-meters") { run(ip, netFor, my) }
     }
 
     fun stop() {
+        gen++
         running = false
         nout = null
         runCatching { tcp?.close() }
@@ -183,9 +187,12 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
 
-    private fun run(ip: String, netFor: () -> Network?) {
+    private fun run(ip: String, netFor: () -> Network?, my: Int) {
+        val alive = { running && gen == my }
         var attempt = 0
-        while (running) {
+        var u0: DatagramSocket? = null
+        var s0: java.net.Socket? = null
+        while (alive()) {
             // Never connect over mobile data: wait until a local network can reach the mixer.
             val net = netFor()
             if (net == null) { Thread.sleep(1000); continue }
@@ -195,7 +202,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 u.bind(InetSocketAddress(0))
                 net.bindSocket(u)
                 u.soTimeout = 500
-                udp = u
+                udp = u; u0 = u
                 val port = u.localPort
                 // Our own meter ids: another app on the desk (Mixing Station, WING Edit) uses 1, 2, 3 too, and the desk
                 // would send our levels to it instead. A random range keeps the two apart.
@@ -204,7 +211,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val s = net.socketFactory.createSocket()
                 s.tcpNoDelay = true
                 s.connect(InetSocketAddress(ip, 2222), 3000)
-                tcp = s
+                tcp = s; s0 = s
+                if (!alive()) throw Exception("superseded")
                 val out = s.getOutputStream()
                 synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }
                 // The WING pushes every change made on the desk on this TCP link, at once.
@@ -212,7 +220,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 thread(name = "wing-native-read") {
                     val buf = ByteArray(4096)
                     val dec = NativeDecoder(onValue) { emit(it) }
-                    runCatching { val inp = s.getInputStream(); while (running) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
+                    runCatching { val inp = s.getInputStream(); while (alive()) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
                 }
                 request(out, mid + 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
                 request(out, mid + 2, port, (0 until 4).map { 0xa3 to it })
@@ -238,7 +246,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 var lastResub = 0L
                 var resub = 0
                 val buf = ByteArray(8192)
-                while (running) {
+                while (alive()) {
                     val now = System.currentTimeMillis()
                     // No levels for 3 s: ask for them again; still nothing after three tries: open the link anew.
                     if (now - lastPkt > 3000 && now - lastResub > (if (gotFirst) 3000 else 10000)) {
@@ -284,14 +292,15 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                     } catch (_: SocketTimeoutException) { }
                 }
             } catch (e: Exception) {
-                if (running) log("err", "meters: ${e.message}")
+                if (alive()) log("err", "meters: ${e.message}")
             } finally {
-                if (nout != null) emit(JSONObject().put("type", "nativeClosed"))
-                nout = null
-                runCatching { tcp?.close() }
-                runCatching { udp?.close() }
+                if (gen == my) { if (nout != null) emit(JSONObject().put("type", "nativeClosed")); nout = null }
+                runCatching { s0?.close() }
+                runCatching { u0?.close() }
+                if (tcp === s0) tcp = null
+                if (udp === u0) udp = null
             }
-            if (!running) break
+            if (!alive()) break
             attempt++
             Thread.sleep(minOf(10_000L, 1000L * attempt))
         }
