@@ -68,6 +68,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
 .tab{height:36px;display:flex;align-items:center;gap:3px;padding:0 6px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.topbar.backR>.backbtn{order:98}.topbar.backR>.wood:last-child{order:99}
 .tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
 .gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
@@ -1641,9 +1642,9 @@ class App extends Component {
         <span class="cap" style=${'top:' + Math.round((1 - lvN) * T) + 'px'}></span>
       </button></div>`;
     return html`
-      <header class="topbar" style="height:60px;gap:10px;position:relative">
+      <header class=${this.topCls()} style="height:60px;gap:10px;position:relative">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
         <span style="font-size:20px;font-weight:700;letter-spacing:.1em;color:#cbbd9f">MONITOR</span>
         <span style="flex:1"></span>${tabs}<span style="flex:1"></span>
         ${!this.isLinked() && html`<span style="font:700 12px/1 var(--mono);letter-spacing:.16em;padding:5px 8px;border-radius:5px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
@@ -1794,11 +1795,11 @@ class App extends Component {
   /* a lying fader: moved only by its knob (no jumps), double tap returns it home */
   hslide(id, n, set, home, col, H = 44, mid) {
     const kn = clamp(n, 0, 1);
-    return html`<div style=${`position:relative;height:${H}px;width:100%;border-radius:${H / 2}px;background:linear-gradient(180deg,#0c0b0a,#16130f);box-shadow:inset 0 2px 6px rgba(0,0,0,.8),0 0 0 1px #2c2721;touch-action:pan-y`}>
+    return html`<div onPointerDown=${() => { if (this.dbl('ht' + id)) set(home); }} style=${`position:relative;height:${H}px;width:100%;border-radius:${H / 2}px;background:linear-gradient(180deg,#0c0b0a,#16130f);box-shadow:inset 0 2px 6px rgba(0,0,0,.8),0 0 0 1px #2c2721;touch-action:pan-y`}>
       <span style=${`position:absolute;left:${H / 2}px;right:${H / 2}px;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:#2c2721`}></span>
       ${mid !== undefined && html`<span style=${`position:absolute;left:calc(${H / 2}px + (100% - ${H}px) * ${mid});top:8px;bottom:8px;width:2px;margin-left:-1px;background:#6a5a40`}></span>`}
       <span style=${`position:absolute;left:${mid !== undefined ? `calc(${H / 2}px + (100% - ${H}px) * ${Math.min(mid, kn)})` : H / 2 + 'px'};width:calc((100% - ${H}px) * ${Math.abs(kn - (mid ?? 0))});top:50%;height:4px;margin-top:-2px;border-radius:2px;background:${col};opacity:.75`}></span>
-      <span role="slider" aria-valuenow=${Math.round(kn * 100)} aria-label=${id} onPointerDown=${e => { e.stopPropagation(); capture(e); if (this.dbl('hs' + id)) { set(home); this.hs = null; return; }
+      <span role="slider" aria-valuenow=${Math.round(kn * 100)} aria-label=${id} onPointerDown=${e => { e.stopPropagation(); capture(e); if (this.dbl('ht' + id)) { set(home); this.hs = null; return; }
           const tr = e.currentTarget.parentElement.getBoundingClientRect(); this.hs = { id, x: e.clientX, n0: kn, w: tr.width - H * tr.width / e.currentTarget.parentElement.offsetWidth }; }}
         onPointerMove=${e => { const d = this.hs; if (!d || d.id !== id) return; set(clamp(d.n0 + (e.clientX - d.x) / d.w, 0, 1)); }}
         onPointerUp=${() => { this.hs = null; }} onPointerCancel=${() => { this.hs = null; }}
@@ -2670,9 +2671,9 @@ class App extends Component {
     };
     const cols = [0, 1, 2, 3].map(c => [1, 2, 3, 4].map(r => c * 4 + r));
     return html`
-      <header class="topbar" style="height:60px;gap:10px">
+      <header class=${this.topCls()} style="height:60px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
         <span style="font-size:20px;font-weight:700;letter-spacing:.1em;color:#cbbd9f">FX RACK</span>
         <span style="flex:1"></span>
         ${!this.isLinked() && html`<span style="font:700 12px/1 var(--mono);letter-spacing:.16em;padding:5px 8px;border-radius:5px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
@@ -2830,9 +2831,9 @@ class App extends Component {
     const wave = m => m === 'SINE' ? 'M4 20 C 10 4, 18 4, 24 20 S 38 36, 44 20' : m === 'PINK' ? 'M4 22 L8 14 L11 26 L15 12 L19 24 L23 16 L27 25 L31 18 L35 23 L39 19 L44 21' : 'M4 20 L6 6 L8 32 L10 10 L12 30 L14 4 L16 34 L18 12 L20 28 L22 6 L24 32 L26 14 L28 26 L30 8 L32 30 L34 12 L36 28 L38 10 L40 30 L44 20';
     const play = () => { const mk = `/io/in/OSC/${n}/mute`; if (!routed) { this.updCfg(i, { main: { grp: 'OSC', n, mode: 'M' }, altOn: false }); this.touch(i); this.monSet(mk, 0); return; } this.monSet(mk, oscOn ? 1 : 0); };
     return html`
-      <header class="topbar" style="height:60px;gap:10px">
+      <header class=${this.topCls()} style="height:60px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => { if (this.oscT) this.oscSweepToggle(n); this.setState({ screen: 'main' }); }} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => { if (this.oscT) this.oscSweepToggle(n); this.setState({ screen: 'main' }); }} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
         <span style="font-size:20px;font-weight:700;letter-spacing:.1em;color:#cbbd9f">OSCILLATOR</span>
         <span style="flex:1"></span>
         <div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">${[1, 2].map(k => html`<button onClick=${() => this.setState({ oscN: k })} aria-pressed=${String(n === k)} style=${`min-width:110px;height:40px;border-radius:7px;border:none;font-weight:700;font-size:16px;cursor:pointer;${n === k ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>Generator ${k}</button>`)}</div>
@@ -3109,9 +3110,9 @@ class App extends Component {
     const big = (label, sub, fn, col) => html`<button onClick=${fn} style=${`flex:1;height:84px;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:linear-gradient(180deg,#2e2924,#1a1714);border:1.5px solid ${col};color:#f3e6cc`}>
       <span style="font-size:22px;font-weight:900;letter-spacing:.12em">${label}</span><span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:13px;color:#9b927f">${sub}</span></button>`;
     return html`
-      <header class="topbar" style="height:60px;gap:10px">
+      <header class=${this.topCls()} style="height:60px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
         <span style="font-size:20px;font-weight:700;letter-spacing:.1em;color:#cbbd9f">LIBRARY</span>
         <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f">הסצנות ששמורות בזיכרון של המיקסר עצמו</span>
         <span style="flex:1"></span>
@@ -3362,9 +3363,9 @@ class App extends Component {
         <span dir="rtl" style="writing-mode:vertical-rl;font-family:'Heebo',sans-serif;font-size:22px;font-weight:800;letter-spacing:.06em">${toRec ? 'מעבר להקלטה' : 'מעבר לנגן'}</span>
         <span style=${`font-size:26px;color:${col}`}>${toRec ? '›' : '‹'}</span></button>`; };
     return html`
-      <header class="topbar" style="height:52px;gap:10px;position:relative">
+      <header class=${this.topCls()} style="height:52px;gap:10px;position:relative">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:44px;height:44px;padding:0;border:none;background:transparent;color:#e9dcc2;cursor:pointer">${IC.back}</button>
         <span style="position:absolute;left:50%;transform:translateX(-50%);font-size:11px;letter-spacing:.2em;color:#9b927f;pointer-events:none">USB ON THE DESK</span>
         <span style="flex:1"></span>
         ${this.connPill()}
@@ -3706,9 +3707,9 @@ class App extends Component {
       </button>`);
     }
     return html`
-      <header class="topbar" style="height:60px;gap:10px;position:relative">
+      <header class=${this.topCls()} style="height:60px;gap:10px;position:relative">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
+        <button class="backbtn" aria-label="Back to mixer" onClick=${() => this.setState({ screen: 'main' })} style="width:56px;height:48px;padding:0;border-radius:10px;border:1px solid #3a342c;background:#1a1714;color:#e9dcc2;cursor:pointer;display:flex;align-items:center;justify-content:center">${IC.back}</button>
         <span style="font-size:20px;font-weight:700;letter-spacing:.1em;color:#cbbd9f">ROUTING</span>
         ${this.routeTabs()}
         <span style="flex:1"></span>
@@ -3981,14 +3982,30 @@ class App extends Component {
       <span style="display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700"><span style=${`width:16px;height:16px;border-radius:50%;border:2px solid ${on ? '#f3c27a' : '#5a5144'};background:${on ? '#f3c27a' : 'transparent'}`}></span>${title}</span>
       <span style="font-size:15px;color:#9b927f">${sub}</span></button>`;
     return html`
-      <header class="topbar" style="height:52px;gap:10px">
+      <header class=${this.topCls()} style="height:52px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
-        <button aria-label="חזרה למיקסר" onClick=${() => this.setState({ screen: 'main' })} style="height:46px;display:flex;align-items:center;gap:8px;padding:0 18px 0 12px;border-radius:10px;border:1px solid #8a6a3a;background:#2a2014;color:var(--brass-hi);font-family:'Heebo',sans-serif;font-size:18px;font-weight:700;cursor:pointer">${IC.back}<span>חזרה</span></button>
+        <button class="backbtn" aria-label="חזרה למיקסר" onClick=${() => this.setState({ screen: 'main' })} style="height:46px;display:flex;align-items:center;gap:8px;padding:0 18px 0 12px;border-radius:10px;border:1px solid #8a6a3a;background:#2a2014;color:var(--brass-hi);font-family:'Heebo',sans-serif;font-size:18px;font-weight:700;cursor:pointer">${IC.back}<span>חזרה</span></button>
         <span style="flex:1"></span>
         <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:24px;font-weight:700">הגדרות</span>
         <div class="wood" style="width:18px;align-self:stretch"></div>
       </header>
       <div dir="rtl" style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:14px;padding:16px 22px;font-family:'Heebo',sans-serif">
+        <section class="sec" style="gap:12px;padding:16px">
+          <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">צד כפתור החזרה</span>
+          <span style="font-size:15px;color:#9b927f;text-align:center">בכל המסכים: באיזה צד כפתור החזרה למיקסר, ובמסכי הערוץ גם החיצים לערוץ הבא.</span>
+          <div style="display:flex;gap:12px">
+            ${[[false, 'חזרה מימין, חיצים משמאל'], [true, 'חזרה משמאל, חיצים מימין']].map(([sw, t]) => { const on = !!P.navSwap === sw;
+              const arrows = html`<span style="display:flex;gap:4px">${['M15 5 L8 12 L15 19', 'M9 5 L16 12 L9 19'].map(d => html`<span style=${`width:34px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;border:1px solid ${on ? '#c9a25a' : '#5a5144'};color:${on ? '#f3c27a' : '#9b927f'}`}><svg width="16" height="16" viewBox="0 0 24 24"><path d=${d} fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>`)}</span>`;
+              const back = html`<span dir="ltr" style=${`height:30px;padding:0 9px;border-radius:6px;display:flex;align-items:center;gap:3px;font:800 11px/1 sans-serif;letter-spacing:.08em;border:1px solid ${on ? '#c9a25a' : '#5a5144'};color:${on ? '#f3c27a' : '#9b927f'}`}><svg width="12" height="12" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>MIX</span></span>`;
+              return html`<button onClick=${() => this.setPref({ navSwap: sw })} aria-pressed=${String(on)}
+                style=${`flex:1;display:flex;flex-direction:column;gap:10px;padding:12px 14px;border-radius:12px;cursor:pointer;font-family:'Heebo',sans-serif;${on ? 'background:#2a2014;border:1.5px solid var(--brass);box-shadow:inset 0 0 22px rgba(232,163,61,.15)' : 'background:#141210;border:1px solid #2c2721'}`}>
+                <span dir="ltr" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:#0c0b0a;border:1px solid #2c2721">
+                  ${sw ? back : arrows}
+                  <span style="flex:1;display:flex;gap:4px">${[0, 1, 2, 3].map(() => html`<span style="flex:1;height:10px;border-radius:3px;background:#2c2721"></span>`)}</span>
+                  ${sw ? arrows : back}</span>
+                <span style=${`display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:${on ? 'var(--brass-hi)' : '#e9dcc2'}`}><span style=${`width:16px;height:16px;border-radius:50%;border:2px solid ${on ? '#f3c27a' : '#5a5144'};background:${on ? '#f3c27a' : 'transparent'}`}></span>${t}</span></button>`; })}
+          </div>
+        </section>
         ${this.renderClockStrip()}
         ${this.renderMixerInfo()}
         ${this.renderClockSync()}
@@ -4007,14 +4024,6 @@ class App extends Component {
           <div style="display:flex;gap:12px">
             ${opt(P.back !== 'last', 'מסך הבית של הערוץ', 'תמיד מתחילים מהסקירה של הערוץ.', () => this.setPref({ back: 'home' }))}
             ${opt(P.back === 'last', 'המסך האחרון שהייתי בו', 'למשל, אם יצאת מהגייט, תחזור לגייט.', () => this.setPref({ back: 'last' }))}
-          </div>
-        </section>
-        <section class="sec" style="gap:12px;padding:16px">
-          <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">כפתורים בראש מסכי הערוץ</span>
-          <span style="font-size:15px;color:#9b927f;text-align:center">איפה החיצים שעוברים לערוץ הבא, ואיפה הכפתור שחוזר למסך הראשי.</span>
-          <div style="display:flex;gap:12px">
-            ${opt(!P.navSwap, 'חיצים משמאל, חזרה מימין', 'החיצים בפינה השמאלית העליונה, החזרה למיקסר בפינה הימנית.', () => this.setPref({ navSwap: false }))}
-            ${opt(!!P.navSwap, 'חזרה משמאל, חיצים מימין', 'החזרה למיקסר בפינה השמאלית העליונה, החיצים בפינה הימנית.', () => this.setPref({ navSwap: true }))}
           </div>
         </section>
         ${this.renderPower()}
@@ -4619,6 +4628,7 @@ class App extends Component {
     return this.chanHeader0(activeTab, right, ch, tabs);
   }
   /* the next strip of the same kind: channels+aux, buses, matrices, mains */
+  topCls() { return 'topbar' + (this.state.prefs.navSwap ? '' : ' backR'); }
   stripStep(s, d) {
     const G = [Array.from({ length: 48 }, (_, k) => k), Array.from({ length: 16 }, (_, k) => 49 + k), Array.from({ length: 8 }, (_, k) => 65 + k), [48, 73, 74, 75]];
     const g = G.find(x => x.includes(s)) || G[0], k = g.indexOf(s);
@@ -5183,10 +5193,13 @@ class App extends Component {
 
             <section class="sec" style="flex:1;min-width:0;justify-content:space-between;gap:8px;padding:8px 12px 12px">
               <div style="display:flex;justify-content:center">${this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a')}</div>
-              <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:14px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">BALANCE</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:17px;color:#7aa7e0">${balText}</span></div>
-              ${this.hslide('Balance', (cf.bal + 9) / 18, n => { let v = Math.round((n * 18 - 9) * 10) / 10; if (Math.abs(v) < 0.3) v = 0; this.updCfg(i, { bal: v }); }, 0.5, '#7aa7e0', 44, 0.5)}
-              <div style="display:flex;align-items:baseline;gap:8px;margin-top:4px"><span style="font-size:14px;font-weight:800;letter-spacing:.14em;color:#e9dcc2">STEREO WIDTH</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:17px;color:#c9a25a">${ch.width < 0.01 ? 'MONO' : Math.round(ch.width * 100) + '%'}</span></div>
-              ${this.hslide('Width', ch.width / 1.5, n => { let w = n * 1.5; if (Math.abs(w - 1) < 0.04) w = 1; if (w < 0.03) w = 0; this.upd(i, { width: w }); }, 1 / 1.5, '#c9a25a', 44, 1 / 1.5)}
+              <div style="display:flex;flex-direction:column;gap:6px;padding:10px 10px 8px;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,rgba(122,167,224,.16),transparent 70%),#100f0e;border:1px solid #2f4a6a;box-shadow:0 0 18px rgba(122,167,224,.12)">
+                <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:17px;font-weight:900;letter-spacing:.16em;color:#cfe0f5">BALANCE</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:24px;font-weight:700;color:#8ec0ff;text-shadow:0 0 10px rgba(122,167,224,.6)">${balText}</span></div>
+                ${this.hslide('Balance', (cf.bal + 9) / 18, n => { let v = Math.round((n * 18 - 9) * 10) / 10; if (Math.abs(v) < 0.3) v = 0; this.updCfg(i, { bal: v }); }, 0.5, '#7aa7e0', 62, 0.5)}
+                <div style="display:flex;justify-content:space-between;padding:0 8px;font-size:12px;font-weight:800;letter-spacing:.14em;color:#6f8fb5"><span>L</span><span>CENTER</span><span>R</span></div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px"><span style="font-size:12px;font-weight:800;letter-spacing:.14em;color:#b8a78a">STEREO WIDTH</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:14px;color:#c9a25a">${ch.width < 0.01 ? 'MONO' : Math.round(ch.width * 100) + '%'}</span></div>
+              ${this.hslide('Width', ch.width / 1.5, n => { let w = n * 1.5; if (Math.abs(w - 1) < 0.04) w = 1; if (w < 0.03) w = 0; this.upd(i, { width: w }); }, 1 / 1.5, '#c9a25a', 34, 1 / 1.5)}
               <div style="display:flex;gap:6px">
                 ${[['MONO', ch.width < 0.01, () => this.upd(i, { width: 0 })], ['STEREO', Math.abs(ch.width - 1) < 0.01, () => this.upd(i, { width: 1 })], ['L ⇄ R', !!ch.swap, () => this.upd(i, { swap: !ch.swap })]].map(([t, on, fn]) => html`<button onClick=${fn} aria-pressed=${String(on)}
                   style=${`flex:1;height:40px;border-radius:8px;font-family:inherit;font-weight:800;font-size:13px;letter-spacing:.08em;cursor:pointer;${on ? 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass);box-shadow:0 0 10px rgba(201,162,90,.3)' : 'background:#141210;color:#cbbd9f;border:1px solid #2c2721'}`}>${t}</button>`)}
