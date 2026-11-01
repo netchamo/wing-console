@@ -167,16 +167,20 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
 
     private fun b(v: Int) = (v and 0xff).toByte()
 
+    /** a value byte equal to 0xdf is sent as 0xdf 0xde, so the desk does not read it as a command */
+    private fun esc(buf: ArrayList<Byte>, vararg v: Int) { for (x in v) { buf.add(b(x)); if ((x and 0xff) == 0xdf) buf.add(b(0xde)) } }
+
     private fun request(out: OutputStream, id: Int, port: Int, groups: List<Pair<Int, Int>>) {
         val buf = ArrayList<Byte>()
-        listOf(0xdf, 0xd3, 0xd3, port shr 8, port, 0xd4, id shr 8, id, port shr 8, port, 0xdc).forEach { buf.add(b(it)) }
+        listOf(0xdf, 0xd3, 0xd3).forEach { buf.add(b(it)) }; esc(buf, port shr 8, port); buf.add(b(0xd4)); esc(buf, id shr 8, id, port shr 8, port); buf.add(b(0xdc))
         for ((g, n) in groups) { buf.add(b(g)); buf.add(b(n)) }
         listOf(0xde, 0xdf, 0xd1).forEach { buf.add(b(it)) }
         synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
 
     private fun keepAlive(out: OutputStream, id: Int, port: Int) {
-        synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd3), b(0xd4), b(id shr 8), b(id), b(port shr 8), b(port), b(0xdf), b(0xd1))); out.flush() }
+        val buf = ArrayList<Byte>(); buf.add(b(0xdf)); buf.add(b(0xd3)); buf.add(b(0xd4)); esc(buf, id shr 8, id, port shr 8, port); buf.add(b(0xdf)); buf.add(b(0xd1))
+        synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
 
     private fun run(ip: String, netFor: () -> Network?) {
@@ -193,6 +197,9 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 u.soTimeout = 500
                 udp = u
                 val port = u.localPort
+                // Our own meter ids: another app on the desk (Mixing Station, WING Edit) uses 1, 2, 3 too, and the desk
+                // would send our levels to it instead. A random range keeps the two apart.
+                val mid = 0x4000 + (java.util.Random().nextInt(0x30) shl 8) + java.util.Random().nextInt(0x80)
 
                 val s = net.socketFactory.createSocket()
                 s.tcpNoDelay = true
@@ -207,9 +214,9 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                     val dec = NativeDecoder(onValue) { emit(it) }
                     runCatching { val inp = s.getInputStream(); while (running) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
                 }
-                request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
-                request(out, 2, port, (0 until 4).map { 0xa3 to it })
-                request(out, 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
+                request(out, mid + 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
+                request(out, mid + 2, port, (0 until 4).map { 0xa3 to it })
+                request(out, mid + 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
                 nout = out
                 log("sys", "native link open (TCP 2222): meters to UDP $port, changes can go this way")
                 emit(JSONObject().put("type", "nativeOpen"))
@@ -238,11 +245,11 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         lastResub = now; resub++
                         if (resub > 3 && gotFirst) throw Exception("no meter levels from the desk for ${(now - lastPkt) / 1000} s; reopening the link")
                         log("sys", "meters: no levels for ${(now - lastPkt) / 1000} s, asking the desk again ($resub)")
-                        request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
-                        request(out, 2, port, (0 until 4).map { 0xa3 to it })
-                        request(out, 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
+                        request(out, mid + 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
+                        request(out, mid + 2, port, (0 until 4).map { 0xa3 to it })
+                        request(out, mid + 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
                     }
-                    if (now >= nextKeep) { keepAlive(out, 1, port); keepAlive(out, 2, port); keepAlive(out, 3, port); nextKeep = now + 3000 }
+                    if (now >= nextKeep) { keepAlive(out, mid + 1, port); keepAlive(out, mid + 2, port); keepAlive(out, mid + 3, port); nextKeep = now + 3000 }
                     if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
                     try {
                         val p = DatagramPacket(buf, buf.size)
@@ -253,13 +260,13 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         val id = ((buf[0].toInt() and 0xff) shl 8) or (buf[1].toInt() and 0xff)
                         val n = (p.length - 4) / 2
                         fun v(k: Int): Double = if (k < n) ((buf[4 + 2 * k].toInt() shl 8) or (buf[5 + 2 * k].toInt() and 0xff)).toShort() / 256.0 else -90.0
-                        if (id == 1) {
+                        if (id == mid + 1) {
                             for (i in 0 until 48) { chL[i] = v(i * 8 + 2); chR[i] = v(i * 8 + 3) }
                             if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values)") }
-                        } else if (id == 2) {
+                        } else if (id == mid + 2) {
                             mainL = v(2); mainR = v(3)
                             for (k in 0 until 4) { mL[k] = v(k * 8 + 2); mR[k] = v(k * 8 + 3) }
-                        } else if (id == 3) {
+                        } else if (id == mid + 3) {
                             for (i in 0 until 24) { bL[i] = v(i * 8 + 2); bR[i] = v(i * 8 + 3) }
                         }
                         if (now - lastEmit >= 50) {
