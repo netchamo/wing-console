@@ -227,15 +227,29 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 var mainL = -90.0
                 var mainR = -90.0
                 var gotFirst = false
+                var lastPkt = System.currentTimeMillis()
+                var lastResub = 0L
+                var resub = 0
                 val buf = ByteArray(8192)
                 while (running) {
                     val now = System.currentTimeMillis()
+                    // No levels for 3 s: ask for them again; still nothing after three tries: open the link anew.
+                    if (now - lastPkt > 3000 && now - lastResub > (if (gotFirst) 3000 else 10000)) {
+                        lastResub = now; resub++
+                        if (resub > 3 && gotFirst) throw Exception("no meter levels from the desk for ${(now - lastPkt) / 1000} s; reopening the link")
+                        log("sys", "meters: no levels for ${(now - lastPkt) / 1000} s, asking the desk again ($resub)")
+                        request(out, 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
+                        request(out, 2, port, (0 until 4).map { 0xa3 to it })
+                        request(out, 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
+                    }
                     if (now >= nextKeep) { keepAlive(out, 1, port); keepAlive(out, 2, port); keepAlive(out, 3, port); nextKeep = now + 3000 }
                     if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
                     try {
                         val p = DatagramPacket(buf, buf.size)
                         u.receive(p)
                         if (p.length < 6) continue
+                        if (resub > 0) log("sys", "meters: levels are back")
+                        lastPkt = now; resub = 0
                         val id = ((buf[0].toInt() and 0xff) shl 8) or (buf[1].toInt() and 0xff)
                         val n = (p.length - 4) / 2
                         fun v(k: Int): Double = if (k < n) ((buf[4 + 2 * k].toInt() shl 8) or (buf[5 + 2 * k].toInt() and 0xff)).toShort() / 256.0 else -90.0
@@ -265,6 +279,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
             } catch (e: Exception) {
                 if (running) log("err", "meters: ${e.message}")
             } finally {
+                if (nout != null) emit(JSONObject().put("type", "nativeClosed"))
                 nout = null
                 runCatching { tcp?.close() }
                 runCatching { udp?.close() }

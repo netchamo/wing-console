@@ -647,9 +647,10 @@ class App extends Component {
       if (e.type === 'osc') { const h = this.holdUntil && this.holdUntil[e.address]; if (!(h && Date.now() < h)) osc.push(e); else C().lastRx = Date.now(); continue; }
       if (e.type === 'nat' || e.type === 'def' || e.type === 'meters') this.rxAny = Date.now();
       if (e.type === 'nat') { if (this.mxIn(e, dirty)) this.natAt = Date.now(); continue; }
-      if (e.type === 'nativeOpen') { setTimeout(() => this.onNativeOpen(), 50); continue; }
+      if (e.type === 'nativeOpen') { this.natOpen = true; setTimeout(() => this.onNativeOpen(), 50); continue; }
+      if (e.type === 'nativeClosed') { this.natOpen = false; this.logLine('sys', 'native link closed'); continue; }
       if (e.type === 'def') { this.defIn(e); continue; }
-      if (e.type === 'meters') { this.realM = e.l ? { l: e.l, r: e.r, ml: e.ml, mr: e.mr, bl: e.bl || [], br: e.br || [], mL: e.mL || [], mR: e.mR || [], t: Date.now() } : { l: e.ch, r: e.ch, ml: e.main, mr: e.main, t: Date.now() }; continue; }
+      if (e.type === 'meters') { this.mtrN = (this.mtrN || 0) + 1; this.mtrAt = Date.now(); this.realM = e.l ? { l: e.l, r: e.r, ml: e.ml, mr: e.mr, bl: e.bl || [], br: e.br || [], mL: e.mL || [], mR: e.mR || [], t: Date.now() } : { l: e.ch, r: e.ch, ml: e.main, mr: e.main, t: Date.now() }; continue; }
       if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
       if (e.type === 'net') { C().wifi = !!e.wifi; continue; }
       if (e.type === 'found') {
@@ -4177,6 +4178,8 @@ class App extends Component {
               return html`<div style="flex:none;display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 12px;border-radius:10px;background:#0e0d0b;border:1px solid #2c2721">
                 ${N.length ? N.map(n => html`${it(n.kind === 'wifi' ? 'TABLET' : 'CABLE', n.addr + '/' + n.prefix)}${it('ROUTER', n.gw || '—')}${it('INTERNET', n.internet ? 'yes' : 'no', n.internet ? '#a6e39c' : '#f3c27a')}`) : it('TABLET', myIp)}
                 ${c.ip && it('MIXER', c.ip + (same === false ? ' · other range' : same ? ' · same range' : ''), same === false ? '#ff9a8a' : same ? '#a6e39c' : null)}
+                ${linked && it('LINK', this.natOpen ? 'full' : 'basic only', this.natOpen ? '#a6e39c' : '#f3c27a')}
+                ${linked && it('METERS', Date.now() - (this.mtrAt || 0) < 1500 ? 'receiving' : 'none', Date.now() - (this.mtrAt || 0) < 1500 ? '#a6e39c' : '#ff9a8a')}
               </div>`; })()}
             <button disabled=${c.status !== 'connected'} onClick=${() => this.setLive(!c.live)} aria-pressed=${String(!!c.live)}
               style=${`height:78px;flex:none;border-radius:14px;cursor:${c.status === 'connected' ? 'pointer' : 'default'};display:flex;align-items:center;gap:16px;padding:0 22px;font-family:inherit;text-align:left;transition:box-shadow .3s,background .3s;${c.live
