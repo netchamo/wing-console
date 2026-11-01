@@ -1450,19 +1450,21 @@ class App extends Component {
     if (GID[p] === undefined) this.logLine('in', 'monitor setting from desk: ' + p + ' (' + e.t + ')');
     GID[p] = e.id; WREV.set(e.id, [-1, p]);
     DEFG[p] = { t: e.t, a: e.a, b: e.b, n: e.n, i: e.i, li: e.li, l: e.lname || e.name, u: UNITS[e.u] || '' };
-    if (/\/dir\//.test(p) && !this.dirLogged) { this.dirLogged = true; this.logLine('in', 'monitor direct input found: ' + p.replace(/\/[^/]+$/, '')); }
+    if (/\/dir/.test(p) && !this.dirLogged) { this.dirLogged = true; this.logLine('in', 'monitor direct input found: ' + p.replace(/\/[^/]+$/, '')); }
     clearTimeout(this.monDT); this.monDT = setTimeout(() => { this.reqIds(Object.keys(DEFG).filter(k => k.startsWith('/cfg/mon/')).map(k => GID[k])); this.setState({ modelsV: Date.now() }); }, 150);
   }
   /* the direct input exists from firmware 3.1 and is not in the app's table: the desk describes it; ask again until it has */
   dirRetry() {
     clearTimeout(this.dirT);
     this.dirT = setTimeout(() => { if (!this.isLinked() || this.state.screen !== 'mon') return;
-      if (Object.keys(GID).some(p => /^\/cfg\/mon\/\d\/dir\//.test(p))) return;
+      if (Object.keys(GID).some(p => /^\/cfg\/mon\/\d\/dir/.test(p))) return;
       if ((this.dirTry = (this.dirTry || 0) + 1) > 4) { this.logLine('sys', 'desk did not describe a monitor direct input; monitor nodes known: ' + Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).join(', ')); this.setState({ modelsV: Date.now() }); return; }
       this.reqDef(Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).map(p => GNID[p])); this.dirRetry(); }, 1500);
   }
   monMeta(p) { const mm = metaOf(-1, p); if (mm.t) return mm;
-    if (/dir\/lvl$/.test(p)) return { t: 'fdr', u: 'dB' }; if (/dir\/on$/.test(p)) return { t: 'int', a: 0, b: 1 }; return {}; }
+    if (/dir\/?lvl$/.test(p)) return { t: 'fdr', u: 'dB' }; if (/dir\/?on$/.test(p)) return { t: 'int', a: 0, b: 1 }; return {}; }
+  /* firmware 3.1 names them dirin / diron / dirlvl; the app's demo uses dir/in … */
+  monDir(m, k) { const a = `/cfg/mon/${m}/dir${k}`, b = `/cfg/mon/${m}/dir/${k}`; return GID[a] !== undefined ? a : GID[b] !== undefined ? b : this.isLinked() ? a : b; }
   monN(p, v) {   // value -> 0..1 along its control
     const m = this.monMeta(p);
     if (m.t === 'fdr') return posOf(+v);
@@ -1593,7 +1595,7 @@ class App extends Component {
   }
   renderMon(Hd) {
     const st = this.state, m = st.monTab || 1, P = k => `/cfg/mon/${m}/${k}`, M = st.monv;
-    const hasDir = !this.isLinked() || GID[P('dir/in')] !== undefined || Object.keys(GID).some(p => p.startsWith(`/cfg/mon/${m}/dir/`));
+    const hasDir = !this.isLinked() || Object.keys(GID).some(p => p.startsWith(`/cfg/mon/${m}/dir`)), PD = k => this.monDir(m, k);
     const lvl = +M[P('$lvl')], lvN = posOf(isNaN(lvl) ? -144 : lvl), FH = Hd - 60 - 150, T = FH - 44;
     const sel = st.monBand ?? 3, B = MON_BANDS[sel];
     const tabs = html`<div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
@@ -1606,7 +1608,7 @@ class App extends Component {
       <span style="flex:1;min-width:0;font-size:21px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${text}</span>
       <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke=${col} stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
     const pickSrc = () => this.setState({ monPick: 'src' }), pickDir = () => this.setState({ monPick: 'dir' });
-    const dirOn = +M[P('dir/on')] === 1;
+    const dirOn = +M[PD('on')] === 1;
     const eqBlock = (W, H, big) => html`
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:15px;font-weight:700;letter-spacing:.14em;color:#cbbd9f">EQ</span>
@@ -1649,9 +1651,9 @@ class App extends Component {
           ${card('SOURCE', html`${bigBtn('Source', this.monSrcText(M[P('src')]), pickSrc)}
             ${this.mbar(P('srclvl'), 'Source level', '', '#c9a25a', 46)}`, '', 'מקור')}
           ${card('DIRECT IN', hasDir ? html`<div style="display:flex;gap:8px;align-items:stretch">
-              <div style="flex:1;min-width:0">${bigBtn('Direct in', this.dirText(M[P('dir/in')] ?? 'OFF'), pickDir, '#4fc9b7')}</div>
-              <button onClick=${() => this.monSet(P('dir/on'), dirOn ? 0 : 1)} aria-pressed=${String(dirOn)} style=${`width:64px;border-radius:9px;font-weight:800;font-size:15px;cursor:pointer;${dirOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${dirOn ? 'ON' : 'OFF'}</button></div>
-            ${!this.isLinked() || GID[P('dir/lvl')] !== undefined ? this.mbar(P('dir/lvl'), 'Direct level', 'ערוץ אחד שנכנס ישר בנוסף למקור, בלי לבזבז באס', '#4fc9b7', 46) : ''}`
+              <div style="flex:1;min-width:0">${bigBtn('Direct in', this.dirText(M[PD('in')] ?? 'OFF'), pickDir, '#4fc9b7')}</div>
+              <button onClick=${() => this.monSet(PD('on'), dirOn ? 0 : 1)} aria-pressed=${String(dirOn)} style=${`width:64px;border-radius:9px;font-weight:800;font-size:15px;cursor:pointer;${dirOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${dirOn ? 'ON' : 'OFF'}</button></div>
+            ${!this.isLinked() || GID[PD('lvl')] !== undefined ? this.mbar(PD('lvl'), 'Direct level', 'ערוץ אחד שנכנס ישר בנוסף למקור, בלי לבזבז באס', '#4fc9b7', 46) : ''}`
             : html`<div dir="rtl" style="display:flex;align-items:center;gap:10px;font-family:'Heebo',sans-serif">
               <span style="flex:1;font-size:14px;line-height:1.4;color:#a89d88">${(this.dirTry || 0) > 4 ? 'המיקסר עוד לא תיאר את הכניסה הישירה לאפליקציה.' : 'קורא את הכניסה הישירה מהמיקסר…'}</span>
               <button onClick=${() => { this.dirTry = 0; this.reqDef(Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).map(p => GNID[p])); this.dirRetry(); this.setState({ modelsV: Date.now() }); }}
@@ -1683,7 +1685,7 @@ class App extends Component {
         <div class="pop" style=${`z-index:21;left:16px;top:12px;width:${DW - 32}px;height:${Hd - 24}px;padding:14px 18px;gap:10px;border-color:#8a6a3a`}>${eqBlock(DW - 32 - 36 - 4, Hd - 24 - 28 - 46 - 70 - 30, true)}</div>`}`;
   }
   renderMonPick(Hd, m) {
-    const st = this.state, P = k => `/cfg/mon/${m}/${k}`, isSrc = st.monPick === 'src', key = P(isSrc ? 'src' : 'dir/in');
+    const st = this.state, P = k => `/cfg/mon/${m}/${k}`, isSrc = st.monPick === 'src', key = isSrc ? P('src') : this.monDir(m, 'in');
     const meta = this.monMeta(key), items = meta.i || (isSrc ? [] : ['OFF', ...Array.from({ length: 40 }, (_, k) => 'CH.' + (k + 1)), ...Array.from({ length: 8 }, (_, k) => 'AUX.' + (k + 1))]);
     const cur = st.monv[key], close = () => this.setState({ monPick: null });
     const lbl = x => isSrc ? this.monSrcText(x) : this.dirText(x);
