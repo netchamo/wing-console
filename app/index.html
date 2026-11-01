@@ -470,7 +470,8 @@ class App extends Component {
       try { NATIVE.ready(); } catch (e) {}
       this.pv = setInterval(() => this.pollTick(), 200);
       const ip = this.state.conn.ip;
-      setTimeout(() => { const me = this.myAddr(); if (ip && this.sameNet(me, ip) !== false) this.nConnect(ip); else { this.autoPick = true; this.nDiscover(); } }, 400);
+      /* Always look around first: the mixer is known by its serial number, not its address, so a new address or another mixer is found too. Meanwhile the last address is tried at once. */
+      setTimeout(() => { const me = this.myAddr(); this.startScan = true; this.nDiscover(); if (ip && this.sameNet(me, ip) !== false) this.nConnect(ip); }, 400);
     }
   }
 
@@ -646,6 +647,15 @@ class App extends Component {
         continue;
       }
       if (e.type === 'discoverDone') { const c = C(); c.searching = false; c.searched = Date.now(); c.foundNone = !e.count; if (!e.count) this.logLine('sys', 'no mixer answered');
+        if (this.startScan) { this.startScan = false; this.autoPick = false;
+          if (c.status !== 'connected') {
+            let known = null; try { known = JSON.parse(localStorage.getItem('wing.mixer') || 'null'); } catch (_) {}
+            const pick = (known && c.found.find(f => f.serial && f.serial === known.serial)) || (c.found.length === 1 ? c.found[0] : null);
+            if (pick) { if (pick.ip !== c.ip || c.status !== 'connecting') { this.logLine('sys', 'connecting to ' + (pick.name || 'WING') + ' at ' + pick.ip); setTimeout(() => this.nConnect(pick.ip), 50); } }
+            else if (c.found.length > 1) { setTimeout(() => { this.setState({ connPop: true }); this.toast('נמצאו כמה מיקסרים. בחר לאיזה להתחבר'); }, 50); }
+            else if (c.ip && c.status !== 'connecting') setTimeout(() => this.nConnect(c.ip), 50);
+          }
+          continue; }
         if (this.autoPick) { this.autoPick = false; if (!e.count && c.ip && c.status !== 'connected') setTimeout(() => this.nConnect(c.ip), 50); } continue; }
       if (e.type === 'status') { const c = C(); if (e.status === 'idle') c.status = 'demo'; else if (e.status === 'error') { c.status = 'demo'; this.toast(e.detail); } continue; }
       if (e.type === 'update') { C().update = true; continue; }
@@ -653,7 +663,8 @@ class App extends Component {
     }
     if (osc.length) {
       const c = C(); c.lastRx = Date.now();
-      if (c.status !== 'connected') { c.status = 'connected'; this.logLine('sys', 'mixer is answering'); }
+      if (c.status !== 'connected') { c.status = 'connected'; this.logLine('sys', 'mixer is answering');
+        const f = (c.found || []).find(x => x.ip === c.ip); if (f) { try { localStorage.setItem('wing.mixer', JSON.stringify({ serial: f.serial, name: f.name, ip: f.ip })); } catch (_) {} } }
     }
     // OSC answers for faders and mutes also update what the app knows of the desk
     for (const m of osc) { const mm = /^\/(ch|aux|main)\/(\d+)\/(fdr|mute)$/.exec(m.address); if (!mm) continue;
@@ -3987,6 +3998,7 @@ class App extends Component {
   /* ---------- mixer connection ---------- */
   connLook() {
     const c = this.state.conn;
+    if (NATIVE && c.status !== 'connected' && c.status !== 'connecting' && (c.found || []).length) return { dot: '#5fa8ff', text: (c.found.length > 1 ? c.found.length + ' MIXERS FOUND' : (c.found[0].name || 'WING') + ' FOUND') + ' · TAP', border: '#3a6a9a', fg: '#cfe6ff' };
     if (!NATIVE || c.status === 'demo') return { dot: '#e8a33d', text: c.searching ? 'SEARCHING…' : 'DEMO · NOT CONNECTED', border: '#6a4a2a', fg: '#f3c27a' };
     if (c.status === 'connecting') return { dot: '#e8a33d', text: 'DEMO · SEARCHING…', border: '#6a4a2a', fg: '#f3c27a' };
     if (c.status === 'lost') return { dot: '#e0513f', text: 'DEMO · NO ANSWER', border: '#7a2a22', fg: '#ff9a8a' };
