@@ -99,6 +99,8 @@ for p, r in by.items():
         G[p] = r
     elif p.startswith('/$syscfg/') and parts[2] in ('consolename', '$firmware', '$serial', '$cnsmdl', '$hwversion', 'ipmode', 'ip0', 'ip1', 'ip2', 'ip3', 'opt_mod'):
         G[p] = r
+    elif p in ('/$stat/time', '/$stat/date', '/$stat/lock', '/$stat/ppm', '/$globals/clksrc', '/$globals/clkrate', '/$ctl/$globals/timefmt', '/$ctl/$globals/datefmt', '/$ctl/$globals/$savenow'):
+        G[p] = r
     elif p in ('/cards/$type', '/cards/$ver') or (p.startswith('/$ctl/cfg/lights/') and r.get('type') != 'node'):
         G[p] = r
     elif (p.startswith('/cfg/mon/1/') or p.startswith('/cfg/mon/2/')) and r.get('type') != 'node' and p.split('/')[-1] not in ('tags', '$lvlact'):
