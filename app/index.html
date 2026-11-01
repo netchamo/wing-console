@@ -351,6 +351,12 @@ const infoOf = (slot, code) => {
   if (isDeq(code)) return MODEL_INFO.DEQ;
   return null;
 };
+/* the Hebrew date, with Hebrew letters for the day and year */
+const gem = n => { const L = [[400, 'ת'], [300, 'ש'], [200, 'ר'], [100, 'ק'], [90, 'צ'], [80, 'פ'], [70, 'ע'], [60, 'ס'], [50, 'נ'], [40, 'מ'], [30, 'ל'], [20, 'כ'], [10, 'י'], [9, 'ט'], [8, 'ח'], [7, 'ז'], [6, 'ו'], [5, 'ה'], [4, 'ד'], [3, 'ג'], [2, 'ב'], [1, 'א']];
+  let o = ''; n = n % 1000; for (const [v, c] of L) while (n >= v) { if (n === 15) { o += 'טו'; n = 0; break; } if (n === 16) { o += 'טז'; n = 0; break; } o += c; n -= v; }
+  return o.length > 1 ? o.slice(0, -1) + '״' + o.slice(-1) : o + '׳'; };
+const hebDate = d => { try { const P = new Intl.DateTimeFormat('he-IL-u-ca-hebrew', { day: 'numeric', month: 'long', year: 'numeric' }).formatToParts(d), g = t => (P.find(x => x.type === t) || {}).value;
+  return gem(+g('day')) + ' ' + g('month') + ' ' + gem(+g('year')); } catch (_) { return ''; } };
 const KNOB_D = { S: 60, M: 78, L: 98, XL: 122 };
 /* newer models are found by name when their code is not one the app knows */
 const faceKey = (slot, code) => { if (FACES[code]) return code; const n = (MODEL_NAMES[slot][code] || code || '').toUpperCase();
@@ -1271,7 +1277,7 @@ class App extends Component {
               onClick=${() => { if (this.plLong) { this.plLong = false; return; } this.setState({ screen: 'rec', recView: 'play', recAnim: false }); }}>${IC.player}<span>Player</span></button>
           <button class="navbtn" aria-label="Recorder" onClick=${() => this.setState({ screen: 'rec', recView: 'rec', recAnim: false })} style=${this.state.rec && this.state.rec.state === 'REC' ? 'background:#3a1412;border-color:#ff3b2f;color:#ffb0a8;box-shadow:0 0 12px rgba(255,59,47,.45)' : ''}>
             <span style=${`width:20px;height:20px;border-radius:50%;background:${this.state.rec && this.state.rec.state === 'REC' ? '#ff3b2f' : '#8a2a22'};box-shadow:${this.state.rec && this.state.rec.state === 'REC' ? '0 0 10px #ff3b2f' : 'none'}`}></span><span>Rec</span></button>
-            <button class="navbtn" onClick=${() => this.setState({ screen: 'fx' })}>${IC.fx}<span>FX</span></button>
+            <button class="navbtn" aria-label="FX rack" onClick=${() => this.setState({ screen: 'fx' })}><span style="font:italic 900 27px/1 'Futura','Avenir Next','Arial Black',sans-serif;letter-spacing:.02em;background:linear-gradient(180deg,#ffe6b0,#c9a25a 70%,#8a6a3a);-webkit-background-clip:text;background-clip:text;color:transparent;text-transform:none;filter:drop-shadow(0 1px 0 rgba(0,0,0,.6))">FX</span></button>
             <button class="navbtn" onClick=${() => this.setState({ screen: 'osc' })}>${IC.osc}<span>Osc</span></button>
           <button class="navbtn" onClick=${() => this.setState({ screen: 'mon' })}>${IC.phones}<span>Phones</span></button>
           <button class="navbtn" onClick=${() => this.setState({ screen: 'routing' })}>${IC.route}<span>Routing</span></button>
@@ -2583,7 +2589,7 @@ class App extends Component {
     const card = M['/cards/$type'] ? M['/cards/$type'] + (M['/cards/$ver'] ? ' ' + M['/cards/$ver'] : '') : '';
     const rows = [['שם המיקסר', M['/$syscfg/consolename'] || f.name], ['דגם', M['/$syscfg/$cnsmdl'] || f.model], ['כתובת IP', ip], ['גרסת תוכנה', M['/$syscfg/$firmware'] || f.fw], ['מספר סידורי', M['/$syscfg/$serial'] || f.serial], ['כרטיס הרחבה', card], ['גרסת חומרה', M['/$syscfg/$hwversion']]];
     return html`<section class="sec" style="gap:10px;padding:16px">
-      <span style="font-size:18px;font-weight:700;color:#e9dcc2">המיקסר</span>
+      <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">פרטי המיקסר</span>
       ${!this.isLinked() && html`<span style="font-size:15px;color:#9b927f">הפרטים יופיעו כשהאפליקציה מחוברת למיקסר.</span>`}
       <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
         ${rows.map(([k, v]) => html`<div style="display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:9px;background:#141210;border:1px solid #2c2721">
@@ -2599,8 +2605,8 @@ class App extends Component {
       .filter(([k], n) => this.isLinked() ? M[base + k] !== undefined : n < 7);
     const setAll = v => this.setState(s => { const m = { ...s.monv }; L.forEach(([k]) => { const g = WMAP.GM[base + k] || { a: 0, b: 100 }; if (k !== 'chlcdctr') m[base + k] = Math.round(clamp(v, g.a ?? 0, g.b ?? 100)); }); return { monv: m }; });
     return html`<section class="sec" style="gap:12px;padding:16px">
-      <div style="display:flex;align-items:center;gap:12px">
-        <span style="font-size:18px;font-weight:700;color:#e9dcc2">תאורת המיקסר</span><span style="flex:1"></span>
+      <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">תאורת המיקסר</span>
+      <div style="display:flex;align-items:center;justify-content:center;gap:12px">
         ${[['חושך מלא', 10], ['במה', 35], ['רגיל', 65], ['אור יום', 100]].map(([t, v]) => html`<button class="pill" style="height:40px;padding:0 16px;font-family:'Heebo',sans-serif;font-size:15px" onClick=${() => setAll(v)}>${t}</button>`)}
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
@@ -2795,18 +2801,21 @@ class App extends Component {
     clearTimeout(this.clkT); this.clkT = setTimeout(() => { if (this.state.screen === 'settings') this.setState({ clk: Date.now() }); }, 1000 - (Date.now() % 1000) + 20);
     const st = this.state, M = st.monv, d = this.deskNow(), h24 = M['/$ctl/$globals/timefmt'] !== '12H', dmy = M['/$ctl/$globals/datefmt'] !== 'YMD';
     const p2 = x => String(x).padStart(2, '0'), H = h24 ? d.getHours() : ((d.getHours() + 11) % 12) + 1;
+    const hold = () => { clearTimeout(this.dtT); this.dtT = setTimeout(() => { try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} const n = this.deskNow(); this.setState({ dtEdit: { date: `${n.getFullYear()}-${p2(n.getMonth() + 1)}-${p2(n.getDate())}`, time: `${p2(n.getHours())}:${p2(n.getMinutes())}` } }); }, 550); };
+    const unhold = () => clearTimeout(this.dtT);
     const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'], months = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
     const seg = (key, opts) => html`<div dir="ltr" style="display:flex;padding:3px;gap:3px;border-radius:9px;background:#0c0b0a;border:1px solid #2c2721">
       ${opts.map(([v, l]) => html`<button onClick=${() => this.monSet(key, v)} aria-pressed=${String((M[key] || opts[0][0]) === v)} style=${`height:34px;padding:0 12px;border-radius:6px;border:none;font:700 13px/1 var(--mono);cursor:pointer;${(M[key] || opts[0][0]) === v ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>${l}</button>`)}</div>`;
     return html`<section dir="ltr" style="display:flex;align-items:center;gap:22px;padding:12px 22px;border-radius:14px;background:radial-gradient(ellipse at 20% 0%,#2a2118,#141210 70%);border:1px solid #3a342c;box-shadow:inset 0 1px 0 rgba(255,255,255,.06)">
-      <div style="display:flex;align-items:baseline;gap:6px;padding:6px 16px;border-radius:10px;background:#07120c;border:1px solid #000;box-shadow:inset 0 2px 10px rgba(0,0,0,.9)">
+      <div role="button" aria-label="Time. Hold to edit" onPointerDown=${hold} onPointerUp=${unhold} onPointerCancel=${unhold} onPointerLeave=${unhold} style="cursor:pointer;display:flex;align-items:baseline;gap:6px;padding:6px 16px;border-radius:10px;background:#07120c;border:1px solid #000;box-shadow:inset 0 2px 10px rgba(0,0,0,.9)">
         <span style="font:700 52px/1 var(--mono);color:#ffcf7a;text-shadow:0 0 16px rgba(255,180,80,.55);letter-spacing:.02em">${p2(H)}<span style=${`opacity:${d.getSeconds() % 2 ? .25 : 1}`}>:</span>${p2(d.getMinutes())}</span>
         <span style="font:700 22px/1 var(--mono);color:#c9a25a">${p2(d.getSeconds())}</span>
         ${!h24 && html`<span style="font:700 14px/1 var(--mono);color:#c9a25a;margin-left:4px">${d.getHours() < 12 ? 'AM' : 'PM'}</span>`}
       </div>
-      <div style="display:flex;flex-direction:column;gap:4px">
+      <div role="button" aria-label="Date. Hold to edit" onPointerDown=${hold} onPointerUp=${unhold} onPointerCancel=${unhold} onPointerLeave=${unhold} style="cursor:pointer;display:flex;flex-direction:column;gap:4px">
         <span style="font:700 24px/1 var(--mono);color:#e9dcc2">${dmy ? `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}` : `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`}</span>
         <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#9b927f;text-align:left">יום ${days[d.getDay()]}, ${d.getDate()} ב${months[d.getMonth()]}</span>
+        <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#c9a25a;text-align:left">${hebDate(d)}</span>
       </div>
       <span style="flex:1"></span>
       ${seg('/$ctl/$globals/timefmt', [['24H', '24H'], ['12H', '12H']])}
@@ -2814,6 +2823,43 @@ class App extends Component {
       <button onClick=${() => this.syncClockFromPhone()} style="height:44px;display:flex;align-items:center;gap:8px;padding:0 16px;border-radius:10px;cursor:pointer;background:#1a1714;border:1px solid #8a6a3a;color:var(--brass-hi);font-weight:800;font-size:14px;letter-spacing:.08em">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M10 18h4"/></svg>SET FROM PHONE</button>
     </section>`;
+  }
+  renderClockHelp(Hd) {
+    const close = () => this.setState({ clkHelp: false });
+    const P = (t) => html`<span style="font-size:17px;line-height:1.6;color:#e9dcc2">${t}</span>`;
+    return html`<button class="scrim" style="z-index:20" aria-label="Close" onClick=${close}></button>
+      <div class="pop" dir="rtl" style=${`z-index:21;left:190px;top:14px;width:800px;max-height:${Hd - 28}px;overflow-y:auto;padding:22px 26px;gap:12px;border-color:#8a6a3a;font-family:'Heebo',sans-serif`}>
+        <span style="font-size:24px;font-weight:800;color:var(--brass-hi)">השעון של המיקסר</span>
+        ${P('כל ציוד דיגיטלי דוגם את הסאונד בקצב קבוע, למשל 48 אלף פעמים בשנייה. כשכמה מכשירים מחוברים יחד בחיבור דיגיטלי, כולם חייבים לדגום בדיוק באותו קצב, ולכן מכשיר אחד הוא "השעון הראשי" וכל השאר עוקבים אחריו.')}
+        <b style="font-size:18px;color:#f3e6cc">מה מומלץ בדרך כלל</b>
+        ${P('INTERNAL: ה־WING הוא השעון הראשי. זו ההגדרה הנכונה כמעט תמיד, גם כשיש סטייג׳ בוקס על AES50, כי הסטייג׳ בוקס מסתנכרן מהמיקסר.')}
+        <b style="font-size:18px;color:#f3e6cc">מתי בוחרים מקור חיצוני</b>
+        ${P('רק כשמכשיר אחר צריך להיות השעון הראשי והמיקסר צריך לעקוב אחריו. למשל: רשת דאנטה שבה מכשיר אחר מוגדר כמוביל, שני מיקסרים שחולקים סטייג׳ בוקס אחד, או מקור AES/EBU דיגיטלי שאי אפשר לשנות את השעון שלו.')}
+        <b style="font-size:18px;color:#f3e6cc">חשוב לדעת</b>
+        ${P('החלפת שעון או קצב דגימה גורמת לרגע של שקט או קליקים בכל היציאות. לא משנים את זה באמצע הופעה. אם הנורה מראה NOT LOCKED, המיקסר לא מצליח להסתנכרן למקור שנבחר, וכדאי לחזור ל־INTERNAL.')}
+        <button class="pill" style="align-self:flex-start;height:48px;padding:0 28px" onClick=${close}>הבנתי</button>
+      </div>`;
+  }
+  renderDtEdit(Hd) {
+    const e = this.state.dtEdit, close = () => this.setState({ dtEdit: null });
+    const send = () => {
+      const [y, mo, d] = e.date.split('-'), M = this.state.monv, dmy = M['/$ctl/$globals/datefmt'] !== 'YMD';
+      this.monSet('/$stat/time', e.time + ':00'); this.monSet('/$stat/date', dmy ? `${d}.${mo}.${y}` : `${y}-${mo}-${d}`); close();
+    };
+    const inp = 'height:64px;padding:0 16px;border-radius:12px;background:#0c0b0a;border:1.5px solid #8a6a3a;color:#ffd99a;font:700 28px/1 var(--mono);color-scheme:dark';
+    return html`<button class="scrim" style="z-index:20" aria-label="Close" onClick=${close}></button>
+      <div class="pop" dir="rtl" style=${`z-index:21;left:270px;top:${Math.max(16, Math.round((Hd - 330) / 2))}px;width:640px;padding:22px 24px;gap:16px;border-color:#8a6a3a;font-family:'Heebo',sans-serif`}>
+        <span style="font-size:23px;font-weight:800;color:var(--brass-hi)">שינוי השעה והתאריך במיקסר</span>
+        <div dir="ltr" style="display:flex;gap:14px">
+          <input type="time" value=${e.time} onInput=${ev => this.setState({ dtEdit: { ...e, time: ev.target.value } })} style=${inp + ';flex:1'}/>
+          <input type="date" value=${e.date} onInput=${ev => this.setState({ dtEdit: { ...e, date: ev.target.value } })} style=${inp + ';flex:1.4'}/>
+        </div>
+        <span style="font-size:14px;color:#9b927f">עוד לא נבדק מול מיקסר אמיתי שה־WING מקבל שינוי שעה מרחוק. אם השעה לא משתנה, השינוי נעשה במסך ההגדרות של המיקסר.</span>
+        <div style="display:flex;gap:12px">
+          <button class="pill" style="flex:1;height:52px;font-size:17px" onClick=${close}>ביטול</button>
+          <button onClick=${send} style="flex:1;height:52px;border-radius:10px;cursor:pointer;font-weight:800;font-size:17px;background:#c9a25a;color:#1a1405;border:none;font-family:'Heebo',sans-serif">שלח למיקסר</button>
+        </div>
+      </div>`;
   }
   renderClockSync() {
     const st = this.state, M = st.monv, src = M['/$globals/clksrc'] || 'INT', rate = +(M['/$globals/clkrate'] ?? 48000), locked = this.isLinked() ? +M['/$stat/lock'] === 1 : true, ppm = M['/$stat/ppm'];
@@ -2836,7 +2882,9 @@ class App extends Component {
           ${icon(src)}<span style="font-size:20px;font-weight:800;letter-spacing:.08em">${srcName}</span><span style="font-size:10px;font-weight:700;letter-spacing:.18em;opacity:.7">${ext ? 'EXTERNAL' : 'THIS CONSOLE'}</span></div>
         <div style="height:96px;min-width:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:12px;background:#141210;border:1px solid #3a342c">
           <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#9b927f">SAMPLE RATE</span><span style="font:800 28px/1 var(--mono);color:#e9dcc2">${rate === 44100 ? '44.1' : '48'}<span style="font-size:15px;color:#9b927f"> kHz</span></span></div>
-        <span style="flex:1"></span>
+        <button onClick=${() => this.setState({ clkHelp: true })} aria-label="What is the clock" style="height:96px;flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:0 16px;border-radius:12px;cursor:pointer;background:#141210;border:1px dashed #5a4630;color:#e9dcc2;text-align:right">
+          <span style="flex:none;width:40px;height:40px;border-radius:50%;border:2px solid #c9a25a;color:var(--brass-hi);font:italic 800 22px/36px Georgia,serif;text-align:center">i</span>
+          <span dir="rtl" style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-family:'Heebo',sans-serif"><b style="font-size:16px">מה זה השעון, ומתי בוחרים מקור חיצוני?</b><span style="font-size:13px;color:#9b927f">הסבר קצר והמלצה</span></span></button>
         <button onClick=${() => this.setState({ clkOpen: true, clkUnlock: false })} aria-label="Change clock" style="height:96px;width:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:12px;cursor:pointer;background:#141210;border:1px solid #5a4630;color:var(--brass-hi);font-weight:800;font-size:14px;letter-spacing:.12em">CHANGE
           <svg width="22" height="22" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div></section>`; }
@@ -2882,7 +2930,7 @@ class App extends Component {
   }
   renderPower() {
     return html`<section class="sec" style="gap:12px;padding:16px">
-      <span style="font-size:18px;font-weight:700;color:#e9dcc2">כיבוי ואיפוס</span>
+      <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">כיבוי ואיפוס</span>
       <div style="display:flex;gap:14px">
         ${this.holdBtn('off', 'SHUT DOWN', 'החזק עד שהריבוע מתמלא', '#e0513f', () => this.setState({ powerAsk: 'off' }))}
         ${this.holdBtn('init', 'INITIALIZE CONSOLE', 'החזק עד שהריבוע מתמלא', '#e8a33d', () => this.setState({ powerAsk: 'init' }))}
@@ -2901,7 +2949,7 @@ class App extends Component {
                 .map(t => html`<span style="display:flex;gap:10px"><i style=${`flex:none;width:8px;height:8px;margin-top:9px;border-radius:50%;background:${col}`}></i>${t}</span>`)}
             </div>
             <button onClick=${() => this.setState({ powerAsk: null, screen: 'lib' })} style="height:64px;display:flex;align-items:center;justify-content:center;gap:12px;border-radius:12px;cursor:pointer;background:linear-gradient(180deg,#2a3a26,#16221a);border:2px solid #62b85c;color:#d6f5dc;font-family:'Heebo',sans-serif;font-size:19px;font-weight:800">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg>קודם לשמור את המצב הנוכחי: לספרייה</button>`}
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></svg><span style="display:flex;flex-direction:column;align-items:center;gap:2px"><span>קודם לשמור את המצב הנוכחי: לספרייה</span><span style="font-size:13px;font-weight:500;color:#a6d8b0">שמירה מתאפשרת רק דרך המיקסר עצמו</span></span></button>`}
         <div style="display:flex;gap:12px;margin-top:4px">
           <button class="pill" style="flex:1;height:54px;font-size:18px" onClick=${close}>ביטול</button>
           <button onClick=${yes} style=${`flex:1;height:54px;border-radius:10px;cursor:pointer;font-weight:800;font-size:18px;background:${col};color:#1a0d05;border:none;font-family:'Heebo',sans-serif`}>${k === 'off' ? 'כן, לכבות' : 'כן, לאפס'}</button>
@@ -2973,45 +3021,43 @@ class App extends Component {
       </div>`;
   }
   /* the player's own channel fader, and one send of it */
-  vfader(id, v, set, H, col, label) {
+  vfader(id, v, set, H, col, label, dblTo = 0.75) {
     const T = H - 44;
-    return html`<button class="fader" style=${`height:${H}px;width:74px`} aria-label=${label + ' ' + dbText(v) + ' dB'}
-      onPointerDown=${e => { capture(e); if (this.dbl('vf' + id)) { set(0.75); return; } this.vf = { id, y: e.clientY, v0: v, px: e.currentTarget.getBoundingClientRect().height * T / H }; }}
+    return html`<button class="fader" style=${`height:${H}px;width:80px`} aria-label=${label + ' ' + dbText(v) + ' dB'}
+      onPointerDown=${e => { capture(e); if (this.dbl('vf' + id)) { set(dblTo); this.vf = null; return; } this.vf = { id, y: e.clientY, v0: v, px: e.currentTarget.getBoundingClientRect().height * T / H }; }}
       onPointerMove=${e => { const d = this.vf; if (!d || d.id !== id) return; set(clamp(d.v0 - (e.clientY - d.y) / d.px, 0, 1)); }}
       onPointerUp=${() => { this.vf = null; }} onPointerCancel=${() => { this.vf = null; }}>
+      ${[[1, '+10'], [0.75, '0'], [0.5, '-10'], [0.25, '-30'], [0, '-∞']].map(([q, l]) => { const c = Math.round((1 - q) * T + 22); return html`<span class="mk" style=${'top:' + (c - 7) + 'px'}>${l}</span><span class="tk" style=${'top:' + c + 'px'}></span>`; })}
       <span class="slot"></span>
       <span style=${`position:absolute;left:50%;width:4px;margin-left:-2px;bottom:22px;height:${Math.round(v * T)}px;border-radius:2px;background:${col};opacity:.5`}></span>
       <span class="cap" style=${'top:' + Math.round((1 - v) * T) + 'px'}></span></button>`;
   }
+  /* a name square over a fader: tap and long-press do different things */
+  nameSq(id, text, sub, col, dark, onTap, onHold) {
+    return html`<button aria-label=${text + (onHold ? '. Hold to change' : '')}
+      onPointerDown=${() => { this.nsLong = false; clearTimeout(this.nsT); if (onHold) this.nsT = setTimeout(() => { this.nsLong = true; try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} onHold(); }, 480); }}
+      onPointerUp=${() => clearTimeout(this.nsT)} onPointerCancel=${() => clearTimeout(this.nsT)} onPointerLeave=${() => clearTimeout(this.nsT)}
+      onClick=${() => { if (this.nsLong) { this.nsLong = false; return; } onTap(); }}
+      style=${`width:92px;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 4px;border-radius:9px;cursor:pointer;border:none;background:${col};color:${dark ? '#121110' : '#f3e6cc'};box-shadow:0 3px 8px rgba(0,0,0,.5)`}>
+      <span style="max-width:100%;font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${text}</span>
+      <span style="font-size:9.5px;font-weight:700;letter-spacing:.12em;opacity:.75">${sub}</span></button>`;
+  }
   playerFaders(Hd) {
-    const st = this.state, i = this.playerCh(), c = st.chans[i], k = st.prefs.playerSend ?? 0, sv = c.sends[k] || 0, son = (c.sendOn || [])[k] !== false, toMain = c.toMain !== false;
-    const H = Math.max(160, Hd - 52 - 24 - 270), col = k < 16 ? '#c9a25a' : '#4fc9b7';
-    return html`<div style="width:196px;flex:none;display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#0e0d0b;border:1px solid #2c2721">
-      <div style="display:flex;gap:4px">
-        <button onClick=${() => this.setState({ screen: 'home', eqCh: i })} aria-label=${'Edit ' + c.name}
-          style=${`flex:1;min-width:0;height:42px;border-radius:7px;border:none;cursor:pointer;font-weight:800;font-size:15px;color:#121110;background:${c.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 6px`}>${c.name}</button>
-        <button onClick=${() => this.setState({ plChPick: true })} aria-label="Choose the player channel" style="width:36px;height:42px;border-radius:7px;cursor:pointer;background:#141210;border:1px solid #3a342c;color:#cbbd9f">▾</button>
+    const st = this.state, i = this.playerCh(), c = st.chans[i], k = st.prefs.playerSend ?? 0, sv = c.sends[k] || 0, son = (c.sendOn || [])[k] !== false;
+    const H = Math.max(200, Hd - 52 - 24 - 200), col = k < 16 ? '#c9a25a' : '#4fc9b7';
+    return html`<div style="flex:none;display:flex;gap:10px;padding:10px;border-radius:14px;background:#0e0d0b;border:1px solid #2c2721">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        ${this.nameSq('pch', c.name, 'CHANNEL', c.color, true, () => this.setState({ screen: 'home', eqCh: i }), () => this.setState({ plChPick: true }))}
+        <span style="font-family:var(--mono);font-size:14px;color:var(--brass-hi)">${dbText(c.v)}</span>
+        ${this.vfader('pc', c.v, v => this.upd(i, { v }), H, '#c9a25a', c.name)}
+        <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)} style=${`width:92px;height:40px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b;box-shadow:0 0 12px rgba(208,57,43,.5)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
       </div>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-          <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">CHANNEL</span>
-          <span style="font-family:var(--mono);font-size:13px;color:var(--brass-hi)">${dbText(c.v)}</span>
-          ${this.vfader('pc', c.v, v => this.upd(i, { v }), H, '#c9a25a', c.name)}
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
-          <button onClick=${() => this.setState({ plSendPick: true })} style=${`max-width:86px;height:15px;padding:0;border:none;background:none;cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.1em;color:${col};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${this.busLabel(k).toUpperCase()} ▾</button>
-          <span style="font-family:var(--mono);font-size:13px;color:${col}">${dbText(sv)}</span>
-          ${this.vfader('ps', sv, v => this.setSend(i, k, v), H, col, 'Send to ' + this.busLabel(k))}
-        </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+        ${this.nameSq('psd', this.busLabel(k), k < 16 ? 'SEND · BUS ' + (k + 1) : 'SEND · MTX ' + (k - 15), `#1a1714;border:1.5px solid ${col}`, false, () => this.setState({ plSendPick: true }), () => this.setState({ plSendPick: true }))}
+        <span style=${`font-family:var(--mono);font-size:14px;color:${col}`}>${dbText(sv)}</span>
+        ${this.vfader('ps', sv, v => this.setSend(i, k, v), H, col, 'Send to ' + this.busLabel(k), 0)}
+        <button onClick=${() => this.setSendArr(i, 'sendOn', k, !son)} aria-pressed=${String(son)} style=${`width:92px;height:40px;border-radius:8px;font-weight:800;font-size:13px;cursor:pointer;${son ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${son ? 'ON' : 'OFF'}</button>
       </div>
-      <div style="display:flex;gap:4px">
-        <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)} style=${`flex:1;height:36px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
-        <button onClick=${() => this.setSendArr(i, 'sendOn', k, !son)} aria-pressed=${String(son)} style=${`flex:1;height:36px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;${son ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>SEND ${son ? 'ON' : 'OFF'}</button>
-      </div>
-      <button onClick=${() => { this.touch(i); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], toMain: !toMain }; return { chans }; }); }} aria-pressed=${String(toMain)}
-        style=${`height:44px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;${toMain ? 'background:#2a2014;border:1px solid var(--brass);color:var(--brass-hi)' : 'background:#1a1210;border:1px solid #e0513f;color:#ff9a8a'}`}>
-        <span style="font-size:12px;font-weight:800;letter-spacing:.12em">${toMain ? 'MAIN ON' : 'MAIN OFF'}</span>
-        <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:11px">${toMain ? 'נשמע גם במיין' : 'נשמע רק בשליחה'}</span></button>
     </div>`;
   }
   renderPlChPick(Hd) {
@@ -3169,8 +3215,8 @@ class App extends Component {
       style=${`width:${Math.round((w || 76) * 1.15)}px;height:74px;border-radius:12px;cursor:pointer;font-weight:800;font-size:19px;letter-spacing:.06em;display:flex;align-items:center;justify-content:center;
       background:${on ? (color || '#c9a25a') : 'linear-gradient(180deg,#3a342c,#201d19)'};color:${on ? '#140f08' : '#e9dcc2'};border:1px solid ${on ? (color || '#c9a25a') : '#4a4339'};box-shadow:${on ? '0 0 14px ' + (color || '#c9a25a') + '88' : 'inset 0 1px 0 rgba(255,255,255,.08),0 3px 6px rgba(0,0,0,.5)'}`}>${label}</button>`;
     const seg = (opts, val, set) => html`<div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">${opts.map(([v, l]) => html`<button onClick=${() => set(v)} aria-pressed=${String(val === v)} style=${`min-width:64px;height:38px;padding:0 10px;border-radius:7px;border:none;font-weight:700;font-size:15px;cursor:pointer;${val === v ? 'background:#c9a25a;color:#1a1405' : 'background:transparent;color:#cbbd9f'}`}>${l}</button>`)}</div>`;
-    const lcd = (txt, sub, color) => html`<div style="display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:8px;background:#0a0b07;border:1px solid #2a2a1c;box-shadow:inset 0 0 18px rgba(0,0,0,.8)">
-      <span style=${`font-family:var(--mono);font-size:46px;line-height:1;color:${color || '#f3c27a'};text-shadow:0 0 10px ${(color || '#f3c27a')}66`}>${txt}</span>
+    const lcd = (txt, sub, color, fs = 46) => html`<div style="display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:8px;background:#0a0b07;border:1px solid #2a2a1c;box-shadow:inset 0 0 18px rgba(0,0,0,.8)">
+      <span style=${`font-family:var(--mono);font-size:${fs}px;line-height:1;white-space:nowrap;color:${color || '#f3c27a'};text-shadow:0 0 10px ${(color || '#f3c27a')}66`}>${txt}</span>
       ${sub && html`<span style="font-family:var(--mono);font-size:13px;color:#9b927f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sub}</span>`}</div>`;
     const ml = this.realLv(48), mN = db => db === null ? 0 : clamp((db + 60) / 60, 0, 1);
     const M = linked && this.realM ? this.realM : null;
@@ -3178,6 +3224,8 @@ class App extends Component {
     const set = p => this.setState(s => ({ rec: { ...s.rec, ...p } }));
     const prog = P.total > 0 ? clamp(P.pos / P.total, 0, 1) : 0;
     const view = st.recView || 'play';
+    const WOOD = 'repeating-linear-gradient(90deg,rgba(0,0,0,.09) 0 2px,transparent 2px 9px),linear-gradient(90deg,#5a3418,#8a5530 14%,#6b3d1f 32%,#9a6236 56%,#5e3519 80%,#7a4826)';
+    const WOOD2 = 'repeating-linear-gradient(90deg,rgba(0,0,0,.12) 0 2px,transparent 2px 8px),linear-gradient(90deg,#3a2210,#6b4022 18%,#4a2c16 40%,#7a4e2a 62%,#3e2412 85%,#5a3820)';
     const side = to => { const toRec = to === 'rec', col = toRec ? '#ff4a3a' : '#62e07a';
       return html`<button onClick=${() => this.setState({ recView: to, recAnim: true })} aria-label=${toRec ? 'Go to the recorder' : 'Go to the player'}
         style=${`width:78px;flex:none;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:linear-gradient(${toRec ? '270deg' : '90deg'},${col}22,#141210 80%);border:1.5px solid ${col}88;color:#f3e6cc`}>
@@ -3197,32 +3245,34 @@ class App extends Component {
       <div style="flex:1;min-height:0;overflow:hidden;position:relative">
       <div style=${`display:flex;width:200%;height:100%;transform:translateX(${view === 'rec' ? '-50%' : '0'});transition:${st.recAnim ? 'transform .55s cubic-bezier(.65,0,.25,1)' : 'none'}`}>
         <div style="width:50%;height:100%;display:flex;gap:10px;padding:12px 14px">
-        <section class="sec" style="flex:1;min-width:0;flex-direction:row;gap:16px;background:linear-gradient(180deg,#2a2420,#171512)">
-          <div style="flex:1.2;min-width:0;display:flex;flex-direction:column;gap:12px;justify-content:space-between">
+        <section class="sec" style="flex:1;min-width:0;flex-direction:row;gap:14px;background:linear-gradient(180deg,#221e1a,#151311)">
+          <div style=${`flex:1.25;min-width:0;display:flex;padding:12px;border-radius:18px;background:${WOOD};box-shadow:0 10px 24px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.18),inset 0 -2px 0 rgba(0,0,0,.4)`}>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;justify-content:space-between;padding:12px 14px;border-radius:10px;position:relative;background:linear-gradient(180deg,#2c2a27,#1a1917 60%,#141312);box-shadow:inset 0 2px 8px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.06)">
+          ${['left:6px;top:6px', 'right:6px;top:6px', 'left:6px;bottom:6px', 'right:6px;bottom:6px'].map(p => html`<i style=${`position:absolute;${p};width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ddd,#777 60%,#333)`}></i>`)}
           <div style="display:flex;align-items:center;gap:10px">
             <span style=${`padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.12em;${playing ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#141210;color:#8a8170;border:1px solid #3a342c'}`}>${P.state}</span>
             <span style="flex:1"></span><span style="font-family:var(--mono);font-size:12px;color:#9b927f">${[P.format, P.rate && P.rate + ' kHz', P.res && P.res + ' bit', P.chans && P.chans + ' ch'].filter(Boolean).join(' · ')}</span></div>
-          <svg viewBox="0 0 420 148" style="width:100%;height:auto;max-height:${Math.max(100, Math.min(190, Hd - 400))}px" aria-hidden="true">
-            <rect x="4" y="6" width="412" height="136" rx="14" fill="#1b1814" stroke="#3a342c"/>
+          <svg viewBox="0 0 420 148" style="width:100%;height:auto;max-height:${Math.max(90, Math.min(170, Hd - 420))}px" aria-hidden="true">
+            <rect x="4" y="6" width="412" height="136" rx="14" fill="#11100e" stroke="#3a342c"/>
             ${reel(110, playing)}${reel(310, playing)}
             <path d="M 110 132 L 160 140 L 260 140 L 310 132" stroke="#4a3520" stroke-width="3" fill="none"/>
             <rect x="180" y="118" width="60" height="18" rx="3" fill="#2c2721"/>
           </svg>
-          ${lcd(t(P.pos) + ' / ' + t(P.total), (P.song || P.file || 'No song') + (P.artist ? ' · ' + P.artist : ''))}
-          <div style="height:8px;border-radius:4px;background:#0c0b0a;overflow:hidden;box-shadow:0 0 0 1px #2c2721"><div style=${`height:100%;width:${(prog * 100).toFixed(1)}%;background:linear-gradient(90deg,#8a6a3a,#f3c27a)`}></div></div>
-          <div style="display:flex;gap:8px;justify-content:center">
+          <div style="padding:6px;border-radius:10px;background:#0b0a09;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.08)">
+            ${lcd(t(P.pos) + ' / ' + t(P.total), (P.song || P.file || 'No song') + (P.artist ? ' · ' + P.artist : ''), null, 34)}
+            <div style="height:6px;margin:6px 4px 2px;border-radius:3px;background:#1a1816;overflow:hidden"><div style=${`height:100%;width:${(prog * 100).toFixed(1)}%;background:linear-gradient(90deg,#8a6a3a,#f3c27a)`}></div></div>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:center;align-items:center;padding:12px 10px;border-radius:12px;background:linear-gradient(180deg,#3a3734,#24221f);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -2px 4px rgba(0,0,0,.5)">
             ${tbtn('⏮', () => this.mxAction('/play/$action', 'PREV'))}
             <button onClick=${() => this.mxAction('/play/$action', playing ? 'STOP' : 'PLAY')} aria-pressed=${String(playing)} aria-label=${playing ? 'Stop' : 'Play'}
-              style=${`width:104px;height:104px;margin:-16px 4px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;border:5px solid #1a2a1a;
+              style=${`width:104px;height:104px;margin:-20px 6px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;border:5px solid #1a2a1a;
                 background:${playing ? 'radial-gradient(circle at 40% 35%,#9cf5b4,#3fae58 50%,#1d5a2a)' : 'radial-gradient(circle at 40% 35%,#4a6a4e,#24402a 55%,#122016)'};
                 box-shadow:${playing ? '0 0 30px 6px rgba(98,224,122,.5),inset 0 -5px 12px rgba(0,0,0,.35)' : '0 8px 20px rgba(0,0,0,.7),inset 0 -5px 12px rgba(0,0,0,.45),0 0 0 2px #2f5a35'};transition:all .25s`}>
               <svg width="44" height="44" viewBox="0 0 24 24">${playing ? html`<rect x="6" y="6" width="12" height="12" rx="2" fill="#0d1f10"/>` : html`<path d="M8 5 L19 12 L8 19 Z" fill="#d6f5dc"/>`}</svg></button>
-            ${tbtn('❚❚', () => this.mxAction('/play/$action', 'PAUSE'), P.state === 'PAUSE')}
             ${tbtn('⏭', () => this.mxAction('/play/$action', 'NEXT'))}
             ${tbtn('REPEAT', () => this.setState(s => ({ play: { ...s.play, repeat: !s.play.repeat } })), P.repeat, '#7aa7e0', 96)}
           </div>
-          </div>
-          ${this.playerFaders(Hd)}
+          </div></div>
           <div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:12px;background:#0e0d0b;border:1px solid #2c2721">
             <div style="display:flex;align-items:center;gap:8px"><span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">PLAYLIST</span>
               <span style="flex:1;min-width:0;font-family:var(--mono);font-size:13px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${P.list || '—'}</span>
@@ -3235,30 +3285,34 @@ class App extends Component {
               : html`<span dir="rtl" style="padding:8px;font-family:'Heebo',sans-serif;font-size:14px;line-height:1.5;color:#9b927f">${linked ? 'המיקסר עוד לא שלח את רשימת השירים של הפלייליסט הפעיל.' : 'כאן תופיע רשימת השירים של הפלייליסט שנטען במיקסר.'}</span>`}
             </div>
           </div>
+          ${this.playerFaders(Hd)}
         </section>
         ${side('rec')}
         </div>
         <div style="width:50%;height:100%;display:flex;gap:10px;padding:12px 14px">
         ${side('play')}
-        <section class="sec" style="flex:1;min-width:0;flex-direction:row;gap:16px;background:linear-gradient(180deg,#2a2020,#171212)">
-          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;justify-content:space-between">
+        <section class="sec" style="flex:1;min-width:0;flex-direction:row;gap:14px;background:linear-gradient(180deg,#221a1a,#151111)">
+          <div style=${`flex:1.15;min-width:0;display:flex;padding:12px;border-radius:18px;background:${WOOD2};box-shadow:0 10px 24px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.15),inset 0 -2px 0 rgba(0,0,0,.4)`}>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;justify-content:space-between;padding:12px 14px;border-radius:10px;position:relative;background:linear-gradient(180deg,#2e2b28,#1c1a18 60%,#151413);box-shadow:inset 0 2px 8px rgba(0,0,0,.8),inset 0 0 0 1px rgba(255,255,255,.06)">
+          ${['left:6px;top:6px', 'right:6px;top:6px', 'left:6px;bottom:6px', 'right:6px;bottom:6px'].map(p => html`<i style=${`position:absolute;${p};width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ddd,#777 60%,#333)`}></i>`)}
           <div style="display:flex;align-items:center;gap:10px">
             <span style=${`width:14px;height:14px;border-radius:50%;background:${recOn ? '#ff3b2f' : recPause ? '#e8a33d' : '#3a1714'};box-shadow:${recOn ? '0 0 14px #ff3b2f' : 'none'}`}></span>
             <span style="font-size:12px;font-weight:700;letter-spacing:.12em;color:#cbbd9f">${R.state}</span>
             <span style="flex:1"></span>${seg([['2', '2 CH'], ['4', '4 CH']], R.chans, v => set({ chans: v }))}${seg([['16', '16 bit'], ['24', '24 bit']], R.res, v => set({ res: v }))}</div>
-          <div style="display:flex;justify-content:center;align-items:center;gap:22px;padding:4px 0">
+          <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:2px 0">
+            <span></span>
             <button onClick=${() => this.mxAction('/rec/$action', 'REC')} aria-pressed=${String(recOn)} aria-label="Record"
-              style=${`width:${Math.max(120, Math.min(170, Hd - 430))}px;height:${Math.max(120, Math.min(170, Hd - 430))}px;border-radius:50%;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+              style=${`width:${Math.max(110, Math.min(160, Hd - 450))}px;height:${Math.max(110, Math.min(160, Hd - 450))}px;border-radius:50%;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
                 border:6px solid #2a1412;font:900 22px/1 sans-serif;letter-spacing:.14em;color:${recOn ? '#fff' : '#ffd0c8'};
                 background:${recOn ? 'radial-gradient(circle at 40% 35%,#ff8a7a,#ff2a1a 45%,#a8100a)' : 'radial-gradient(circle at 40% 35%,#b8463c,#7a1a14 55%,#3a0a08)'};
                 box-shadow:${recOn ? '0 0 40px 8px rgba(255,59,47,.6),inset 0 -6px 14px rgba(0,0,0,.4)' : '0 10px 24px rgba(0,0,0,.7),inset 0 -6px 14px rgba(0,0,0,.5),0 0 0 2px #5a2420'};transition:box-shadow .3s,background .3s`}>
               <span style="width:26px;height:26px;border-radius:50%;background:#fff;opacity:.9"></span>REC</button>
             <button onClick=${() => this.mxAction('/rec/$action', 'NEWFILE')} aria-label="New file, recording continues"
-              style="width:118px;height:118px;border-radius:22px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:linear-gradient(180deg,#2e2924,#1a1714);border:2px solid #8a6a3a;color:#f3e6cc;box-shadow:0 8px 18px rgba(0,0,0,.6)">
-              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#f3c27a" stroke-width="2"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg>
-              <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;font-weight:700;line-height:1.2;text-align:center">קובץ הקלטה<br/>חדש רציף</span></button>
+              style="justify-self:end;width:96px;height:96px;border-radius:18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:linear-gradient(180deg,#3a3734,#24221f);border:1.5px solid #8a6a3a;color:#f3e6cc;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 6px 14px rgba(0,0,0,.6)">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f3c27a" stroke-width="2"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></svg>
+              <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:12.5px;font-weight:700;line-height:1.2;text-align:center">קובץ הקלטה<br/>חדש רציף</span></button>
           </div>
-          <div style="display:flex;gap:10px;align-items:stretch">
+          <div style="display:flex;gap:10px;align-items:stretch;padding:6px;border-radius:10px;background:#0b0a09;box-shadow:inset 0 2px 8px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.08)">
             <div style="flex:1;min-width:0">${lcd(t(R.time), R.file || R.path || 'USB', recOn ? '#ff6b5a' : '#f3c27a')}</div>
             <div style="display:flex;gap:4px;padding:8px;border-radius:8px;background:#0a0b07;border:1px solid #2a2a1c">
               ${recLv.map((v, k) => html`<span style="width:14px;height:64px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:2px;background:#16140f;position:relative;overflow:hidden" aria-label=${'Record input ' + (k + 1)}>
@@ -3266,11 +3320,11 @@ class App extends Component {
                 <span style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,#0a0b07 2px 3px)"></span></span>`)}
             </div>
           </div>
-          <div style="display:flex;gap:8px;justify-content:center">
+          <div style="display:flex;gap:10px;justify-content:center;padding:10px;border-radius:12px;background:linear-gradient(180deg,#3a3734,#24221f);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -2px 4px rgba(0,0,0,.5)">
             ${tbtn('❚❚', () => this.mxAction('/rec/$action', 'PAUSE'), recPause, '#e8a33d')}
             ${tbtn('■', () => this.mxAction('/rec/$action', 'STOP'), R.state === 'STOP')}
           </div>
-          </div>
+          </div></div>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px;padding:10px;border-radius:12px;background:#0e0d0b;border:1px solid #2c2721">
           <div style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:700;letter-spacing:.14em;color:#b8a78a">RECORD SOURCE</span><span style="flex:1;height:1px;background:#2c2721"></span>
             <button class="small" style="height:34px;opacity:${st.recPrev ? 1 : 0.4}" disabled=${!st.recPrev} aria-label="Back to the sources before Main"
@@ -3800,7 +3854,7 @@ class App extends Component {
         ${this.renderClockSync()}
         ${this.renderLights()}
         <section class="sec" style="gap:12px;padding:16px">
-          <span style="font-size:18px;font-weight:700;color:#e9dcc2">כניסה לערוץ מהמיקסר</span>
+          <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">כניסה לערוץ מהמיקסר</span>
           <span style="font-size:15px;color:#9b927f">לאיזה מסך להגיע כשלוחצים על שם הערוץ במסך הראשי.</span>
           <div style="display:flex;gap:12px">
             ${opt(P.back !== 'last', 'מסך הבית של הערוץ', 'תמיד מתחילים מהסקירה של הערוץ.', () => this.setPref({ back: 'home' }))}
@@ -3809,6 +3863,7 @@ class App extends Component {
         </section>
         ${this.renderPower()}
       </div>
+      ${this.state.clkHelp && this.renderClockHelp(Hd)}${this.state.dtEdit && this.renderDtEdit(Hd)}
       ${this.state.powerAsk && this.renderPowerAsk(Hd)}${this.state.powerMsg && this.renderPowerMsg(Hd)}`;
   }
 
