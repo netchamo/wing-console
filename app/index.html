@@ -4028,10 +4028,9 @@ class App extends Component {
     const help = (() => {
       if (c.wifi === false) return ['bad', 'הטאבלט לא מחובר ל־Wi-Fi', 'בלי רשת אין דרך להגיע למיקסר.', ['לחצו על כפתור ה־Wi-Fi ובחרו את הרשת שהמיקסר מחובר אליה.']];
       if (linked) return ['ok', 'מחובר למיקסר', c.live ? 'שליטה חיה דלוקה: כל שינוי באפליקציה נשלח למיקסר.' : 'קריאה בלבד: רואים את המיקסר, ושום דבר לא נשלח אליו עד שמדליקים שליטה חיה.', []];
-      if (same === false) return ['bad', 'המיקסר שמור בכתובת מרשת אחרת', `הטאבלט נמצא ברשת ${net3}.x, והמיקסר שמור בכתובת ${c.ip}. מכשירים ברשתות שונות לא רואים זה את זה, ולכן אין חיבור.${c.searching ? ' מחפש עכשיו ברשת…' : ''}`, [
-        'לחצו "חפש מיקסרים". אם המיקסר מקבל כתובת מהראוטר הזה, הוא יימצא והאפליקציה תתחבר אליו לבד.',
-        `במיקסר: SETUP ← NETWORK. להדליק DHCP, או לקבוע כתובת שמתחילה ב־${net3}.`,
-        `או בטאבלט: בהגדרות ה־Wi-Fi של הרשת, לקבוע כתובת קבועה מאותה רשת של המיקסר, למשל ${c.ip.split('.').slice(0, 3).join('.')}.50.`]];
+      if (same === false) return ['bad', 'הכתובת של המיקסר בטווח אחר מזה של הטאבלט', `לפי אנדרואיד, הטאבלט קיבל כתובת ${myIp.split(',')[0]} והמיקסר בכתובת ${c.ip}. זה עובד רק אם הראוטר מעביר בין שני הטווחים, והאפליקציה מנסה דרכו.${c.searching ? ' מחפש עכשיו ברשת…' : ''}`, [
+        'כדאי לבדוק בפרטים למטה מה הראוטר שהטאבלט מחובר אליו. אם זה לא הראוטר של המיקסר, הטאבלט עבר לרשת אחרת, לרוב כי לרשת של המיקסר אין אינטרנט.',
+        `אם זה כן הראוטר של המיקסר, הראוטר מחלק כתובות בטווח ${net3}. ואז הכי פשוט לתת למיקסר כתובת מהטווח הזה, או להדליק בו DHCP.`]];
       if (c.searching) return ['wait', 'מחפש מיקסרים ברשת…', 'זה לוקח כמה שניות. אם יימצא מיקסר אחד, האפליקציה תתחבר אליו לבד.', []];
       if (c.status === 'connecting') return ['wait', 'מתחבר ל־' + c.ip + '…', 'מחכה לתשובה מהמיקסר.', []];
       if (c.status === 'lost') return ['bad', 'המיקסר לא עונה', 'האפליקציה ממשיכה לנסות לבד: מחפשת ברשת ומנסה שוב את הכתובת השמורה כל כמה שניות.', [
@@ -4057,12 +4056,6 @@ class App extends Component {
         </div>
         <div style="flex:1;min-height:0;display:flex;gap:14px">
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
-            <div dir="rtl" style=${`display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:12px;background:${HC[1]};border:1.5px solid ${HC[0]};font-family:'Heebo',sans-serif`}>
-              <span style=${`font-size:21px;font-weight:800;color:${HC[2]}`}>${help[1]}</span>
-              <span style="font-size:15px;line-height:1.45;color:#e2d6bd">${help[2]}</span>
-              ${help[3].length ? html`<ol style="margin:2px 0 0;padding-right:22px;display:flex;flex-direction:column;gap:3px;font-size:14.5px;line-height:1.45;color:#cfc3aa">${help[3].map(t => html`<li>${t}</li>`)}</ol>` : ''}
-              ${myIp && html`<span dir="ltr" style="align-self:flex-end;font-family:var(--mono);font-size:12.5px;color:#9b927f">this tablet ${myIp}${c.ip ? ' · mixer ' + c.ip : ''}</span>`}
-            </div>
             <div style="display:flex;gap:10px">
               <button onClick=${() => NATIVE.openWifi()} style=${big + ';width:200px;flex:none;background:linear-gradient(180deg,#24303a,#151c22);border:1.5px solid #5fa8ff;color:#cfe6ff'}>
                 <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.3" fill="currentColor"/></svg>WI-FI</button>
@@ -4079,6 +4072,17 @@ class App extends Component {
                 <span style="font-family:var(--mono);font-size:15px;color:#cbbd9f">${f.ip}</span>
                 <span style="flex:1"></span><span style="font-size:12px;color:#9b927f">${f.model} · ${f.fw}</span></button>`)}
             </div>
+            <div dir="rtl" style=${`display:flex;flex-direction:column;flex:none;gap:4px;padding:9px 14px;border-radius:10px;background:${HC[1]};border:1.5px solid ${HC[0]};font-family:'Heebo',sans-serif`}>
+              <span style=${`font-size:16px;font-weight:800;color:${HC[2]}`}>${help[1]}</span>
+              <span style="font-size:13.5px;line-height:1.4;color:#e2d6bd">${help[2]}</span>
+              ${help[3].length ? html`<ol style="margin:2px 0 0;padding-right:22px;display:flex;flex-direction:column;gap:3px;font-size:13px;line-height:1.4;color:#cfc3aa">${help[3].map(t => html`<li>${t}</li>`)}</ol>` : ''}
+            </div>
+            ${(() => { let N = []; try { N = JSON.parse(NATIVE.netInfo ? NATIVE.netInfo() : '[]'); } catch (e) {} if (!N.length && !myIp) return null;
+              const it = (k, v, col) => html`<span style="display:inline-flex;gap:5px;align-items:baseline"><span style="font-size:10.5px;font-weight:700;letter-spacing:.14em;color:#8f8676">${k}</span><span style=${`font-family:var(--mono);font-size:13px;color:${col || '#e2d6bd'}`}>${v}</span></span>`;
+              return html`<div style="flex:none;display:flex;flex-wrap:wrap;gap:6px 16px;padding:8px 12px;border-radius:10px;background:#0e0d0b;border:1px solid #2c2721">
+                ${N.length ? N.map(n => html`${it(n.kind === 'wifi' ? 'TABLET' : 'CABLE', n.addr + '/' + n.prefix)}${it('ROUTER', n.gw || '—')}${it('INTERNET', n.internet ? 'yes' : 'no', n.internet ? '#a6e39c' : '#f3c27a')}`) : it('TABLET', myIp)}
+                ${c.ip && it('MIXER', c.ip + (same === false ? ' · other range' : same ? ' · same range' : ''), same === false ? '#ff9a8a' : same ? '#a6e39c' : null)}
+              </div>`; })()}
             <button disabled=${c.status !== 'connected'} onClick=${() => this.setLive(!c.live)} aria-pressed=${String(!!c.live)}
               style=${`height:78px;flex:none;border-radius:14px;cursor:${c.status === 'connected' ? 'pointer' : 'default'};display:flex;align-items:center;gap:16px;padding:0 22px;font-family:inherit;text-align:left;transition:box-shadow .3s,background .3s;${c.live
                 ? 'background:radial-gradient(ellipse at 20% 50%,#3d7a3a,#18331a 70%);border:2px solid #7ee07a;color:#eaffe6;box-shadow:0 0 28px rgba(98,224,122,.55),inset 0 0 18px rgba(160,255,150,.25)'

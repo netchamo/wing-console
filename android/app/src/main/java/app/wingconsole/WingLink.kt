@@ -152,6 +152,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         return (if (t != null) ifs.firstOrNull { contains(it, t) } else null)?.net
     }
 
+    @Volatile private var routedLogAt = 0L
     @Volatile private var lastErrAt = 0L
     /** A send failed (e.g. the network went away): drop the socket so the next send binds again. */
     private fun sendFailed(e: Throwable) {
@@ -172,6 +173,20 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     }
 
     fun wifiAvailable() = localIfaces().isNotEmpty()
+
+    /** Each local network: address, router, whether Android found internet on it, and which one the app uses. */
+    fun netInfo(): String {
+        val arr = JSONArray()
+        for (i in localIfaces()) {
+            val lp = cm.getLinkProperties(i.net)
+            val gw = lp?.routes?.firstOrNull { it.isDefaultRoute && it.gateway is Inet4Address }?.gateway?.hostAddress ?: ""
+            val caps = cm.getNetworkCapabilities(i.net)
+            arr.put(JSONObject().put("kind", i.kind).put("addr", i.addr.hostAddress).put("prefix", i.prefix).put("gw", gw)
+                .put("internet", caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true)
+                .put("pinned", i.net == pinned).put("iface", lp?.interfaceName ?: ""))
+        }
+        return arr.toString()
+    }
 
     /** Every local address of this device, e.g. "192.168.0.23/24, 10.87.141.5/24"; "" when none. */
     fun wifiAddress(): String = localIfaces().joinToString(", ") { "${it.addr.hostAddress}/${it.prefix}" }
@@ -215,7 +230,7 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
             s.soTimeout = 300
             val probe = "WING?".toByteArray(Charsets.US_ASCII)
             val targets = LinkedHashSet<InetAddress>()
-            if (hint != null && contains(iface, hint)) targets.add(hint)
+            if (hint != null) targets.add(hint)
             targets.add(broadcastOf(iface))
             runCatching { InetAddress.getByName("255.255.255.255") }.getOrNull()?.let { targets.add(it) }
             val buf = ByteArray(512)
@@ -287,7 +302,13 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
         status("connecting", ip)
         thread(name = "wing-rx") { receiveLoop() }
         val t = target
-        meters.start(ip) { pickedAt = 0L; localNetFor(t) }
+        meters.start(ip) {
+            pickedAt = 0L
+            localNetFor(t) ?: (wifiNet ?: localIfaces().firstOrNull()?.net)?.also {
+                val now = System.currentTimeMillis()
+                if (now - routedLogAt > 10000) { routedLogAt = now; log("sys", "${t?.hostAddress} is outside this Wi-Fi's range (${wifiAddress()}); trying through the router") }
+            }
+        }
     }
 
     fun disconnect() {
