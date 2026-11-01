@@ -89,6 +89,8 @@ for p, r in by.items():
     parts = p.split('/')
     if p.startswith('/io/in/') and len(parts) == 6 and parts[5] in ('g', 'vph', 'mode', 'name', 'pol', 'mute', 'col') and not parts[3].startswith('$'):
         G[p] = r
+    elif p.startswith('/io/in/OSC/') and len(parts) == 7 and parts[5] == 'osc':
+        G[p] = r
     elif p.startswith('/io/out/') and len(parts) == 6 and parts[5] in ('grp', 'in'):
         G[p] = r
     elif (p.startswith('/play/') or p.startswith('/rec/')) and r.get('type') != 'node':
@@ -105,7 +107,7 @@ GIDS = {p: b36(r['id']) for p, r in G.items()}
 GMETA = {}
 for p, r in G.items():
     pp = p.split('/')
-    key = '/'.join(pp[:4] + ['*', pp[5]]) if p.startswith('/io/') else ('/fx/*/' + pp[3]) if p.startswith('/fx/') else p
+    key = '/'.join(pp[:4] + ['*'] + pp[5:]) if p.startswith('/io/') else ('/fx/*/' + pp[3]) if p.startswith('/fx/') else p
     GMETA.setdefault(key, meta(r))
 INCOUNT = {}
 for p in by:
