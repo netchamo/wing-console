@@ -500,7 +500,7 @@ class App extends Component {
       if (st.screen === 'rec' && ps.screen !== 'rec') this.reqStrip(this.playerCh(), 'all');
       if (st.screen === 'lib' && ps.screen !== 'lib') { this.reqG(['/$ctl/lib/']); this.reqDef([GID['/$ctl/lib/$scenes']]); }
       if (st.screen === 'settings' && ps.screen !== 'settings') this.reqG(['/$syscfg/', '/cards/', '/$ctl/cfg/lights/', '/$stat/', '/$globals/', '/$ctl/$globals/']);
-      if (st.screen === 'mon' && ps.screen !== 'mon') { this.reqG(['/cfg/mon/']); this.reqDef(Object.values(GNID));
+      if (st.screen === 'mon' && ps.screen !== 'mon') { this.reqG(['/cfg/mon/']); this.reqDef(Object.values(GNID)); this.dirTry = 0; this.dirRetry();
         clearTimeout(this.monLogT); this.monLogT = setTimeout(() => { const all = Object.keys(GID).filter(p => p.startsWith('/cfg/mon/')), got = all.filter(p => p in this.gx); this.logLine('sys', `monitor: desk reported ${got.length} of ${all.length} values` + (got.length < all.length ? ' · missing e.g. ' + all.filter(p => !(p in this.gx)).slice(0, 4).join(', ') : '')); }, 2500); }
       if (st.screen === 'rec' && ps.screen !== 'rec') { this.reqG(['/rec/', '/play/', '/io/out/REC/']); this.reqDef([GID['/play/$songs']]); }
       if (st.srcPop && (!ps.srcPop || ps.srcPop.grp !== st.srcPop.grp)) this.reqG([`/io/in/${wgrp(st.srcPop.grp)}/`]);
@@ -521,6 +521,8 @@ class App extends Component {
     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip || '')) { this.toast('הקלד את כתובת ה-IP של המיקסר, למשל 192.168.1.62'); return; }
     try { localStorage.setItem('wing.ip', ip); } catch (e) {}
     this.pollN = 0;
+    if (this.wasLive && ip === this.state.conn.ip) this.reLive = true; else this.reLive = false;
+    this.wasLive = false; this.rxAny = 0; this.reqQ = [];
     this.setState(st => ({ conn: { ...st.conn, ip, status: 'connecting', lastRx: 0, connAt: Date.now(), live: false } }));
     NATIVE.connect(ip);
   }
@@ -614,9 +616,11 @@ class App extends Component {
     if (!(c.status === 'connecting' || c.status === 'connected' || c.status === 'lost')) return;
     const now = Date.now();
     const sending = now - (this.lastSend || 0) < 400;
-    if (c.status === 'connected' && now - c.lastRx > 4000 && !sending) this.setState(s => ({ conn: { ...s.conn, status: 'lost' } }));
+    const heard = Math.max(c.lastRx || 0, this.rxAny || 0);
+    if (c.status === 'connected' && now - heard > 8000 && !sending) { this.lostAt = now; this.wasLive = c.live; this.logLine('sys', 'no data from the desk for 8 s'); this.setState(s => ({ conn: { ...s.conn, status: 'lost' } })); }
+    if (c.status === 'lost' && now - heard < 1500) { this.logLine('sys', 'desk is answering again'); this.setState(s => ({ conn: { ...s.conn, status: 'connected' } })); return; }
     if (c.status === 'connecting' && now - (c.connAt || now) > 6000 && !c.lastRx) this.setState(s => ({ conn: { ...s.conn, status: 'lost' } }));
-    if (c.status === 'lost' && !c.searching && now - (this.recAt || 0) > 12000) {
+    if (c.status === 'lost' && !c.searching && now - (this.lostAt || 0) > 6000 && now - (this.recAt || 0) > 12000) {
       this.recAt = now; this.recN = (this.recN || 0) + 1;
       if (this.recN % 2) { this.autoPick = true; this.logLine('sys', 'no answer, searching the network again'); this.nDiscover(); } else if (c.ip) { this.logLine('sys', 'trying ' + c.ip + ' again'); this.nConnect(c.ip); }
     }
@@ -637,6 +641,7 @@ class App extends Component {
     for (const e of list) {
       if (e.type === 'osc' && this.testAddr && e.address === this.testAddr) { const a = e.args || []; this.testRead = typeof a[2] === 'number' ? a[2] : a[0]; }
       if (e.type === 'osc') { const h = this.holdUntil && this.holdUntil[e.address]; if (!(h && Date.now() < h)) osc.push(e); else C().lastRx = Date.now(); continue; }
+      if (e.type === 'nat' || e.type === 'def' || e.type === 'meters') this.rxAny = Date.now();
       if (e.type === 'nat') { if (this.mxIn(e, dirty)) this.natAt = Date.now(); continue; }
       if (e.type === 'nativeOpen') { setTimeout(() => this.onNativeOpen(), 50); continue; }
       if (e.type === 'def') { this.defIn(e); continue; }
@@ -667,6 +672,7 @@ class App extends Component {
     if (osc.length) {
       const c = C(); c.lastRx = Date.now();
       if (c.status !== 'connected') { c.status = 'connected'; this.logLine('sys', 'mixer is answering');
+        if (this.reLive) { this.reLive = false; setTimeout(() => { if (this.isLinked() && this.canSend()) { NATIVE.setLive(true); this.setState(z => ({ conn: { ...z.conn, live: true } })); this.toast('החיבור חזר. שליטה חיה דלוקה שוב'); } }, 1500); }
         const f = (c.found || []).find(x => x.ip === c.ip); if (f) { try { localStorage.setItem('wing.mixer', JSON.stringify({ serial: f.serial, name: f.name, ip: f.ip })); } catch (_) {} } }
     }
     // OSC answers for faders and mutes also update what the app knows of the desk
@@ -798,12 +804,25 @@ class App extends Component {
      screen snaps back to the desk (live control off). Nothing the desk has not reported is ever sent. */
   mxReset() { this.mx = Array.from({ length: 76 }, () => ({})); this.gx = {}; this.sliceCh = -1; this.cfgSeen = new Set(); }
   canReq() { return !!NATIVE && typeof NATIVE.request === 'function'; }
-  reqIds(ids) { if (!this.canReq()) return; ids = ids.filter(Boolean); for (let k = 0; k < ids.length; k += 150) NATIVE.request(ids.slice(k, k + 150).join(',')); }
+  reqIds(ids, front) {
+    if (!this.canReq()) return; ids = ids.filter(Boolean); if (!ids.length) return;
+    const Q = this.reqQ || (this.reqQ = []), have = new Set(Q), add = ids.filter(x => !have.has(x));
+    this.reqQ = front ? [...add, ...Q.filter(x => !add.includes(x))] : [...Q, ...add];
+    if (!this.reqT) this.reqT = setTimeout(() => this.reqPump(), 0);
+  }
+  reqPump() {
+    this.reqT = null; const Q = this.reqQ || []; if (!Q.length || !this.canReq()) return;
+    NATIVE.request(Q.splice(0, 60).join(','));
+    if (Q.length) this.reqT = setTimeout(() => this.reqPump(), 45);
+  }
   reqStrip(s, which) {
     const core = ['mute', 'fdr', 'pan', 'wid', '$solo', 'name', 'col', 'icon', 'tags'];
     let list = which === 'core' ? core : which === 'slots' ? WS.filter(k => /^(gate|dyn)\//.test(k)) : WS;
     if (which !== 'core' && DYNID[s]) list = [...new Set([...list, ...Object.keys(DYNID[s])])];
-    this.reqIds(list.map(k => wid(s, k)));
+    /* what the open screen shows first: name, fader, EQ, the two dynamics slots */
+    const first = k => /^(mute|fdr|pan|name|col|icon|eq\/|flt\/|(gate|dyn)\/(on|mdl)$|proc$|main\/)/.test(k);
+    if (which === 'all') list = [...list.filter(first), ...list.filter(k => !first(k))];
+    this.reqIds(list.map(k => wid(s, k)), which !== 'core');
   }
   reqDef(ids) { if (!NATIVE || typeof NATIVE.requestDef !== 'function') return; ids = ids.filter(Boolean); if (ids.length) NATIVE.requestDef(ids.join(',')); }
   reqSlotDefs(s) { if (s < 40) this.reqDef([wid(s, 'gate/mdl'), wid(s, 'dyn/mdl'), wid(s, 'gate'), wid(s, 'dyn')]); else if (s >= 48) this.reqDef([wid(s, 'dyn/mdl'), wid(s, 'dyn')]); }
@@ -1434,6 +1453,14 @@ class App extends Component {
     if (/\/dir\//.test(p) && !this.dirLogged) { this.dirLogged = true; this.logLine('in', 'monitor direct input found: ' + p.replace(/\/[^/]+$/, '')); }
     clearTimeout(this.monDT); this.monDT = setTimeout(() => { this.reqIds(Object.keys(DEFG).filter(k => k.startsWith('/cfg/mon/')).map(k => GID[k])); this.setState({ modelsV: Date.now() }); }, 150);
   }
+  /* the direct input exists from firmware 3.1 and is not in the app's table: the desk describes it; ask again until it has */
+  dirRetry() {
+    clearTimeout(this.dirT);
+    this.dirT = setTimeout(() => { if (!this.isLinked() || this.state.screen !== 'mon') return;
+      if (Object.keys(GID).some(p => /^\/cfg\/mon\/\d\/dir\//.test(p))) return;
+      if ((this.dirTry = (this.dirTry || 0) + 1) > 4) { this.logLine('sys', 'desk did not describe a monitor direct input; monitor nodes known: ' + Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).join(', ')); this.setState({ modelsV: Date.now() }); return; }
+      this.reqDef(Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).map(p => GNID[p])); this.dirRetry(); }, 1500);
+  }
   monMeta(p) { const mm = metaOf(-1, p); if (mm.t) return mm;
     if (/dir\/lvl$/.test(p)) return { t: 'fdr', u: 'dB' }; if (/dir\/on$/.test(p)) return { t: 'int', a: 0, b: 1 }; return {}; }
   monN(p, v) {   // value -> 0..1 along its control
@@ -1566,7 +1593,7 @@ class App extends Component {
   }
   renderMon(Hd) {
     const st = this.state, m = st.monTab || 1, P = k => `/cfg/mon/${m}/${k}`, M = st.monv;
-    const hasDir = !this.isLinked() || GID[P('dir/in')] !== undefined;
+    const hasDir = !this.isLinked() || GID[P('dir/in')] !== undefined || Object.keys(GID).some(p => p.startsWith(`/cfg/mon/${m}/dir/`));
     const lvl = +M[P('$lvl')], lvN = posOf(isNaN(lvl) ? -144 : lvl), FH = Hd - 60 - 150, T = FH - 44;
     const sel = st.monBand ?? 3, B = MON_BANDS[sel];
     const tabs = html`<div style="display:flex;padding:3px;gap:3px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
@@ -1625,12 +1652,15 @@ class App extends Component {
               <div style="flex:1;min-width:0">${bigBtn('Direct in', this.dirText(M[P('dir/in')] ?? 'OFF'), pickDir, '#4fc9b7')}</div>
               <button onClick=${() => this.monSet(P('dir/on'), dirOn ? 0 : 1)} aria-pressed=${String(dirOn)} style=${`width:64px;border-radius:9px;font-weight:800;font-size:15px;cursor:pointer;${dirOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${dirOn ? 'ON' : 'OFF'}</button></div>
             ${!this.isLinked() || GID[P('dir/lvl')] !== undefined ? this.mbar(P('dir/lvl'), 'Direct level', 'ערוץ אחד שנכנס ישר בנוסף למקור, בלי לבזבז באס', '#4fc9b7', 46) : ''}`
-            : html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#8f8676">הכניסה הישירה קיימת מגרסה 3.1 של השולחן. היא תופיע כאן כשהשולחן ידווח עליה.</span>`, '', 'ערוץ כניסה נוסף')}
+            : html`<div dir="rtl" style="display:flex;align-items:center;gap:10px;font-family:'Heebo',sans-serif">
+              <span style="flex:1;font-size:14px;line-height:1.4;color:#a89d88">${(this.dirTry || 0) > 4 ? 'המיקסר עוד לא תיאר את הכניסה הישירה לאפליקציה.' : 'קורא את הכניסה הישירה מהמיקסר…'}</span>
+              <button onClick=${() => { this.dirTry = 0; this.reqDef(Object.keys(GNID).filter(p => p.startsWith('/cfg/mon/')).map(p => GNID[p])); this.dirRetry(); this.setState({ modelsV: Date.now() }); }}
+                style="height:40px;padding:0 14px;border-radius:8px;border:1px solid #4fc9b7;background:#10201e;color:#9fe8dc;font-family:inherit;font-weight:700;cursor:pointer">נסה שוב</button></div>`, '', 'ערוץ כניסה נוסף')}
           ${card('WHILE SOLO IS ON', html`${this.mbar(P('srcmix'), 'Mix under solo', 'כמה מהמקור נשמע מתחת לסולו. מינוס אינסוף: רק הסולו', '#7aa7e0', 46)}
             ${this.mbar(P('pfldim'), 'Solo dim', 'כמה יורדת העוצמה בזמן סולו', '#7aa7e0', 46)}`)}
         </div>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
-          ${eqBlock(DW - 290 - 300 - 14 * 2 - 24 - 36, Math.max(180, Hd - 60 - 24 - 46 - 92), false)}
+          ${eqBlock(DW - 290 - 300 - 14 * 2 - 24 - 36, Math.max(150, Math.round((Hd - 60 - 24 - 46 - 92) * 0.68)), false)}
         </div>
         <div style="width:300px;flex:none;display:flex;gap:10px">
           <div style="flex:none;display:flex;padding:6px 4px;border-radius:12px;border:1px solid #4a4036;background:linear-gradient(180deg,#1b1815,#121110);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 4px 12px rgba(0,0,0,.4)">${fader}</div>
