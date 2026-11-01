@@ -142,7 +142,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     @Volatile private var nout: OutputStream? = null
     private val wlock = Any()
 
-    fun isOpen() = nout != null
+    fun isOpen() = running && nout != null
 
     /** Writes raw native-protocol bytes on the open TCP link. Returns false when the link is not open. */
     fun write(bytes: ByteArray): Boolean {
@@ -159,9 +159,6 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         val my = gen
         thread(name = "wing-meters") { run(ip, netFor, my) }
     }
-
-    /** the full link is up and its loop is the current one */
-    fun isOpen() = running && nout != null
 
     fun stop() {
         gen++
