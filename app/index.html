@@ -394,7 +394,7 @@ class App extends Component {
   constructor() {
     super();
     this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', eqCh: 1,
-      chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, sofOn: false, sof: 0, monTab: 1, monv: { ...this.makeMon(), ...this.makeFx(), '/io/in/OSC/1/osc/mode': 'PINK', '/io/in/OSC/1/osc/f': 1000, '/io/in/OSC/1/osc/lvl': -20, '/io/in/OSC/2/osc/mode': 'SINE', '/io/in/OSC/2/osc/f': 1000, '/io/in/OSC/2/osc/lvl': -20 }, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]), cLv: [0, 0], cPk: [0, 0],
+      chans: makeChannels(), main: { v: 0.75, pan: 0, width: 1, swap: false, mute: false }, bank: 0, sofOn: false, sof: 0, monTab: 1, monv: { ...this.makeMon(), ...this.makeFx(), '/io/in/OSC/1/mute': 1, '/io/in/OSC/2/mute': 1, '/io/in/OSC/1/osc/mode': 'PINK', '/io/in/OSC/1/osc/f': 1000, '/io/in/OSC/1/osc/lvl': -20, '/io/in/OSC/2/osc/mode': 'SINE', '/io/in/OSC/2/osc/f': 1000, '/io/in/OSC/2/osc/lvl': -20 }, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]), cLv: [0, 0], cPk: [0, 0],
       panPop: null, sendPop: null, eq: makeEq(),
       lastTab: 'home', cfg: {}, srcs: {}, srcPop: null, balPop: null, cfgLv: [0, 0, 0],
       otherModel: { gate: 'E88', comp: 'B160' }, dragPop: false, connPop: false,
@@ -2611,10 +2611,49 @@ class App extends Component {
       </div></section>`;
   }
   /* ===================== oscillator: a test-signal player ===================== */
-  oscCh() {
-    const p = this.state.prefs.oscCh; if (p != null) return p;
-    for (let i = 0; i < 48; i++) { const cf = this.state.cfg[i]; if (cf && cf.main && cf.main.grp === 'OSC') return i; }
-    return 47;   // Aux 8 until one is chosen
+  /* each of the two generators plays through its own channel */
+  oscCh(n = 1) {
+    const p = this.state.prefs['oscCh' + n] ?? (n === 1 ? this.state.prefs.oscCh : null); if (p != null) return p;
+    for (let i = 0; i < 48; i++) { const cf = this.state.cfg[i]; if (cf && cf.main && cf.main.grp === 'OSC' && +cf.main.n === n) return i; }
+    return n === 1 ? 47 : 46;   // Aux 8 and Aux 7 until chosen
+  }
+  openOscGate(i) {
+    this.setState({ eqCh: i, dynSlot: 'gate', oscGate: true });
+    if (this.isLinked()) { this.reqStrip(i, 'all'); this.reqSlotDefs(i); setTimeout(() => this.setState(s2 => this.injectAll(s2, [i])), 0); }
+  }
+  renderOscGate(Hd, i) {
+    const st = this.state, c = st.chans[i], G = st.gate, sc = G.sc, close = () => this.setState({ oscGate: false });
+    const isWing = st.slots.gate === 'GATE', open = (G.sim && G.sim.gr < 3) || !G.on;
+    return html`<button class="scrim" aria-label="Close gate" onClick=${close}></button>
+      <div class="pop" style=${`left:90px;top:14px;width:1000px;height:${Hd - 28}px;padding:16px 20px;gap:12px;border-color:#8a6a3a`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${'background:' + c.color}>${c.name}</span>
+          <span style="font-size:24px;font-weight:700;letter-spacing:.04em">Gate</span>
+          <span style=${`display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;border:1px solid ${open ? '#62b85c' : '#4a2420'};font:700 13px/1 var(--mono);letter-spacing:.12em;color:${open ? '#a6e39c' : '#d48a80'}`}><i style=${`width:10px;height:10px;border-radius:50%;background:${open ? '#62e07a' : '#d0392b'};box-shadow:0 0 8px ${open ? '#62e07a' : '#d0392b'}`}></i>${open ? 'OPEN' : 'CLOSED'}</span>
+          <span style="flex:1"></span>
+          <button onClick=${() => this.updGate({ on: !G.on })} aria-pressed=${String(G.on)} style=${`width:80px;height:44px;border-radius:8px;font-weight:800;font-size:16px;cursor:pointer;${G.on ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${G.on ? 'ON' : 'OFF'}</button>
+          <button class="small" style="height:44px" onClick=${() => this.setState({ oscGate: false, screen: 'dyn' })}>FULL SCREEN</button>
+          <button class="small" style="height:44px;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)" onClick=${close}>DONE</button>
+        </div>
+        ${!isWing ? html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:17px;color:#cbbd9f">במקום הגייט של הערוץ הזה יושב עכשיו ${mName('gate', st.slots.gate)}. אפשר לפתוח אותו במסך מלא.</span>` : html`
+        <div dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#9b927f">דוגמה לסיידצ׳יין: סינוס של 60 הרץ בערוץ הזה, ומקור הטריגר הוא מיקרופון הקיק. הגייט ייפתח רק כשהקיק מכה.</div>
+        <div style="display:flex;gap:10px">
+          <button onClick=${() => this.setState({ chPick: true })} style="flex:1;height:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:10px;cursor:pointer;text-align:left;background:#100f0d;border:1.5px solid #4fc9b7">
+            <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#4fc9b7">KEY SOURCE · מי פותח את הגייט</span><span style="font-size:20px;font-weight:700;color:#f3e6cc">${this.keySrcName()} ›</span></button>
+          <button onClick=${() => this.setState({ keyPop: true })} style="flex:1;height:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:10px;cursor:pointer;text-align:left;background:#100f0d;border:1.5px solid #8fd3e0">
+            <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#8fd3e0">KEY FILTER · לאיזה תדר הוא מקשיב</span><span style="font-size:20px;font-weight:700;color:#f3e6cc">${!sc.on ? 'Flat' : (KEYT[sc.type] || sc.type) + ' · ' + fmtF(sc.f)} ›</span></button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          ${this.gbox('thr', 'Threshold', G.thr.toFixed(1) + ' dB', [-80, 0], '#f3c27a', 'height:96px')}
+          ${this.gbox('range', 'Range', G.range.toFixed(1) + ' dB', [3, 60], '#e0513f', 'height:96px')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+          ${this.gbox('att', 'Attack', G.att + ' ms', [0, 120], '#8cc47e', 'height:96px')}
+          ${this.gbox('hld', 'Hold', G.hld + ' ms', [0, 200], '#8cc47e', 'height:96px')}
+          ${this.gbox('rel', 'Release', G.rel + ' ms', [4, 4000, 1], '#8cc47e', 'height:96px')}
+        </div>`}
+      </div>
+      ${st.keyPop && this.renderKeyPop(Hd)}${st.chPick && this.renderChPick(Hd)}`;
   }
   oscSweepToggle(n) {
     if (this.oscT) { clearInterval(this.oscT); this.oscT = null; this.setState({ oscSweep: false }); return; }
@@ -2627,8 +2666,8 @@ class App extends Component {
   renderOsc(Hd) {
     const st = this.state, n = st.oscN || 1, P = k => `/io/in/OSC/${n}/osc/${k}`, M = st.monv;
     const mode = M[P('mode')] || 'PINK', f = +(M[P('f')] ?? 1000), lvl = +(M[P('lvl')] ?? -20);
-    const i = this.oscCh(), c = st.chans[i], cf = this.cfgOf(i), routed = cf.main && cf.main.grp === 'OSC' && +cf.main.n === n;
-    const playing = routed && !c.mute, FH = Hd - 60 - 120, T = FH - 44;
+    const i = this.oscCh(n), c = st.chans[i], cf = this.cfgOf(i), routed = cf.main && cf.main.grp === 'OSC' && +cf.main.n === n;
+    const oscOn = +(M[`/io/in/OSC/${n}/mute`] ?? 1) === 0, playing = routed && oscOn && !c.mute, FH = Hd - 60 - 120, T = FH - 44;
     const lv = this.realLv(i), lvN = lv === null ? (playing && !this.isLinked() ? c.v * (0.82 + Math.random() * 0.06) : 0) : clamp((lv + 60) / 60, 0, 1);
     const knob = (label, val, txt, nrm, set, D, col) => {
       const ang = -135 + 270 * nrm;
@@ -2646,7 +2685,7 @@ class App extends Component {
     const lN = (lvl + 40) / 34, setL = q => this.monSet(P('lvl'), Math.round(-40 + q * 34));
     const modes = [['SINE', 'סינוס', 'צליל אחד נקי, לבדיקת תדר מסוים'], ['PINK', 'רעש ורוד', 'אנרגיה שווה בכל אוקטבה: לכיוון מערכת ולמדידות'], ['WHITE', 'רעש לבן', 'אנרגיה שווה בכל תדר: נשמע חד יותר']];
     const wave = m => m === 'SINE' ? 'M4 20 C 10 4, 18 4, 24 20 S 38 36, 44 20' : m === 'PINK' ? 'M4 22 L8 14 L11 26 L15 12 L19 24 L23 16 L27 25 L31 18 L35 23 L39 19 L44 21' : 'M4 20 L6 6 L8 32 L10 10 L12 30 L14 4 L16 34 L18 12 L20 28 L22 6 L24 32 L26 14 L28 26 L30 8 L32 30 L34 12 L36 28 L38 10 L40 30 L44 20';
-    const play = () => { if (!routed) { this.updCfg(i, { main: { grp: 'OSC', n, mode: 'M' }, altOn: false }); this.touch(i); if (c.mute) this.upd(i, { mute: false }); return; } this.upd(i, { mute: !c.mute }); };
+    const play = () => { const mk = `/io/in/OSC/${n}/mute`; if (!routed) { this.updCfg(i, { main: { grp: 'OSC', n, mode: 'M' }, altOn: false }); this.touch(i); this.monSet(mk, 0); return; } this.monSet(mk, oscOn ? 1 : 0); };
     return html`
       <header class="topbar" style="height:60px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
@@ -2663,7 +2702,7 @@ class App extends Component {
             <div style=${`flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:10px;background:radial-gradient(ellipse at 30% 20%,#13261a,#08110b 75%);border:2px solid #000;box-shadow:inset 0 2px 12px rgba(0,0,0,.9)`}>
               <div style="display:flex;align-items:center;gap:10px">
                 <span style=${`width:12px;height:12px;border-radius:50%;background:${playing ? '#62e07a' : '#2a3a2e'};box-shadow:${playing ? '0 0 10px #62e07a' : 'none'}`}></span>
-                <span style="font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:#7fd69a">${playing ? 'PLAYING' : routed ? 'MUTED' : 'NOT ROUTED'} · OSC ${n} → ${c.name}</span>
+                <span style="font-family:var(--mono);font-size:14px;letter-spacing:.14em;color:#7fd69a">${!routed ? 'NOT ROUTED' : !oscOn ? 'STOPPED' : c.mute ? 'CHANNEL MUTED' : 'PLAYING'} · OSC ${n} → ${c.name}</span>
               </div>
               <div style="display:flex;align-items:baseline;gap:18px">
                 <span style="font-family:var(--mono);font-size:46px;font-weight:700;color:#9cf5b4;text-shadow:0 0 12px rgba(98,224,122,.5)">${mode === 'SINE' ? fmtF(f) : mode === 'PINK' ? 'PINK' : 'WHITE'}</span>
@@ -2671,11 +2710,11 @@ class App extends Component {
               </div>
               <svg width="100%" height="46" viewBox="0 0 48 40" preserveAspectRatio="none"><path d=${wave(mode)} fill="none" stroke="#62e07a" stroke-width="1.6" vector-effect="non-scaling-stroke" style=${playing ? 'filter:drop-shadow(0 0 4px #62e07a)' : 'opacity:.4'}/></svg>
             </div>
-            <button onClick=${play} aria-pressed=${String(playing)} aria-label=${playing ? 'Stop' : 'Play'}
+            <button onClick=${play} aria-pressed=${String(routed && oscOn)} aria-label=${routed && oscOn ? 'Stop' : routed ? 'Play' : 'Route + Play'}
               style=${`width:150px;flex:none;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-weight:800;font-size:18px;letter-spacing:.1em;
-                ${playing ? 'background:radial-gradient(circle,#2f5a35,#15301a);color:#b8f5c4;border:2px solid #62e07a;box-shadow:0 0 22px rgba(98,224,122,.45)' : 'background:linear-gradient(180deg,#2e2924,#1a1714);color:var(--brass-hi);border:2px solid #8a6a3a'}`}>
-              <svg width="44" height="44" viewBox="0 0 24 24">${playing ? html`<rect x="6" y="5" width="4.5" height="14" rx="1" fill="currentColor"/><rect x="13.5" y="5" width="4.5" height="14" rx="1" fill="currentColor"/>` : html`<path d="M7 4.5 L19 12 L7 19.5 Z" fill="currentColor"/>`}</svg>
-              ${playing ? 'STOP' : routed ? 'PLAY' : 'ROUTE + PLAY'}</button>
+                ${routed && oscOn ? 'background:radial-gradient(circle,#2f5a35,#15301a);color:#b8f5c4;border:2px solid #62e07a;box-shadow:0 0 22px rgba(98,224,122,.45)' : 'background:linear-gradient(180deg,#2e2924,#1a1714);color:var(--brass-hi);border:2px solid #8a6a3a'}`}>
+              <svg width="44" height="44" viewBox="0 0 24 24">${routed && oscOn ? html`<rect x="6" y="5" width="4.5" height="14" rx="1" fill="currentColor"/><rect x="13.5" y="5" width="4.5" height="14" rx="1" fill="currentColor"/>` : html`<path d="M7 4.5 L19 12 L7 19.5 Z" fill="currentColor"/>`}</svg>
+              ${routed && oscOn ? 'STOP' : routed ? 'PLAY' : 'ROUTE + PLAY'}</button>
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
             ${modes.map(([m, he, hint]) => html`<button onClick=${() => this.monSet(P('mode'), m)} aria-pressed=${String(mode === m)}
@@ -2709,20 +2748,22 @@ class App extends Component {
             <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)} style=${`flex:1;height:42px;border-radius:7px;font-weight:700;cursor:pointer;${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
             <button onClick=${() => this.setState({ screen: 'eq', eqCh: i })} style="flex:1;height:42px;border-radius:7px;font-weight:700;cursor:pointer;background:#141210;color:#e8b93a;border:1px solid #5a4a1a">EQ</button>
           </div>
+          <button onClick=${() => this.openOscGate(i)} style="width:100%;height:42px;border-radius:7px;font-weight:700;cursor:pointer;background:#141210;color:#8cc47e;border:1px solid #2f4a2a">GATE · KEY</button>
         </div>
       </div>
       ${st.oscPick && html`<button class="scrim" aria-label="Close" onClick=${() => this.setState({ oscPick: false })}></button>
         <div class="pop" style=${`left:120px;top:20px;width:940px;height:${Hd - 40}px;padding:14px 18px;gap:10px;border-color:#8a6a3a`}>
-          <div style="display:flex;align-items:center;gap:12px"><span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:20px;font-weight:700">דרך איזה ערוץ האוסילטור מתנגן?</span><span style="flex:1"></span><button class="small" onClick=${() => this.setState({ oscPick: false })}>CLOSE</button></div>
+          <div style="display:flex;align-items:center;gap:12px"><span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:20px;font-weight:700">דרך איזה ערוץ מחולל ${n} מתנגן?</span><span style="flex:1"></span><button class="small" onClick=${() => this.setState({ oscPick: false })}>CLOSE</button></div>
           <div style="flex:1;min-height:0;overflow-y:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;align-content:start">
-            ${st.chans.slice(0, 48).map((ch, k) => { const cf2 = this.cfgOf(k), isOsc = cf2.main && cf2.main.grp === 'OSC'; return html`<button onClick=${() => { this.setPref({ oscCh: k }); this.setState({ oscPick: false }); }} aria-pressed=${String(k === i)}
+            ${st.chans.slice(0, 48).map((ch, k) => { const cf2 = this.cfgOf(k), isOsc = cf2.main && cf2.main.grp === 'OSC' ? ' · OSC ' + cf2.main.n : ''; return html`<button onClick=${() => { this.setPref({ ['oscCh' + n]: k }); this.setState({ oscPick: false }); }} aria-pressed=${String(k === i)}
               style=${`height:58px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 10px;border-radius:8px;cursor:pointer;text-align:left;position:relative;overflow:hidden;${k === i ? 'background:#2a2014;border:1.5px solid var(--brass)' : 'background:#141210;border:1px solid #2c2721'}`}>
               <i style=${`position:absolute;left:0;top:0;bottom:0;width:4px;background:${ch.color}`}></i>
-              <span style="font-family:var(--mono);font-size:11px;color:#9b927f">${k < 40 ? 'CH ' + pad2(k + 1) : 'AUX ' + (k - 39)}${isOsc ? ' · OSC' : ''}</span>
+              <span style="font-family:var(--mono);font-size:11px;color:#9b927f">${k < 40 ? 'CH ' + pad2(k + 1) : 'AUX ' + (k - 39)}${isOsc}</span>
               <span style="max-width:100%;font-size:15px;font-weight:600;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ch.name}</span></button>`; })}
           </div>
-          <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f">אם הערוץ עוד לא מקבל את האוסילטור, כפתור הניגון יחבר אותו אליו לפני שהוא מתחיל לנגן.</span>
-        </div>`}`;
+          <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f">אם הערוץ עוד לא מקבל את המחולל, כפתור הניגון יחבר אותו אליו לפני שהוא מתחיל לנגן.</span>
+        </div>`}
+      ${st.oscGate && this.renderOscGate(Hd, i)}`;
   }
   lever(up, P, k = 1) {
     const w = Math.round(30 * k), h = Math.round(44 * k);
@@ -3891,7 +3932,7 @@ class App extends Component {
   updGate(p) { this.setState(st => ({ gate: { ...st.gate, ...(typeof p === 'function' ? p(st.gate) : p) } })); }
   gateSim() {
     const st = this.state;
-    if (!((st.screen === 'dyn' && st.dynSlot === 'gate' && st.slots.gate === 'GATE') || (st.screen === 'home' && st.slots.gate === 'GATE'))) return;
+    if (!((st.screen === 'dyn' && st.dynSlot === 'gate' && st.slots.gate === 'GATE') || ((st.screen === 'home' || (st.screen === 'osc' && st.oscGate)) && st.slots.gate === 'GATE'))) return;
     const G = st.gate, s = { ...G.sim }, dt = 0.05;
     const real = this.realLv(st.eqCh);
     if (real !== null) s.env = clamp(real, -80, 0);
