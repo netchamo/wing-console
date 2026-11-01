@@ -1340,7 +1340,7 @@ class App extends Component {
               onPointerDown=${() => { this.plLong = false; clearTimeout(this.plT); this.plT = setTimeout(() => { this.plLong = true; this.setState({ plPop: true, plPick: false }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 480); }}
               onPointerUp=${() => clearTimeout(this.plT)} onPointerCancel=${() => clearTimeout(this.plT)} onPointerLeave=${() => clearTimeout(this.plT)}
               onClick=${() => { if (this.plLong) { this.plLong = false; return; } this.setState({ screen: 'rec', recView: 'play', recAnim: false }); }}>${IC.player}<span>Player</span></button>
-          <button class="navbtn" aria-label="Recorder" onClick=${() => this.setState({ screen: 'rec', recView: 'rec', recAnim: false })} style=${this.state.rec && this.state.rec.state === 'REC' ? 'background:#3a1412;border-color:#ff3b2f;color:#ffb0a8;box-shadow:0 0 12px rgba(255,59,47,.45)' : ''}>
+           <button class="navbtn hot" aria-label="Recorder" onClick=${() => this.setState({ screen: 'rec', recView: 'rec', recAnim: false })} style=${this.state.rec && this.state.rec.state === 'REC' ? 'background:#3a1412;border-color:#ff3b2f;color:#ffb0a8;box-shadow:0 0 12px rgba(255,59,47,.45)' : ''}>
             <span style=${`width:20px;height:20px;border-radius:50%;background:${this.state.rec && this.state.rec.state === 'REC' ? '#ff3b2f' : '#8a2a22'};box-shadow:${this.state.rec && this.state.rec.state === 'REC' ? '0 0 10px #ff3b2f' : 'none'}`}></span><span>Rec</span></button>
             <button class="navbtn" aria-label="FX rack" onClick=${() => this.setState({ screen: 'fx' })}><span style="font:italic 900 27px/1 'Futura','Avenir Next','Arial Black',sans-serif;letter-spacing:.02em;background:linear-gradient(180deg,#ffe6b0,#c9a25a 70%,#8a6a3a);-webkit-background-clip:text;background-clip:text;color:transparent;text-transform:none;filter:drop-shadow(0 1px 0 rgba(0,0,0,.6))">FX</span></button>
             <button class="navbtn" onClick=${() => this.setState({ screen: 'osc' })}>${IC.osc}<span>Osc</span></button>
@@ -4052,12 +4052,11 @@ class App extends Component {
         `אם זה כן הראוטר של המיקסר, הראוטר מחלק כתובות בטווח ${net3}. ואז הכי פשוט לתת למיקסר כתובת מהטווח הזה, או להדליק בו DHCP.`]];
       if (c.searching) return ['wait', 'מחפש מיקסרים ברשת…', 'זה לוקח כמה שניות. אם יימצא מיקסר אחד, האפליקציה תתחבר אליו לבד.', []];
       if (c.status === 'connecting') return ['wait', 'מתחבר ל־' + c.ip + '…', 'מחכה לתשובה מהמיקסר.', []];
-      if (c.status === 'lost') return ['bad', 'המיקסר לא עונה', 'האפליקציה ממשיכה לנסות לבד: מחפשת ברשת ומנסה שוב את הכתובת השמורה כל כמה שניות.', [
-        'לבדוק שהמיקסר דלוק ושכבל הרשת שלו מחובר לראוטר.',
-        'לבדוק שהטאבלט מחובר לאותה רשת Wi-Fi של הראוטר הזה.',
-        'בחלק מהראוטרים יש "בידוד לקוחות" (AP isolation / Client isolation) שחוסם מכשירים מלדבר זה עם זה. צריך לכבות אותו.',
-        'אם המיקסר מחובר ל־Mixing Station או ל־WING Edit באותו רגע, זה בסדר, הם לא חוסמים.']];
-      if (c.foundNone) return ['bad', 'החיפוש לא מצא מיקסר ברשת הזו', 'ייתכן שהמיקסר ברשת אחרת או שהראוטר חוסם חיפוש.', ['אם ידועה הכתובת של המיקסר (במיקסר: SETUP ← NETWORK), הקלידו אותה ולחצו CONNECT.']];
+      if (c.status === 'lost') return ['bad', 'המיקסר לא עונה', 'האפליקציה ממשיכה לנסות לבד כל כמה שניות.', [
+        'לבדוק שהמיקסר דלוק ומחובר בכבל לראוטר, ושהמכשיר מחובר לרשת של אותו ראוטר.',
+        'אם הרשת מחוברת ועדיין אין חיבור: בהגדרות הרשת של המכשיר, לוודא שהגדרות ה־IP במצב DHCP ולא סטטי.',
+        'בראוטר: לכבות "בידוד לקוחות" (AP isolation) אם הוא דלוק.']];
+      if (c.foundNone) return ['bad', 'החיפוש לא מצא מיקסר ברשת הזו', '', ['אם הרשת מחוברת ועדיין אין חיבור: בהגדרות הרשת של המכשיר, לוודא שהגדרות ה־IP במצב DHCP ולא סטטי.', 'אם הכתובת של המיקסר ידועה, להקליד אותה וללחוץ CONNECT.']];
       return ['wait', 'עוד לא מחובר', 'אפשר לחפש מיקסרים ברשת או להקליד את הכתובת.', []];
     })();
     const HC = { ok: ['#62b85c', '#16241a', '#a6e39c'], bad: ['#e0513f', '#2a1412', '#ff9a8a'], wait: ['#e8a33d', '#2a1f10', '#f3c27a'] }[help[0]];
