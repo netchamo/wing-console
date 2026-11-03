@@ -101,6 +101,8 @@ for p, r in by.items():
         G[p] = r
     elif p.startswith('/$ctl/lib/'):
         G[p] = r
+    elif p in ('/cfg/rta/rtasrc', '/cfg/rta/$src', '/cfg/rta/rtatap'):
+        G[p] = r
     elif p in ('/$stat/time', '/$stat/date', '/$stat/lock', '/$stat/ppm', '/$globals/clksrc', '/$globals/clkrate', '/$ctl/$globals/timefmt', '/$ctl/$globals/datefmt', '/$ctl/$globals/$savenow'):
         G[p] = r
     elif p in ('/cards/$type', '/cards/$ver') or (p.startswith('/$ctl/cfg/lights/') and r.get('type') != 'node'):

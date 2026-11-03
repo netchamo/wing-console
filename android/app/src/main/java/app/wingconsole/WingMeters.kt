@@ -188,6 +188,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
         buf.add(b(0xa3)); for (i in 0 until 4) buf.add(b(i))      // mains 1..4
         buf.add(b(0xa2)); for (i in 0 until 16) buf.add(b(i))     // buses 1..16
         buf.add(b(0xa4)); for (i in 0 until 8) buf.add(b(i))      // matrices 1..8
+        buf.add(b(0xaa))                                           // rta: 120 bands of the desk's RTA source
         buf.add(b(0xde)); buf.add(b(0xdf)); buf.add(b(0xd1))
         synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
@@ -252,6 +253,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val mL = DoubleArray(4) { -90.0 }
                 val mR = DoubleArray(4) { -90.0 }
                 // per strip (40 ch, 8 aux, 4 mains, 16 buses, 8 matrices): what the gate / comp hears, and their gain reduction
+                val rta = DoubleArray(120) { -90.0 }
                 val gK = DoubleArray(80) { -90.0 }; val gG = DoubleArray(80); val dK = DoubleArray(80) { -90.0 }; val dG = DoubleArray(80)
                 var mainL = -90.0
                 var mainR = -90.0
@@ -281,14 +283,15 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         val n = (p.length - 4) / 2
                         fun v(k: Int): Double = if (k < n) ((buf[4 + 2 * k].toInt() shl 8) or (buf[5 + 2 * k].toInt() and 0xff)).toShort() / 256.0 else -90.0
                         // one packet, in the order requested: 40 channels, 8 aux, 4 mains, 16 buses, 8 matrices; 8 words each
-                        for (i in 0 until 48) { chL[i] = v(i * 8 + 2); chR[i] = v(i * 8 + 3) }
+                        for (i in 0 until 48) { chL[i] = v(i * 8); chR[i] = v(i * 8 + 1) }
                         val mo = 48 * 8
-                        for (k in 0 until 4) { mL[k] = v(mo + k * 8 + 2); mR[k] = v(mo + k * 8 + 3) }
+                        for (k in 0 until 4) { mL[k] = v(mo + k * 8); mR[k] = v(mo + k * 8 + 1) }
                         mainL = mL[0]; mainR = mR[0]
                         val bo = mo + 4 * 8
-                        for (i in 0 until 24) { bL[i] = v(bo + i * 8 + 2); bR[i] = v(bo + i * 8 + 3) }
+                        for (i in 0 until 24) { bL[i] = v(bo + i * 8); bR[i] = v(bo + i * 8 + 1) }
+                        for (k in 0 until 120) rta[k] = v(80 * 8 + k)
                         for (i in 0 until 80) { gK[i] = v(i * 8 + 4); gG[i] = v(i * 8 + 5); dK[i] = v(i * 8 + 6); dG[i] = v(i * 8 + 7) }
-                        if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${80 * 8})") }
+                        if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${80 * 8 + 120})") }
                         if (now - lastEmit >= 50) {
                             lastEmit = now
                             // left and right separately: a stereo channel shows two different columns
@@ -300,7 +303,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                             for (i in 0 until 24) { bl.put(Math.round(bL[i] * 10) / 10.0); br.put(Math.round(bR[i] * 10) / 10.0) }
                             val gk = JSONArray(); val gg = JSONArray(); val dk = JSONArray(); val dg = JSONArray()
                             for (i in 0 until 80) { gk.put(Math.round(gK[i] * 10) / 10.0); gg.put(Math.round(gG[i] * 1000) / 1000.0); dk.put(Math.round(dK[i] * 10) / 10.0); dg.put(Math.round(dG[i] * 1000) / 1000.0) }
-                            emit(JSONObject().put("type", "meters").put("l", l).put("r", r).put("gk", gk).put("gg", gg).put("dk", dk).put("dg", dg)
+                            val ra = JSONArray(); for (k in 0 until 120) ra.put(Math.round(rta[k] * 10) / 10.0)
+                            emit(JSONObject().put("type", "meters").put("rta", ra).put("l", l).put("r", r).put("gk", gk).put("gg", gg).put("dk", dk).put("dg", dg)
                                 .put("ml", Math.round(mainL * 10) / 10.0).put("mr", Math.round(mainR * 10) / 10.0).put("bl", bl).put("br", br).put("mL", ml4).put("mR", mr4))
                         }
                     } catch (_: SocketTimeoutException) { }
