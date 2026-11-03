@@ -164,6 +164,7 @@ function posOf(d) {
   return (d + 90) / 480;
 }
 const NATIVE_NAME = {}; for (const k in NATIVE_IDS) NATIVE_NAME[NATIVE_IDS[k]] = k;
+const rTxtG = r => r >= 100 ? '∞:1' : (Math.round(r * 10) / 10) + ':1';
 const dbText = v => { const d = dbOf(v); return d === -Infinity ? '-∞' : (d > 0 ? '+' : '') + d.toFixed(1); };
 const panText = p => Math.abs(p) < 0.01 ? 'C' : (p < 0 ? 'L' : 'R') + Math.round(Math.abs(p) * 100);
 const fmtF = f => f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 1 : 2) + ' kHz' : Math.round(f) + ' Hz';
@@ -231,7 +232,7 @@ function makeEq() {
       { id: '4', type: 'bell', f: 165, g: -3.2, q: 1.4, on: true, dyn: false, thr: -24, range: -4, att: 10, rel: 150, color: '#4fc9b7' },
       { id: 'H', type: 'hish', f: 9000, g: 1.5, q: 0.7, on: true, dyn: false, thr: -30, range: 4, att: 5, rel: 120, color: '#a993d9' }
     ],
-    sel: 1, fs: false, R: 12, bypass: false, listen: false, pre: true,
+    sel: 1, fs: false, R: 18, bypass: false, listen: false, pre: true,
     lc: { on: true, f: 60 }, hc: { on: false, f: 16000 }, tilt: 0,
     spec, base: spec.slice(), bl: [-40,-40,-40,-40,-40,-40], mIn: 60, mOut: 55
   };
@@ -500,7 +501,7 @@ class App extends Component {
       if (st.screen === 'routing' && st.routeTab === 'ch' && (ps.routeTab !== 'ch' || ps.screen !== 'routing')) { const K = ['in/conn/grp', 'in/conn/in', 'in/conn/altgrp', 'in/conn/altin', 'in/set/altsrc']; const ids = []; for (let s = 0; s < 48; s++) K.forEach(k => ids.push(wid(s, k))); this.reqIds(ids); }
       if (st.screen === 'routing' && st.routeTab === 'src' && (ps.routeTab !== 'src' || ps.routeSrc !== st.routeSrc || ps.screen !== 'routing')) this.reqG([`/io/in/${wgrp(st.routeSrc || 'LCL')}/`]);
       if (st.screen === 'fx' && ps.screen !== 'fx') this.reqG(['/fx/']);
-      if (st.screen === 'osc' && ps.screen !== 'osc') { this.reqG(['/io/in/OSC/']); this.reqStrip(this.oscCh(1), 'all'); this.reqStrip(this.oscCh(2), 'all'); }
+      if (st.screen === 'osc' && ps.screen !== 'osc') { this.reqG(['/io/in/OSC/']); [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) this.reqStrip(k, 'all'); }); }
       if (st.screen === 'rec' && ps.screen !== 'rec') this.reqStrip(this.playerCh(), 'all');
       if (st.screen === 'lib' && ps.screen !== 'lib') { this.reqG(['/$ctl/lib/']); this.reqDef([GID['/$ctl/lib/$scenes']]); }
       if (st.screen === 'settings' && ps.screen !== 'settings') this.reqG(['/$syscfg/', '/cards/', '/$ctl/cfg/lights/', '/$stat/', '/$globals/', '/$ctl/$globals/']);
@@ -525,12 +526,13 @@ class App extends Component {
     if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip || '')) { this.toast('הקלד את כתובת ה-IP של המיקסר, למשל 192.168.1.62'); return; }
     try { localStorage.setItem('wing.ip', ip); } catch (e) {}
     this.pollN = 0;
+    this.userDisc = false;
     if (this.wasLive && ip === this.state.conn.ip) this.reLive = true; else this.reLive = false;
     this.wasLive = false; this.rxAny = 0; this.reqQ = [];
     this.setState(st => ({ conn: { ...st.conn, ip, status: 'connecting', lastRx: 0, connAt: Date.now(), live: false, gaveUp: false } }));
     NATIVE.connect(ip);
   }
-  nDisconnect() { if (!NATIVE) return; NATIVE.disconnect(); this.setState(st => ({ conn: { ...st.conn, status: 'demo', live: false } })); }
+  nDisconnect() { if (!NATIVE) return; this.userDisc = true; NATIVE.disconnect(); this.setState(st => ({ conn: { ...st.conn, status: 'demo', live: false } })); }
   startApkUpdate() {
     if (!NATIVE || typeof NATIVE.downloadUpdate !== 'function') return;
     if (this.state.conn.live) { this.toast('כבה קודם את Live control'); return; }
@@ -650,9 +652,12 @@ class App extends Component {
       if (e.type === 'nativeOpen') { this.natOpen = true; setTimeout(() => this.onNativeOpen(), 50); continue; }
       if (e.type === 'nativeClosed') { this.natOpen = false; this.logLine('sys', 'native link closed'); continue; }
       if (e.type === 'def') { this.defIn(e); continue; }
-      if (e.type === 'meters') { this.mtrN = (this.mtrN || 0) + 1; this.mtrAt = Date.now(); this.realM = e.l ? { l: e.l, r: e.r, ml: e.ml, mr: e.mr, bl: e.bl || [], br: e.br || [], mL: e.mL || [], mR: e.mR || [], t: Date.now() } : { l: e.ch, r: e.ch, ml: e.main, mr: e.main, t: Date.now() }; continue; }
+      if (e.type === 'meters') { this.mtrN = (this.mtrN || 0) + 1; this.mtrAt = Date.now(); this.realD = e.dk ? { gk: e.gk, gg: e.gg, dk: e.dk, dg: e.dg, t: Date.now() } : null; this.realM = e.l ? { l: e.l, r: e.r, ml: e.ml, mr: e.mr, bl: e.bl || [], br: e.br || [], mL: e.mL || [], mR: e.mR || [], t: Date.now() } : { l: e.ch, r: e.ch, ml: e.main, mr: e.main, t: Date.now() }; continue; }
       if (e.type === 'log') { this.logLine(e.dir, e.text); continue; }
-      if (e.type === 'net') { C().wifi = !!e.wifi; continue; }
+      if (e.type === 'net') { const c = C(), was = c.wifi; c.wifi = !!e.wifi;
+        /* the Wi-Fi just came up: one quiet try with the mixer used last time (no endless retries) */
+        if (e.wifi && was === false && c.ip && !this.userDisc && c.status !== 'connected') setTimeout(() => { if (!this.isLinked()) { this.logLine('sys', 'Wi-Fi is up; trying ' + c.ip); this.nConnect(c.ip); } }, 800);
+        continue; }
       if (e.type === 'found') {
         const c = C(); if (!c.found.some(f => f.ip === e.ip)) c.found = [...c.found, e];
         this.logLine('in', 'found ' + e.name + ' (' + e.model + ') at ' + e.ip + ' fw ' + e.fw);
@@ -1202,7 +1207,7 @@ class App extends Component {
     if (st.sendPop) strips.add(st.sendPop.i);
     if (st.sofOn && st.screen === 'main') strips.add(sofIdx(st.sof));
     if (st.plPop || st.screen === 'rec') strips.add(this.playerCh());
-    if (st.screen === 'osc') { strips.add(this.oscCh(1)); strips.add(this.oscCh(2)); }
+    if (st.screen === 'osc') [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) strips.add(k); });
     if (this.touchS) { this.touchS.forEach(x => strips.add(x)); this.touchS.clear(); }
     const diff = [];
     for (const s of strips) {
@@ -1397,10 +1402,6 @@ class App extends Component {
       </div>
       ${st.sendPop && this.renderSends(Hd)}
       ${st.connPop && this.renderConnPop(Hd)}
-      ${st.conn.gaveUp && st.conn.status === 'lost' && html`<div dir="rtl" style="position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:12;display:flex;align-items:center;gap:14px;padding:10px 12px 10px 18px;border-radius:12px;background:#2a1412;border:1.5px solid #e0513f;box-shadow:0 10px 30px rgba(0,0,0,.6);font-family:'Heebo',sans-serif">
-        <span style="font-size:17px;font-weight:700;color:#ffb0a8">החיבור למיקסר נפל</span>
-        <button onClick=${() => this.nConnect(st.conn.ip)} style="height:42px;padding:0 16px;border-radius:9px;border:1px solid #e0513f;background:#e0513f;color:#1a0806;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">התחבר שוב</button>
-        <button onClick=${() => this.setState({ connPop: true })} style="height:42px;padding:0 14px;border-radius:9px;border:1px solid #6a3a32;background:transparent;color:#ffb0a8;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer">פרטים</button></div>`}
       ${st.mainPick && this.renderMainPick(Hd)}
       ${st.nameEdit && this.renderNameEdit(Hd)}
       ${st.liveAsk && html`
@@ -1972,13 +1973,37 @@ class App extends Component {
     if (k === 'tilt') return this.updEq({ tilt: Math.round(v * 10) / 10 });
     this.updBand(q.sel, { [k]: k === 'f' || k === 'rel' ? Math.round(v) : k === 'q' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10 });
   }
+  /* precise control: every drag box registers how to read/write it; a long press opens it in a pinned window */
+  fineReg(id, spec) { (this.specReg || (this.specReg = {}))[id] = spec; }
+  fineDown(id) { clearTimeout(this.fineT); this.fineT = setTimeout(() => { this.nd = this.cnd = this.gnd = null; this.hideDragPop(); this.setState({ finePop: id }); try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} }, 520); }
+  fineCancel() { clearTimeout(this.fineT); }
+  renderFine(Hd) {
+    const id = this.state.finePop, R = this.specReg || {}, sp = R[id]; if (!sp) return null;
+    const rows = (sp.group || [id]).map(k => R[k]).filter(Boolean), close = () => this.setState({ finePop: null });
+    const step = (r, d) => r.set(clamp(r.get() + d, 0, 1));
+    const sb = 'width:56px;height:56px;flex:none;border-radius:12px;border:1px solid #5a4630;background:linear-gradient(180deg,#2a241d,#17140f);color:var(--brass-hi);font:800 22px/1 var(--mono);cursor:pointer';
+    const H = 40 + rows.length * 118;
+    return html`<button class="scrim" style="z-index:30;background:rgba(0,0,0,.25)" aria-label="Close" onClick=${close}></button>
+      <div class="pop" style=${`z-index:31;left:170px;top:${Math.max(60, Hd - H - 16)}px;width:840px;padding:14px 18px;gap:12px;border-color:#8a6a3a`}>
+        ${rows.map(r => html`<div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:baseline;gap:12px"><span style=${`font-size:16px;font-weight:800;letter-spacing:.14em;color:${r.color}`}>${r.label.toUpperCase()}</span><span style="flex:1"></span>
+            <span style="font-family:var(--mono);font-size:30px;font-weight:700;color:#f3e6cc">${r.text()}</span></div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button style=${sb} onClick=${() => step(r, -0.02)} aria-label="Much less">«</button><button style=${sb} onClick=${() => step(r, -0.0025)} aria-label="Less">‹</button>
+            <div style="flex:1;min-width:0">${this.hslide('fine-' + r.id, r.get(), n => r.set(n), r.home ?? r.get(), r.color, 56)}</div>
+            <button style=${sb} onClick=${() => step(r, 0.0025)} aria-label="More">›</button><button style=${sb} onClick=${() => step(r, 0.02)} aria-label="Much more">»</button>
+          </div></div>`)}
+        <div style="display:flex;justify-content:flex-end"><button class="small" style="height:44px;min-width:110px" onClick=${close}>DONE</button></div>
+      </div>`;
+  }
   box(k, label, value, color, op, extraStyle) {
-    return html`<button class="box" style=${`opacity:${op};${extraStyle || ''}`} aria-label=${label + ' ' + value + ', drag sideways'}
-      onPointerDown=${e => { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.nd = { k, sx: e.clientX, n0: this.norm(k, this.getVal(k)), w: r.width, moved: false }; }}
+    this.fineReg('e:' + k, { id: 'e:' + k, label, color, get: () => this.norm(k, this.getVal(k)), set: n => this.setVal(k, this.denorm(k, n)), text: () => this.fmtEq(k), group: ['thr', 'att', 'rel'].includes(k) && this.ek !== 'eq' && ['att', 'rel'].includes(k) ? ['e:att', 'e:rel'] : null });
+    return html`<button class="box" style=${`opacity:${op};${extraStyle || ''}`} aria-label=${label + ' ' + value + ', drag sideways, hold for a precise window'}
+      onPointerDown=${e => { capture(e); const r = e.currentTarget.getBoundingClientRect(); this.nd = { k, sx: e.clientX, n0: this.norm(k, this.getVal(k)), w: r.width, moved: false }; this.fineDown('e:' + k); }}
       onPointerMove=${e => { const d = this.nd; if (!d) return;
-        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.fmtEq(k), () => this.norm(k, this.getVal(k))); }
+        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.fineCancel(); this.showDragPop(label, color, () => this.fmtEq(k), () => this.norm(k, this.getVal(k))); }
         this.setVal(d.k, this.denorm(d.k, d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-      onPointerUp=${() => { this.nd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.nd = null; this.hideDragPop(); }}>
+      onPointerUp=${() => { this.fineCancel(); this.nd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.fineCancel(); this.nd = null; this.hideDragPop(); }}>
       <b>${label}</b><em>${value}</em><s style=${`width:${Math.round(this.norm(k, this.getVal(k)) * 100)}%;background:${color}`}></s></button>`;
   }
 
@@ -2010,7 +2035,7 @@ class App extends Component {
     const tgl = (on, label, onClick, w) => html`<button aria-pressed=${String(on)} onClick=${onClick} class="pill" style=${`${w};${on ? 'background:#f0a24a;color:#1a1405;border-color:#f0a24a' : 'background:#141210'}`}>${label}</button>`;
     const lisBtn = w => html`<button aria-pressed=${String(q.listen)} onClick=${() => this.updEq({ listen: !q.listen })} class="pill" style=${`${w};${q.listen ? 'background:#1b272b;color:#cfe0e5;border-color:#8fa3aa' : 'background:#141210'}`}>LISTEN</button>`;
     const bypBtn = (w, cls) => html`<button aria-pressed=${String(q.bypass)} onClick=${() => this.updEq({ bypass: !q.bypass })} class=${cls} style=${`${w};${q.bypass ? 'background:#3a1714;color:#ffb4a8;border-color:#d0392b' : ''}`}>BYPASS</button>`;
-    const rangeBtn = h => html`<button class="small" style=${`height:${h}px;font-family:var(--mono);font-size:13px;color:#cbbd9f`} onClick=${() => { const rs = [6, 12, 18]; this.updEq({ R: rs[(rs.indexOf(q.R) + 1) % 3] }); }}>±${R} dB</button>`;
+    const rangeBtn = h => html`<button class="small" style=${`height:${h}px;font-family:var(--mono);font-size:13px;color:#cbbd9f`} onClick=${() => { const rs = [6, 12, 18, 24]; this.updEq({ R: rs[(rs.indexOf(q.R) + 1) % 4] }); }}>±${R} dB</button>`;
     const rtaBtn = h => html`<button class="small" style=${`height:${h}px;border-color:${q.pre ? '#7fa6b4' : '#3a342c'}`} onClick=${() => this.updEq({ pre: !q.pre })}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`;
     const tabs = tabsOf(this.state.eqCh);
     const dop = sb.dyn ? 1 : 0.4;
@@ -2139,6 +2164,12 @@ class App extends Component {
     return html`<span class="meter" style=${`height:${h}px;${style || ''}`}>${col(l, pl)}${col(r, pr)}</span>`;
   }
   /* level of a strip in dB from the desk's meters (null when there are none) */
+  /* the desk's own dynamics meters for a strip: what the gate / comp hears (dB) and how much they take off (0..1) */
+  realDyn(s) {
+    const D = this.isLinked() && this.realD && Date.now() - this.realD.t < 1500 ? this.realD : null; if (!D) return null;
+    const k = s < 48 ? s : s === 48 ? 48 : s >= 73 ? 49 + (s - 73) : s >= 65 ? 68 + (s - 65) : 52 + (s - 49);
+    return { gk: D.gk[k], gg: Math.abs(D.gg[k] || 0), dk: D.dk[k], dg: Math.abs(D.dg[k] || 0) };
+  }
   realLv(s) {
     const M = this.isLinked() && this.realM && Date.now() - this.realM.t < 1500 ? this.realM : null;
     if (!M) return null;
@@ -2163,6 +2194,11 @@ class App extends Component {
     const st = this.state;
     if (!((st.screen === 'dyn' && st.dynSlot === 'comp') || st.screen === 'home')) return;
     const C = st.comp, s = { ...(C.sim || { t: 0, next: 0.3, env: -40, gr: 0, hist: [], lin: -40 }) }, dt = 0.05;
+    const RD = this.realDyn(st.eqCh);
+    if (RD && RD.dk !== undefined) {   // the desk: level at the compressor's detector, and its real gain reduction (1.0 = 20 dB)
+      s.lin = clamp(RD.dk, -80, 0); s.gr = C.on ? RD.dg * 20 : 0; s.env = s.lin;
+      s.hist = [...s.hist.slice(-119), [s.lin, s.gr]]; this.updComp({ sim: s }); return;
+    }
     const real = this.realLv(st.eqCh);
     if (real !== null) s.env = real;
     else if (this.isLinked()) s.env = -80;
@@ -2182,12 +2218,14 @@ class App extends Component {
     const nrm = v => clamp(lg ? Math.log(v / a) / Math.log(b / a) : (v - a) / (b - a), 0, 1);
     const dn = n => { n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); };
     const set = v => this.updComp({ [key]: round ? round(v) : Math.round(v * 10) / 10 });
-    return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
-      onPointerDown=${e => { capture(e); this.cnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width, moved: false }; }}
+    const adsr = ['att', 'hld', 'rel'].includes(key);
+    this.fineReg('c:' + key, { id: 'c:' + key, label, color, get: () => nrm(get()), set: n => set(dn(n)), text: () => key === 'ratio' ? rTxtG(this.state.comp.ratio) : this.fmtComp(key), group: adsr ? ['c:att', 'c:hld', 'c:rel'] : null });
+    return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways, hold for a precise window'}
+      onPointerDown=${e => { capture(e); this.cnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width, moved: false }; this.fineDown('c:' + key); }}
       onPointerMove=${e => { const d = this.cnd; if (!d) return;
-        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.fmtComp(key), () => nrm(get())); }
+        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.fineCancel(); this.showDragPop(label, color, () => this.fmtComp(key), () => nrm(get())); }
         set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-      onPointerUp=${() => { this.cnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.cnd = null; this.hideDragPop(); }}>
+      onPointerUp=${() => { this.fineCancel(); this.cnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.fineCancel(); this.cnd = null; this.hideDragPop(); }}>
       <b>${label}</b><em>${text}</em><s style=${`width:${Math.round(nrm(get()) * 100)}%;background:${color}`}></s></button>`;
   }
   fmtComp(k) {
@@ -2765,7 +2803,7 @@ class App extends Component {
   oscCh(n = 1) {
     const p = this.state.prefs['oscCh' + n] ?? (n === 1 ? this.state.prefs.oscCh : null); if (p != null) return p;
     for (let i = 0; i < 48; i++) { const cf = this.state.cfg[i]; if (cf && cf.main && cf.main.grp === 'OSC' && +cf.main.n === n) return i; }
-    return n === 1 ? 47 : 46;   // Aux 8 and Aux 7 until chosen
+    return null;   // not wired anywhere until you choose a channel (a generator is loud)
   }
   openOscGate(i) {
     this.setState({ eqCh: i, dynSlot: 'gate', oscGate: true });
@@ -2816,7 +2854,8 @@ class App extends Component {
   renderOsc(Hd) {
     const st = this.state, n = st.oscN || 1, P = k => `/io/in/OSC/${n}/osc/${k}`, M = st.monv;
     const mode = M[P('mode')] || 'PINK', f = +(M[P('f')] ?? 1000), lvl = +(M[P('lvl')] ?? -20);
-    const i = this.oscCh(n), c = st.chans[i], cf = this.cfgOf(i), routed = cf.main && cf.main.grp === 'OSC' && +cf.main.n === n;
+    const i0 = this.oscCh(n), none = i0 == null, i = none ? -5 : i0;
+    const c = none ? { name: 'Choose a channel', color: '#3a342c', v: 0, mute: true } : st.chans[i], cf = none ? {} : this.cfgOf(i), routed = !none && cf.main && cf.main.grp === 'OSC' && +cf.main.n === n;
     const oscOn = +(M[`/io/in/OSC/${n}/mute`] ?? 1) === 0, playing = routed && oscOn && !c.mute, FH = Hd - 60 - 120, T = FH - 44;
     const lv = this.realLv(i), lvN = lv === null ? (playing && !this.isLinked() ? c.v * (0.82 + Math.random() * 0.06) : 0) : clamp((lv + 60) / 60, 0, 1);
     /* the screen glows in the colour of the signal: sine violet, pink noise pink, white noise white */
@@ -2838,7 +2877,12 @@ class App extends Component {
     const lN = (lvl + 40) / 34, setL = q => this.monSet(P('lvl'), Math.round(-40 + q * 34));
     const modes = [['SINE', 'סינוס', 'צליל אחד נקי, לבדיקת תדר מסוים'], ['PINK', 'רעש ורוד', 'אנרגיה שווה בכל אוקטבה: לכיוון מערכת ולמדידות'], ['WHITE', 'רעש לבן', 'אנרגיה שווה בכל תדר: נשמע חד יותר']];
     const wave = m => m === 'SINE' ? 'M4 20 C 10 4, 18 4, 24 20 S 38 36, 44 20' : m === 'PINK' ? 'M4 22 L8 14 L11 26 L15 12 L19 24 L23 16 L27 25 L31 18 L35 23 L39 19 L44 21' : 'M4 20 L6 6 L8 32 L10 10 L12 30 L14 4 L16 34 L18 12 L20 28 L22 6 L24 32 L26 14 L28 26 L30 8 L32 30 L34 12 L36 28 L38 10 L40 30 L44 20';
-    const play = () => { const mk = `/io/in/OSC/${n}/mute`; if (!routed) { this.updCfg(i, { main: { grp: 'OSC', n, mode: 'M' }, altOn: false }); this.touch(i); this.monSet(mk, 0); return; } this.monSet(mk, oscOn ? 1 : 0); };
+    const play = () => { const mk = `/io/in/OSC/${n}/mute`;
+      if (none) { this.setState({ oscPick: true }); this.toast('קודם בוחרים לאיזה ערוץ המחולל יוצא'); return; }
+      if (!routed) {   // first wiring: the generator starts quiet, the channel fader is left where it is
+        this.monSet(P('lvl'), -40); this.updCfg(i, { main: { grp: 'OSC', n, mode: 'M' }, altOn: false }); this.touch(i); this.monSet(mk, 0);
+        this.toast(`המחולל מחובר עכשיו ל־${c.name}, בעוצמה נמוכה (-40 dB). מעלים בזהירות`); return; }
+      this.monSet(mk, oscOn ? 1 : 0); };
     return html`
       <header class=${this.topCls()} style="height:60px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
@@ -2887,6 +2931,10 @@ class App extends Component {
           </div>
         </div>
         <div style="width:200px;flex:none;display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;border-radius:14px;background:#141210;border:1px solid #2c2721">
+          ${none ? html`<div dir="rtl" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;font-family:'Heebo',sans-serif">
+            <span style="font-size:17px;font-weight:700;color:#e9dcc2">המחולל לא מחובר לשום ערוץ</span>
+            <span style="font-size:13.5px;line-height:1.4;color:#9b927f">זה מכשיר רועש. בוחרים ערוץ, והוא יתחיל בעוצמה נמוכה.</span>
+            <button onClick=${() => this.setState({ oscPick: true })} style="height:48px;padding:0 18px;border-radius:10px;border:1.5px solid #c9a25a;background:#2a2014;color:var(--brass-hi);font-family:inherit;font-weight:800;font-size:16px;cursor:pointer">בחר ערוץ</button></div>` : html`
           <button onClick=${() => this.setState({ oscPick: true })} aria-label=${'Plays through ' + c.name + '. Tap to choose another channel'}
             style=${`width:100%;height:46px;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:16px;color:#121110;background:${c.color}`}>
             <span style="max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</span><span>▾</span></button>
@@ -2901,7 +2949,7 @@ class App extends Component {
             <button onClick=${() => this.upd(i, { mute: !c.mute })} aria-pressed=${String(c.mute)} style=${`flex:1;height:42px;border-radius:7px;font-weight:700;cursor:pointer;${c.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
             <button onClick=${() => this.setState({ screen: 'eq', eqCh: i })} style="flex:1;height:42px;border-radius:7px;font-weight:700;cursor:pointer;background:#141210;color:#e8b93a;border:1px solid #5a4a1a">EQ</button>
           </div>
-          <button onClick=${() => this.openOscGate(i)} style="width:100%;height:42px;border-radius:7px;font-weight:700;cursor:pointer;background:#141210;color:#8cc47e;border:1px solid #2f4a2a">GATE · KEY</button>
+          <button onClick=${() => this.openOscGate(i)} style="width:100%;height:42px;border-radius:7px;font-weight:700;cursor:pointer;background:#141210;color:#8cc47e;border:1px solid #2f4a2a">GATE · KEY</button>`}
         </div>
       </div>
       ${st.oscPick && html`<button class="scrim" aria-label="Close" onClick=${() => this.setState({ oscPick: false })}></button>
@@ -2916,7 +2964,7 @@ class App extends Component {
           </div>
           <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:14px;color:#9b927f">אם הערוץ עוד לא מקבל את המחולל, כפתור הניגון יחבר אותו אליו לפני שהוא מתחיל לנגן.</span>
         </div>`}
-      ${st.oscGate && this.renderOscGate(Hd, i)}`;
+      ${st.oscGate && !none && this.renderOscGate(Hd, i)}`;
   }
   /* ===================== settings: date and time, clock, power ===================== */
   deskNow() {
@@ -4687,6 +4735,12 @@ class App extends Component {
     const st = this.state;
     if (!((st.screen === 'dyn' && st.dynSlot === 'gate' && st.slots.gate === 'GATE') || ((st.screen === 'home' || (st.screen === 'osc' && st.oscGate)) && st.slots.gate === 'GATE'))) return;
     const G = st.gate, s = { ...G.sim }, dt = 0.05;
+    const RD = this.realDyn(st.eqCh);
+    if (RD && RD.gk !== undefined) {   // the desk: level at the gate's detector, and its real reduction (1.0 = 60 dB for the WING gate)
+      const L = clamp(RD.gk, -80, 0), gr = G.on ? RD.gg * 60 : 0;
+      s.env = L; s.gr = gr; s.lin = L; s.hist = [...s.hist.slice(-119), [L, L - gr, gr < 3]]; s.trail = [...s.trail.slice(-9), [L, L - gr]];
+      this.updGate({ sim: s }); return;
+    }
     const real = this.realLv(st.eqCh);
     if (real !== null) s.env = clamp(real, -80, 0);
     else if (this.isLinked()) s.env = -80;
@@ -4719,12 +4773,14 @@ class App extends Component {
     const dn = n => { n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); };
     const rnd = v => k === 'q' ? Math.round(v * 100) / 100 : (k === 'thr' || k === 'range' || (k === 'att' && v < 10)) ? Math.round(v * 10) / 10 : Math.round(v);
     const set = v => sc ? this.updGate(g => ({ sc: { ...g.sc, [k]: rnd(v) } })) : this.updGate({ [k]: rnd(v) });
-    return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways'}
-      onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width, moved: false }; }}
+    const adsr = ['att', 'hld', 'rel'].includes(key);
+    this.fineReg('g:' + key, { id: 'g:' + key, label, color, get: () => nrm(get()), set: n => set(dn(n)), text: () => this.fmtGate(key), home: GATE_DEF[key] !== undefined ? nrm(GATE_DEF[key]) : undefined, group: adsr ? ['g:att', 'g:hld', 'g:rel'] : null });
+    return html`<button class="box big" style=${`opacity:${op == null ? 1 : op};${extra || ''}`} aria-label=${label + ' ' + text + ', drag sideways, hold for a precise window'}
+      onPointerDown=${e => { capture(e); if (this.dbl('gb' + key)) { set(GATE_DEF[key]); this.gnd = null; return; } this.gnd = { sx: e.clientX, n0: nrm(get()), w: e.currentTarget.getBoundingClientRect().width, moved: false }; this.fineDown('g:' + key); }}
       onPointerMove=${e => { const d = this.gnd; if (!d) return;
-        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.showDragPop(label, color, () => this.fmtGate(key), () => nrm(get())); }
+        if (!d.moved && Math.abs(e.clientX - d.sx) > 3) { d.moved = true; this.fineCancel(); this.showDragPop(label, color, () => this.fmtGate(key), () => nrm(get())); }
         set(dn(d.n0 + (e.clientX - d.sx) / (d.w * 2.2))); }}
-      onPointerUp=${() => { this.gnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.gnd = null; this.hideDragPop(); }}>
+      onPointerUp=${() => { this.fineCancel(); this.gnd = null; this.hideDragPop(); }} onPointerCancel=${() => { this.fineCancel(); this.gnd = null; this.hideDragPop(); }}>
       <b>${label}</b><em>${text}</em><s style=${`width:${Math.round(nrm(get()) * 100)}%;background:${color}`}></s></button>`;
   }
   shapeIcon(r) {
@@ -5416,6 +5472,7 @@ class App extends Component {
       <div ref=${el => { this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
           ${st.dragPop && this.dragInfo && this.renderDragPop()}
+          ${st.finePop && this.renderFine(Hd)}
           ${st.infoPop && st.screen === 'dyn' && this.renderInfo(Hd)}
           ${st.screen === 'main' ? this.renderMain(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'dyn' ? this.withStrip(Hd, H => this.renderDyn(H)) : st.screen === 'chain' ? this.withStrip(Hd, H => this.renderChain(H)) : st.screen === 'rec' ? this.renderRec(Hd) : st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'sends' ? this.withStrip(Hd, H => this.renderSendsTab(H)) : st.screen === 'routing' ? this.renderRouting(Hd) : st.screen === 'mon' ? this.renderMon(Hd) : st.screen === 'fx' ? this.renderFx(Hd) : st.screen === 'osc' ? this.renderOsc(Hd) : st.screen === 'lib' ? this.renderLib(Hd) : st.screen === 'bus' ? this.renderBus(Hd) : (this.ek = 'eq', this.withStrip(Hd, H => this.renderEQ(H)))}
         </div>

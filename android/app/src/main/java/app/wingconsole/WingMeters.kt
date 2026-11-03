@@ -251,6 +251,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val bR = DoubleArray(24) { -90.0 }
                 val mL = DoubleArray(4) { -90.0 }
                 val mR = DoubleArray(4) { -90.0 }
+                // per strip (40 ch, 8 aux, 4 mains, 16 buses, 8 matrices): what the gate / comp hears, and their gain reduction
+                val gK = DoubleArray(80) { -90.0 }; val gG = DoubleArray(80); val dK = DoubleArray(80) { -90.0 }; val dG = DoubleArray(80)
                 var mainL = -90.0
                 var mainR = -90.0
                 var gotFirst = false
@@ -285,6 +287,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         mainL = mL[0]; mainR = mR[0]
                         val bo = mo + 4 * 8
                         for (i in 0 until 24) { bL[i] = v(bo + i * 8 + 2); bR[i] = v(bo + i * 8 + 3) }
+                        for (i in 0 until 80) { gK[i] = v(i * 8 + 4); gG[i] = v(i * 8 + 5); dK[i] = v(i * 8 + 6); dG[i] = v(i * 8 + 7) }
                         if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${80 * 8})") }
                         if (now - lastEmit >= 50) {
                             lastEmit = now
@@ -295,7 +298,9 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                             for (k in 0 until 4) { ml4.put(Math.round(mL[k] * 10) / 10.0); mr4.put(Math.round(mR[k] * 10) / 10.0) }
                             val bl = JSONArray(); val br = JSONArray()
                             for (i in 0 until 24) { bl.put(Math.round(bL[i] * 10) / 10.0); br.put(Math.round(bR[i] * 10) / 10.0) }
-                            emit(JSONObject().put("type", "meters").put("l", l).put("r", r)
+                            val gk = JSONArray(); val gg = JSONArray(); val dk = JSONArray(); val dg = JSONArray()
+                            for (i in 0 until 80) { gk.put(Math.round(gK[i] * 10) / 10.0); gg.put(Math.round(gG[i] * 1000) / 1000.0); dk.put(Math.round(dK[i] * 10) / 10.0); dg.put(Math.round(dG[i] * 1000) / 1000.0) }
+                            emit(JSONObject().put("type", "meters").put("l", l).put("r", r).put("gk", gk).put("gg", gg).put("dk", dk).put("dg", dg)
                                 .put("ml", Math.round(mainL * 10) / 10.0).put("mr", Math.round(mainR * 10) / 10.0).put("bl", bl).put("br", br).put("mL", ml4).put("mR", mr4))
                         }
                     } catch (_: SocketTimeoutException) { }
