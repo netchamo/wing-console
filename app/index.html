@@ -527,7 +527,7 @@ class App extends Component {
     this.pollN = 0;
     if (this.wasLive && ip === this.state.conn.ip) this.reLive = true; else this.reLive = false;
     this.wasLive = false; this.rxAny = 0; this.reqQ = [];
-    this.setState(st => ({ conn: { ...st.conn, ip, status: 'connecting', lastRx: 0, connAt: Date.now(), live: false } }));
+    this.setState(st => ({ conn: { ...st.conn, ip, status: 'connecting', lastRx: 0, connAt: Date.now(), live: false, gaveUp: false } }));
     NATIVE.connect(ip);
   }
   nDisconnect() { if (!NATIVE) return; NATIVE.disconnect(); this.setState(st => ({ conn: { ...st.conn, status: 'demo', live: false } })); }
@@ -623,16 +623,16 @@ class App extends Component {
     const heard = Math.max(c.lastRx || 0, this.rxAny || 0);
     if (c.status === 'connected' && now - heard > 8000 && !sending) { this.lostAt = now; this.wasLive = c.live; this.logLine('sys', 'no data from the desk for 8 s'); this.setState(s => ({ conn: { ...s.conn, status: 'lost' } })); }
     if (c.status === 'lost' && now - heard < 1500) { this.logLine('sys', 'desk is answering again'); this.setState(s => ({ conn: { ...s.conn, status: 'connected' } })); return; }
-    if (c.status === 'connecting' && now - (c.connAt || now) > 6000 && !c.lastRx) this.setState(s => ({ conn: { ...s.conn, status: 'lost' } }));
-    if (c.status === 'lost' && !c.searching && now - (this.lostAt || 0) > 6000 && now - (this.recAt || 0) > 12000) {
-      this.recAt = now; this.recN = (this.recN || 0) + 1;
-      if (this.recN % 2) { this.autoPick = true; this.logLine('sys', 'no answer, searching the network again'); this.nDiscover(); } else if (c.ip) { this.logLine('sys', 'trying ' + c.ip + ' again'); this.nConnect(c.ip); }
+    if (c.status === 'connecting' && now - (c.connAt || now) > 6000 && !c.lastRx) { this.lostAt = now; this.setState(s => ({ conn: { ...s.conn, status: 'lost' } })); }
+    if (c.status === 'lost' && !c.gaveUp && !c.searching && now - (this.lostAt || 0) > 4000) {
+      if (!this.retried && c.ip) { this.retried = true; this.lostAt = now; this.logLine('sys', 'no answer; trying ' + c.ip + ' once more'); this.nConnect(c.ip); }
+      else if (this.retried) { this.logLine('sys', 'still no answer; waiting for you to reconnect'); this.setState(s => ({ conn: { ...s.conn, gaveUp: true } })); }
     }
-    if (c.status === 'connected') this.recN = 0;
+    if (c.status === 'connected' && (this.retried || c.gaveUp)) { this.retried = false; if (c.gaveUp) this.setState(s => ({ conn: { ...s.conn, gaveUp: false } })); }
     // While the user moves a control, leave the line free for the moves themselves.
     if (sending) return;
     const n = this.pollN = (this.pollN || 0) + 1, q = [];
-    if (n % 45 === 1) q.push('/*S');                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
+    if (n % 45 === 1 && !this.natOpen) q.push('/*S');                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1 && st.bank < 6 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
@@ -656,20 +656,21 @@ class App extends Component {
       if (e.type === 'found') {
         const c = C(); if (!c.found.some(f => f.ip === e.ip)) c.found = [...c.found, e];
         this.logLine('in', 'found ' + e.name + ' (' + e.model + ') at ' + e.ip + ' fw ' + e.fw);
-        if ((!c.ip && c.status === 'demo' && c.found.length === 1) || (this.autoPick && c.status !== 'connected' && c.found.length === 1)) { this.autoPick = false; this.logLine('sys', 'connecting to the mixer found at ' + e.ip); setTimeout(() => this.nConnect(e.ip), 50); }
+
         continue;
       }
       if (e.type === 'discoverDone') { const c = C(); c.searching = false; c.searched = Date.now(); c.foundNone = !e.count; if (!e.count) this.logLine('sys', 'no mixer answered');
         if (this.startScan) { this.startScan = false; this.autoPick = false;
           if (c.status !== 'connected') {
             let known = null; try { known = JSON.parse(localStorage.getItem('wing.mixer') || 'null'); } catch (_) {}
-            const pick = (known && c.found.find(f => f.serial && f.serial === known.serial)) || (c.found.length === 1 ? c.found[0] : null);
+            /* the mixer used last time connects by itself; any other mixer is offered, you choose */
+            const pick = known && c.found.find(f => f.serial && f.serial === known.serial);
             if (pick) { if (pick.ip !== c.ip || c.status !== 'connecting') { this.logLine('sys', 'connecting to ' + (pick.name || 'WING') + ' at ' + pick.ip); setTimeout(() => this.nConnect(pick.ip), 50); } }
-            else if (c.found.length > 1) { setTimeout(() => { this.setState({ connPop: true }); this.toast('נמצאו כמה מיקסרים. בחר לאיזה להתחבר'); }, 50); }
+            else if (c.found.length) { setTimeout(() => { this.setState({ connPop: true }); this.toast(c.found.length > 1 ? 'נמצאו כמה מיקסרים. בחר לאיזה להתחבר' : 'נמצא מיקסר. לחץ עליו כדי להתחבר'); }, 50); }
             else if (c.ip && c.status !== 'connecting') setTimeout(() => this.nConnect(c.ip), 50);
           }
           continue; }
-        if (this.autoPick) { this.autoPick = false; if (!e.count && c.ip && c.status !== 'connected') setTimeout(() => this.nConnect(c.ip), 50); } continue; }
+        continue; }
       if (e.type === 'status') { const c = C(); if (e.status === 'idle') c.status = 'demo'; else if (e.status === 'error') { c.status = 'demo'; this.toast(e.detail); } continue; }
       if (e.type === 'update') { C().update = true; continue; }
       if (e.type === 'apkUpdate') { C().apk = { build: e.build, current: e.current }; this.logLine('sys', 'app build ' + e.build + ' available (installed ' + e.current + ')'); continue; }
@@ -887,7 +888,6 @@ class App extends Component {
     this.reqIds(P);
   }
   onNativeOpen() {
-    if (this.state.prefs.meterRandom && !this.meterModeSent && typeof NATIVE.setMeterClassic === 'function') { this.meterModeSent = true; try { NATIVE.setMeterClassic(false); } catch (e) {} }
     setTimeout(() => this.reqG(['/$syscfg/']), 400);
     this.logLine('sys', 'reading the desk (native link)');
     for (let s = 0; s < 76; s++) this.reqStrip(s, 'core');
@@ -1397,6 +1397,10 @@ class App extends Component {
       </div>
       ${st.sendPop && this.renderSends(Hd)}
       ${st.connPop && this.renderConnPop(Hd)}
+      ${st.conn.gaveUp && st.conn.status === 'lost' && html`<div dir="rtl" style="position:absolute;left:50%;top:64px;transform:translateX(-50%);z-index:12;display:flex;align-items:center;gap:14px;padding:10px 12px 10px 18px;border-radius:12px;background:#2a1412;border:1.5px solid #e0513f;box-shadow:0 10px 30px rgba(0,0,0,.6);font-family:'Heebo',sans-serif">
+        <span style="font-size:17px;font-weight:700;color:#ffb0a8">החיבור למיקסר נפל</span>
+        <button onClick=${() => this.nConnect(st.conn.ip)} style="height:42px;padding:0 16px;border-radius:9px;border:1px solid #e0513f;background:#e0513f;color:#1a0806;font-family:inherit;font-weight:800;font-size:15px;cursor:pointer">התחבר שוב</button>
+        <button onClick=${() => this.setState({ connPop: true })} style="height:42px;padding:0 14px;border-radius:9px;border:1px solid #6a3a32;background:transparent;color:#ffb0a8;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer">פרטים</button></div>`}
       ${st.mainPick && this.renderMainPick(Hd)}
       ${st.nameEdit && this.renderNameEdit(Hd)}
       ${st.liveAsk && html`
@@ -4161,7 +4165,7 @@ class App extends Component {
               ${linked ? html`<button onClick=${() => this.nDisconnect()} style=${big + ';width:200px;flex:none;background:#1a1714;border:1.5px solid #5a4630;color:#e9dcc2'}>DISCONNECT</button>`
                        : html`<button onClick=${() => this.nConnect(c.ip)} style=${big + ';width:200px;flex:none;background:linear-gradient(180deg,#3a2c18,#22190e);border:1.5px solid #c9a25a;color:var(--brass-hi);box-shadow:0 0 14px rgba(201,162,90,.25)'}>CONNECT</button>`}
             </div>
-            <button onClick=${() => { this.autoPick = !linked; this.nDiscover(); }} disabled=${c.searching} style=${big + ';height:54px;font-size:17px;background:#141210;border:1.5px solid #3a342c;color:#e9dcc2'}>${c.searching ? 'SEARCHING THE NETWORK…' : 'FIND MIXERS ON THIS NETWORK'}</button>
+            <button onClick=${() => this.nDiscover()} disabled=${c.searching} style=${big + ';height:54px;font-size:17px;background:#141210;border:1.5px solid #3a342c;color:#e9dcc2'}>${c.searching ? 'SEARCHING THE NETWORK…' : 'FIND MIXERS ON THIS NETWORK'}</button>
             <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
               ${c.found.map(f => html`<button onClick=${() => this.nConnect(f.ip)}
                 style=${`height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;border-radius:10px;cursor:pointer;text-align:left;${f.ip === c.ip && linked ? 'background:#1d2a19;border:1px solid #62b85c;color:#a6e39c' : 'background:#141210;border:1px solid #3a342c;color:#e9dcc2'}`}>
@@ -4199,10 +4203,6 @@ class App extends Component {
               <button class="small" style="height:32px;font-size:11px" disabled=${!c.live} onClick=${() => this.testWrite()}>TEST · CH 33</button>
               <button class="small" style="height:32px;font-size:11px" onClick=${() => { NATIVE.copy((this.logLines || []).join('\n')); this.toast('היומן הועתק. אפשר להדביק אותו בצ׳אט'); }}>COPY LOG</button>
             </div>
-            ${typeof NATIVE.setMeterClassic === 'function' && html`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;border:1px dashed #8a6a3a;background:#1a1510">
-              <span style="font-size:11px;font-weight:800;letter-spacing:.12em;color:#f3c27a">DIAG · METER IDS</span><span style="flex:1"></span>
-              ${[[true, '1 · 2 · 3'], [false, 'RANDOM']].map(([v, t]) => { const on = !st.prefs.meterRandom === v; return html`<button onClick=${() => { this.setPref({ meterRandom: !v }); try { NATIVE.setMeterClassic(v); } catch (e) {} }} aria-pressed=${String(on)}
-                style=${`height:32px;padding:0 10px;border-radius:7px;font:800 12px/1 var(--mono);cursor:pointer;${on ? 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass)' : 'background:#141210;color:#9b927f;border:1px solid #2c2721'}`}>${t}</button>`; })}</div>`}
             <pre style="flex:1;min-height:0;margin:0;padding:8px 10px;overflow:auto;touch-action:pan-y;overscroll-behavior:contain;border-radius:8px;background:#0a0908;border:1px solid #2c2721;font-family:var(--mono);font-size:11px;line-height:1.45;color:#b9ad95;white-space:pre-wrap;word-break:break-all">${(this.logLines || []).slice(-60).join('\n') || 'No messages yet.'}</pre>
           </div>
         </div>

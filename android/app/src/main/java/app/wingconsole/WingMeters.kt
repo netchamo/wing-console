@@ -153,18 +153,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     /** netFor: returns the local network that reaches the mixer right now (null = none yet). */
     /** each start gets its own generation: an older loop still unwinding stops itself and never touches the new link */
     @Volatile private var gen = 0
-    /** DIAGNOSTIC: true = meter ids 1, 2, 3 (as libwing and the app before 0.1.43); false = random ids */
-    @Volatile var classicIds = true
-    private var lastIp: String? = null
-    private var lastNetFor: (() -> Network?)? = null
-    fun setClassic(on: Boolean) {
-        classicIds = on
-        log("sys", "DIAG meter ids now " + (if (on) "1,2,3" else "random") + "; reopening the meter link")
-        val ip = lastIp; val nf = lastNetFor
-        if (running && ip != null && nf != null) start(ip, nf)
-    }
     fun start(ip: String, netFor: () -> Network?) {
-        lastIp = ip; lastNetFor = netFor
         stop()
         running = true
         val my = gen
@@ -185,16 +174,31 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     /** a value byte equal to 0xdf is sent as 0xdf 0xde, so the desk does not read it as a command */
     private fun esc(buf: ArrayList<Byte>, vararg v: Int) { for (x in v) { buf.add(b(x)); if ((x and 0xff) == 0xdf) buf.add(b(0xde)) } }
 
-    private fun request(out: OutputStream, id: Int, port: Int, groups: List<Pair<Int, Int>>) {
+    /** Behringer, WING Remote Protocols 3.1, "Channel 3: Metering": set the UDP port, give a 4-byte report id,
+     *  then one collection (type, indexes...); the desk sends it all in one packet and stops after 5 s unless
+     *  the same report id is sent again. One collection only: the desk keeps just the last one sent. */
+    private val REPORT = 1
+    private fun requestMeters(out: OutputStream, port: Int) {
         val buf = ArrayList<Byte>()
-        listOf(0xdf, 0xd3, 0xd3).forEach { buf.add(b(it)) }; esc(buf, port shr 8, port); buf.add(b(0xd4)); esc(buf, id shr 8, id, port shr 8, port); buf.add(b(0xdc))
-        for ((g, n) in groups) { buf.add(b(g)); buf.add(b(n)) }
-        listOf(0xde, 0xdf, 0xd1).forEach { buf.add(b(it)) }
+        buf.add(b(0xdf)); buf.add(b(0xd3)); buf.add(b(0xd3)); esc(buf, port shr 8, port)
+        buf.add(b(0xd4)); esc(buf, REPORT ushr 24, REPORT shr 16, REPORT shr 8, REPORT)
+        buf.add(b(0xdc))
+        buf.add(b(0xa0)); for (i in 0 until 40) buf.add(b(i))     // channels 1..40
+        buf.add(b(0xa1)); for (i in 0 until 8) buf.add(b(i))      // aux 1..8
+        buf.add(b(0xa3)); for (i in 0 until 4) buf.add(b(i))      // mains 1..4
+        buf.add(b(0xa2)); for (i in 0 until 16) buf.add(b(i))     // buses 1..16
+        buf.add(b(0xa4)); for (i in 0 until 8) buf.add(b(i))      // matrices 1..8
+        buf.add(b(0xde)); buf.add(b(0xdf)); buf.add(b(0xd1))
         synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
-
-    private fun keepAlive(out: OutputStream, id: Int, port: Int) {
-        val buf = ArrayList<Byte>(); buf.add(b(0xdf)); buf.add(b(0xd3)); buf.add(b(0xd4)); esc(buf, id shr 8, id, port shr 8, port); buf.add(b(0xdf)); buf.add(b(0xd1))
+    private fun renewMeters(out: OutputStream) {
+        val buf = ArrayList<Byte>(); buf.add(b(0xdf)); buf.add(b(0xd3)); buf.add(b(0xd4)); esc(buf, REPORT ushr 24, REPORT shr 16, REPORT shr 8, REPORT); buf.add(b(0xdf)); buf.add(b(0xd1))
+        synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
+    }
+    /** The desk closes a link with no data exchange for 10 s: ask for one real value (channel 1 fader). */
+    private val PING_ID = 950957506
+    private fun ping(out: OutputStream) {
+        val buf = ArrayList<Byte>(); buf.add(b(0xdf)); buf.add(b(0xd1)); buf.add(b(0xd7)); esc(buf, PING_ID ushr 24, PING_ID shr 16, PING_ID shr 8, PING_ID); buf.add(b(0xdc))
         synchronized(wlock) { out.write(buf.toByteArray()); out.flush() }
     }
 
@@ -217,8 +221,6 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val port = u.localPort
                 // Our own meter ids: another app on the desk (Mixing Station, WING Edit) uses 1, 2, 3 too, and the desk
                 // would send our levels to it instead. A random range keeps the two apart.
-                val mid = if (classicIds) 0 else 0x4000 + (java.util.Random().nextInt(0x30) shl 8) + java.util.Random().nextInt(0x80)
-                log("sys", "DIAG meter ids " + (mid + 1) + "," + (mid + 2) + "," + (mid + 3) + (if (classicIds) " (classic)" else " (random)"))
 
                 val s = net.socketFactory.createSocket()
                 s.tcpNoDelay = true
@@ -234,16 +236,14 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                     val dec = NativeDecoder(onValue) { emit(it) }
                     runCatching { val inp = s.getInputStream(); while (alive()) { val n = inp.read(buf); if (n < 0) break; for (k in 0 until n) dec.feed(buf[k].toInt() and 0xff) } }
                 }
-                request(out, mid + 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
-                request(out, mid + 2, port, (0 until 4).map { 0xa3 to it })
-                request(out, mid + 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
+                requestMeters(out, port)
                 nout = out
                 log("sys", "native link open (TCP 2222): meters to UDP $port, changes can go this way")
                 emit(JSONObject().put("type", "nativeOpen"))
                 attempt = 0
 
-                var nextKeep = System.currentTimeMillis() + 3000
-                var nextData = System.currentTimeMillis() + 7000
+                var nextKeep = System.currentTimeMillis() + 2500
+                var nextData = System.currentTimeMillis() + 5000
                 var lastEmit = 0L
                 val chL = DoubleArray(48) { -90.0 }
                 val chR = DoubleArray(48) { -90.0 }
@@ -255,38 +255,37 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 var mainR = -90.0
                 var gotFirst = false
                 var lastPkt = System.currentTimeMillis()
-                var resub = 0
-                var cCh = 0; var cMain = 0; var cBus = 0; var cOther = 0
-                val openedAt = System.currentTimeMillis(); var nextCnt = openedAt + 2000; var lastCntLog = 0L
+                var cnt = 0
+                val openedAt = System.currentTimeMillis(); var nextCnt = openedAt + 2000; var lastCntLog = 0L; var quiet = false
                 val buf = ByteArray(8192)
                 while (alive()) {
                     val now = System.currentTimeMillis()
-                    // DIAGNOSTIC: count the packets of each kind; no automatic re-requests in this build
+                    // packets per 2 s in the log: every 2 s for the first minute, then every 30 s
                     if (now >= nextCnt) {
-                        if (now - openedAt < 120000 || now - lastCntLog > 15000) { log("sys", "DIAG meters/2s: ch $cCh · main $cMain · bus $cBus · other $cOther"); lastCntLog = now }
-                        cCh = 0; cMain = 0; cBus = 0; cOther = 0; nextCnt = now + 2000
+                        if (now - openedAt < 60000 || now - lastCntLog > 30000) { log("sys", "meters: $cnt packets in 2 s"); lastCntLog = now }
+                        if (cnt == 0 && !quiet && now - lastPkt > 6000) { quiet = true; log("err", "meters: the desk stopped sending levels") }
+                        cnt = 0; nextCnt = now + 2000
                     }
-                    if (now >= nextKeep) { keepAlive(out, mid + 1, port); keepAlive(out, mid + 2, port); keepAlive(out, mid + 3, port); nextKeep = now + 3000 }
-                    if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
+                    if (now >= nextKeep) { renewMeters(out); nextKeep = now + 2500 }
+                    if (now >= nextData) { ping(out); nextData = now + 5000 }
                     try {
                         val p = DatagramPacket(buf, buf.size)
                         u.receive(p)
                         if (p.length < 6) continue
-                        if (resub > 0) log("sys", "meters: levels are back")
-                        lastPkt = now; resub = 0
-                        val id = ((buf[0].toInt() and 0xff) shl 8) or (buf[1].toInt() and 0xff)
+                        val id = ((buf[0].toInt() and 0xff) shl 24) or ((buf[1].toInt() and 0xff) shl 16) or ((buf[2].toInt() and 0xff) shl 8) or (buf[3].toInt() and 0xff)
+                        if (id != REPORT) continue
+                        if (quiet) { quiet = false; log("sys", "meters: levels are back") }
+                        lastPkt = now; cnt++
                         val n = (p.length - 4) / 2
                         fun v(k: Int): Double = if (k < n) ((buf[4 + 2 * k].toInt() shl 8) or (buf[5 + 2 * k].toInt() and 0xff)).toShort() / 256.0 else -90.0
-                        when (id) { mid + 1 -> cCh++; mid + 2 -> cMain++; mid + 3 -> cBus++; else -> cOther++ }
-                        if (id == mid + 1) {
-                            for (i in 0 until 48) { chL[i] = v(i * 8 + 2); chR[i] = v(i * 8 + 3) }
-                            if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values)") }
-                        } else if (id == mid + 2) {
-                            mainL = v(2); mainR = v(3)
-                            for (k in 0 until 4) { mL[k] = v(k * 8 + 2); mR[k] = v(k * 8 + 3) }
-                        } else if (id == mid + 3) {
-                            for (i in 0 until 24) { bL[i] = v(i * 8 + 2); bR[i] = v(i * 8 + 3) }
-                        }
+                        // one packet, in the order requested: 40 channels, 8 aux, 4 mains, 16 buses, 8 matrices; 8 words each
+                        for (i in 0 until 48) { chL[i] = v(i * 8 + 2); chR[i] = v(i * 8 + 3) }
+                        val mo = 48 * 8
+                        for (k in 0 until 4) { mL[k] = v(mo + k * 8 + 2); mR[k] = v(mo + k * 8 + 3) }
+                        mainL = mL[0]; mainR = mR[0]
+                        val bo = mo + 4 * 8
+                        for (i in 0 until 24) { bL[i] = v(bo + i * 8 + 2); bR[i] = v(bo + i * 8 + 3) }
+                        if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${80 * 8})") }
                         if (now - lastEmit >= 50) {
                             lastEmit = now
                             // left and right separately: a stereo channel shows two different columns

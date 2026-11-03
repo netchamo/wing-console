@@ -395,7 +395,6 @@ class WingLink(ctx: Context, private val emit: (JSONObject) -> Unit) {
     }
 
     fun nativeOpen() = meters.isOpen()
-    fun setMeterClassic(on: Boolean) = meters.setClassic(on)
 
     /** Asks the WING for the current values of these ids (read only, allowed with live control off).
      *  libwing request_node_data: D7 + id + DC. The answers arrive as normal pushes (type "nat"). */
