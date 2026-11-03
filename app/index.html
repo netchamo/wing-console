@@ -165,7 +165,7 @@ function posOf(d) {
 }
 const NATIVE_NAME = {}; for (const k in NATIVE_IDS) NATIVE_NAME[NATIVE_IDS[k]] = k;
 /* the desk's gate/comp key level arrives at twice the dB value (measured 3.11): scale it; 1 = as the document says */
-const DYN_KEY_SCALE = 0.5;
+const DYN_KEY_SCALE = 0.5;   /* comp detector only: the desk reports it about twice as deep; the gate key is already in dB */
 const rTxtG = r => r >= 100 ? '∞:1' : (Math.round(r * 10) / 10) + ':1';
 const dbText = v => { const d = dbOf(v); return d === -Infinity ? '-∞' : (d > 0 ? '+' : '') + d.toFixed(1); };
 const panText = p => Math.abs(p) < 0.01 ? 'C' : (p < 0 ? 'L' : 'R') + Math.round(Math.abs(p) * 100);
@@ -2182,7 +2182,7 @@ class App extends Component {
   realDyn(s) {
     const D = this.isLinked() && this.realD && Date.now() - this.realD.t < 1500 ? this.realD : null; if (!D) return null;
     const k = s < 48 ? s : s === 48 ? 48 : s >= 73 ? 49 + (s - 73) : s >= 65 ? 68 + (s - 65) : 52 + (s - 49);
-    return { gk: D.gk[k] * DYN_KEY_SCALE, gg: Math.abs(D.gg[k] || 0), dk: D.dk[k] * DYN_KEY_SCALE, dg: Math.abs(D.dg[k] || 0), raw: [D.gk[k], D.dk[k]] };
+    return { gk: D.gk[k], gg: Math.abs(D.gg[k] || 0), dk: D.dk[k] * DYN_KEY_SCALE, dg: Math.abs(D.dg[k] || 0), raw: [D.gk[k], D.dk[k]] };
   }
   /* the desk's RTA index of a strip: 1-40 ch, 41-48 aux, 49-64 bus, 65-68 main, 69-76 matrix */
   rtaIdx(s) { return s < 48 ? s + 1 : s === 48 ? 65 : s >= 73 ? 66 + (s - 73) : s >= 65 ? 69 + (s - 65) : s; }
@@ -2194,6 +2194,7 @@ class App extends Component {
   /* point the desk's analyser at the channel being edited (live only); give the old source back on leaving */
   rtaFollow(on) {
     if (!this.isLinked() || GID['/cfg/rta/rtasrc'] === undefined) return;
+    this.rtaTap(on);
     const cur = this.gx['/cfg/rta/rtasrc'];
     if (on) {
       const want = this.rtaIdx(this.state.eqCh); if (cur === undefined || +cur === want) return;
@@ -2203,6 +2204,19 @@ class App extends Component {
     } else if (this.rtaPrev !== undefined) {
       if (this.state.conn.live && cur !== undefined && +cur !== this.rtaPrev) { this.logLine('sys', 'RTA source back to ' + this.rtaPrev); this.mxSend(-1, '/cfg/rta/rtasrc', this.rtaPrev); }
       this.rtaPrev = undefined;
+    }
+  }
+  /* the analyser after the EQ while editing it (the curve and the sound agree); the old tap goes back on leaving */
+  rtaTap(on) {
+    const K = '/cfg/rta/rtatap'; if (GID[K] === undefined) return;
+    const cur = this.gx[K];
+    if (on) {
+      if (cur === undefined || !this.state.conn.live || String(cur).toUpperCase() === 'POSTEQ') return;
+      if (this.tapPrev === undefined) this.tapPrev = cur;
+      this.logLine('sys', 'RTA tap on the desk: ' + cur + ' → POSTEQ'); this.mxSend(-1, K, 'POSTEQ');
+    } else if (this.tapPrev !== undefined) {
+      if (this.state.conn.live && String(cur) !== String(this.tapPrev)) { this.logLine('sys', 'RTA tap back to ' + this.tapPrev); this.mxSend(-1, K, this.tapPrev); }
+      this.tapPrev = undefined;
     }
   }
   dynDiag() {
@@ -2237,7 +2251,9 @@ class App extends Component {
     const C = st.comp, s = { ...(C.sim || { t: 0, next: 0.3, env: -40, gr: 0, hist: [], lin: -40 }) }, dt = 0.05;
     const RD = this.realDyn(st.eqCh); this.dynDiag();
     if (RD && RD.dk !== undefined) {   // the desk: level at the compressor's detector, and its real gain reduction (1.0 = 20 dB)
-      s.lin = clamp(RD.dk, -80, 0); s.gr = C.on ? RD.dg * 20 : 0; s.env = s.lin;
+      s.lin = clamp(RD.dk, -80, 0); s.gr = C.on ? RD.dg * 20 : 0;
+      if (s.gr > 0.3 && C.ratio > 1) s.lin = Math.max(s.lin, Math.min(0, C.thr + s.gr * C.ratio / (C.ratio - 1)));   // compressing: the level is above threshold
+      s.env = s.lin;
       s.hist = [...s.hist.slice(-119), [s.lin, s.gr]]; this.updComp({ sim: s }); return;
     }
     const real = this.realLv(st.eqCh);
@@ -2302,6 +2318,12 @@ class App extends Component {
       const px = d.mode === 'graph' ? (Math.abs(dx) > Math.abs(dy) ? dx : -dy) : -dy;
       this.updComp({ thr: Math.round(clamp(d.start + px / 5, -60, 0) * 2) / 2 }); };
     const cte = () => { this.ctd = null; };
+    /* ratio handle on the curve: drag down = more ratio, up = less (one step per 16 px); double tap = 3:1 */
+    const rIx = r => { let b = 0; R_ALL.forEach((v, i) => { if (Math.abs(v - r) < Math.abs(R_ALL[b] - r)) b = i; }); return b; };
+    const rtd = e => { capture(e); if (this.dbl('cratio')) { this.updComp({ ratio: R_ALL[rIx(3)] }); return; } this.rtd = { sy: e.clientY, start: rIx(C.ratio) }; };
+    const rtm = e => { const d = this.rtd; if (!d) return; const i = clamp(d.start + Math.round((e.clientY - d.sy) / 16), 0, R_ALL.length - 1); if (R_ALL[i] !== this.state.comp.ratio) this.updComp({ ratio: R_ALL[i] }); };
+    const rte = () => { this.rtd = null; };
+    const rx = exp ? C.thr - Math.max(6, (C.thr + 60) * 0.5) : C.thr + Math.max(Math.min(6, -C.thr), -C.thr * 0.6), ry = this.compOut(rx, C);
     const onBtn = w => html`<button class="pill" aria-pressed=${String(C.on)} onClick=${() => this.updComp({ on: !C.on })}
       style=${`${w};${C.on ? 'background:#1d2a19;color:#a6e39c;border-color:#62b85c' : 'background:#141210;color:#8a8170'}`}>${C.on ? 'ON' : 'OFF'}</button>`;
     const tg = (on, label, fn, w) => html`<button class="pill" aria-pressed=${String(on)} onClick=${fn} style=${`${w || 'flex:1'};height:44px;border-radius:6px;font-size:15px;${on ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : 'background:#141210'}`}>${label}</button>`;
@@ -2346,7 +2368,12 @@ class App extends Component {
             style=${`position:absolute;left:${X(C.thr)}px;top:${Y(C.thr)}px;width:52px;height:52px;margin:-26px 0 0 -26px;padding:0;border:none;background:transparent;cursor:move;touch-action:none`}>
             <span style="position:absolute;inset:11px;border-radius:50%;border:3px solid #f3c27a;background:rgba(243,194,122,.14);box-shadow:0 0 14px rgba(243,194,122,.45)"></span>
           </button>
-          <span style=${`position:absolute;left:${X(C.thr) + (C.thr > -20 ? -104 : 20)}px;top:${Y(C.thr) - 30}px;font-family:var(--mono);font-size:13px;color:#f3c27a;white-space:nowrap;pointer-events:none`}>THR ${C.thr.toFixed(1)}</span>
+          <button aria-label=${'Ratio ' + rTxt(C.ratio) + '. Drag down for more, up for less'} onPointerDown=${rtd} onPointerMove=${rtm} onPointerUp=${rte} onPointerCancel=${rte}
+            style=${`position:absolute;left:${X(rx)}px;top:${Y(ry)}px;width:48px;height:48px;margin:-24px 0 0 -24px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none`}>
+            <span style="position:absolute;inset:12px;border-radius:50%;border:3px solid #f0a24a;background:rgba(240,162,74,.16);box-shadow:0 0 12px rgba(240,162,74,.4)"></span>
+          </button>
+          <span style=${`position:absolute;left:${X(rx) - 14}px;top:${Y(ry) + 22}px;font-family:var(--mono);font-size:13px;color:#f0a24a;white-space:nowrap;pointer-events:none`}>${rTxt(C.ratio)}</span>
+          <span style=${`position:absolute;left:${X(C.thr) + (exp ? 20 : C.thr < -50 ? 20 : -104)}px;top:${Y(C.thr) - (exp || C.thr >= -50 ? 30 : -24)}px;font-family:var(--mono);font-size:13px;color:#f3c27a;white-space:nowrap;pointer-events:none`}>THR ${C.thr.toFixed(1)}</span>
         </div>
 
         <div style=${`position:relative;width:${HW}px;height:${H}px;flex:none;border-radius:10px;overflow:hidden;background:#0e0d0b;border:1px solid #2c2721`}>

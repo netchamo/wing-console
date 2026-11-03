@@ -289,9 +289,9 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         mainL = mL[0]; mainR = mR[0]
                         val bo = mo + 4 * 8
                         for (i in 0 until 24) { bL[i] = v(bo + i * 8); bR[i] = v(bo + i * 8 + 1) }
-                        for (k in 0 until 120) rta[k] = v(80 * 8 + k)
-                        for (i in 0 until 80) { gK[i] = v(i * 8 + 4); gG[i] = v(i * 8 + 5); dK[i] = v(i * 8 + 6); dG[i] = v(i * 8 + 7) }
-                        if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${80 * 8 + 120})") }
+                        for (k in 0 until 120) rta[k] = v(76 * 8 + k)   // 76 strips (40+8+4+16+8) of 8 words, then the 120 rta bands
+                        for (i in 0 until 76) { gK[i] = v(i * 8 + 4); gG[i] = v(i * 8 + 5); dK[i] = v(i * 8 + 6); dG[i] = v(i * 8 + 7) }
+                        if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${76 * 8 + 120})") }
                         if (now - lastEmit >= 50) {
                             lastEmit = now
                             // left and right separately: a stereo channel shows two different columns
