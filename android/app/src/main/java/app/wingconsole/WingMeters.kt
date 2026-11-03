@@ -153,7 +153,18 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
     /** netFor: returns the local network that reaches the mixer right now (null = none yet). */
     /** each start gets its own generation: an older loop still unwinding stops itself and never touches the new link */
     @Volatile private var gen = 0
+    /** DIAGNOSTIC: true = meter ids 1, 2, 3 (as libwing and the app before 0.1.43); false = random ids */
+    @Volatile var classicIds = true
+    private var lastIp: String? = null
+    private var lastNetFor: (() -> Network?)? = null
+    fun setClassic(on: Boolean) {
+        classicIds = on
+        log("sys", "DIAG meter ids now " + (if (on) "1,2,3" else "random") + "; reopening the meter link")
+        val ip = lastIp; val nf = lastNetFor
+        if (running && ip != null && nf != null) start(ip, nf)
+    }
     fun start(ip: String, netFor: () -> Network?) {
+        lastIp = ip; lastNetFor = netFor
         stop()
         running = true
         val my = gen
@@ -206,7 +217,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val port = u.localPort
                 // Our own meter ids: another app on the desk (Mixing Station, WING Edit) uses 1, 2, 3 too, and the desk
                 // would send our levels to it instead. A random range keeps the two apart.
-                val mid = 0x4000 + (java.util.Random().nextInt(0x30) shl 8) + java.util.Random().nextInt(0x80)
+                val mid = if (classicIds) 0 else 0x4000 + (java.util.Random().nextInt(0x30) shl 8) + java.util.Random().nextInt(0x80)
+                log("sys", "DIAG meter ids " + (mid + 1) + "," + (mid + 2) + "," + (mid + 3) + (if (classicIds) " (classic)" else " (random)"))
 
                 val s = net.socketFactory.createSocket()
                 s.tcpNoDelay = true
@@ -243,19 +255,16 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 var mainR = -90.0
                 var gotFirst = false
                 var lastPkt = System.currentTimeMillis()
-                var lastResub = 0L
                 var resub = 0
+                var cCh = 0; var cMain = 0; var cBus = 0; var cOther = 0
+                val openedAt = System.currentTimeMillis(); var nextCnt = openedAt + 2000; var lastCntLog = 0L
                 val buf = ByteArray(8192)
                 while (alive()) {
                     val now = System.currentTimeMillis()
-                    // No levels for 3 s: ask for them again; still nothing after three tries: open the link anew.
-                    if (now - lastPkt > 3000 && now - lastResub > (if (gotFirst) 3000 else 10000)) {
-                        lastResub = now; resub++
-                        if (resub > 3 && gotFirst) throw Exception("no meter levels from the desk for ${(now - lastPkt) / 1000} s; reopening the link")
-                        log("sys", "meters: no levels for ${(now - lastPkt) / 1000} s, asking the desk again ($resub)")
-                        request(out, mid + 1, port, (0 until 40).map { 0xa0 to it } + (0 until 8).map { 0xa1 to it })
-                        request(out, mid + 2, port, (0 until 4).map { 0xa3 to it })
-                        request(out, mid + 3, port, (0 until 16).map { 0xa2 to it } + (0 until 8).map { 0xa4 to it })
+                    // DIAGNOSTIC: count the packets of each kind; no automatic re-requests in this build
+                    if (now >= nextCnt) {
+                        if (now - openedAt < 120000 || now - lastCntLog > 15000) { log("sys", "DIAG meters/2s: ch $cCh · main $cMain · bus $cBus · other $cOther"); lastCntLog = now }
+                        cCh = 0; cMain = 0; cBus = 0; cOther = 0; nextCnt = now + 2000
                     }
                     if (now >= nextKeep) { keepAlive(out, mid + 1, port); keepAlive(out, mid + 2, port); keepAlive(out, mid + 3, port); nextKeep = now + 3000 }
                     if (now >= nextData) { synchronized(wlock) { out.write(byteArrayOf(b(0xdf), b(0xd1))); out.flush() }; nextData = now + 7000 }
@@ -268,6 +277,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         val id = ((buf[0].toInt() and 0xff) shl 8) or (buf[1].toInt() and 0xff)
                         val n = (p.length - 4) / 2
                         fun v(k: Int): Double = if (k < n) ((buf[4 + 2 * k].toInt() shl 8) or (buf[5 + 2 * k].toInt() and 0xff)).toShort() / 256.0 else -90.0
+                        when (id) { mid + 1 -> cCh++; mid + 2 -> cMain++; mid + 3 -> cBus++; else -> cOther++ }
                         if (id == mid + 1) {
                             for (i in 0 until 48) { chL[i] = v(i * 8 + 2); chR[i] = v(i * 8 + 3) }
                             if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values)") }

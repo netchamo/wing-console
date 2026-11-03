@@ -261,6 +261,7 @@ class MainActivity : Activity() {
         @JavascriptInterface fun wifi(): Boolean = link.wifiAvailable()
         @JavascriptInterface fun wifiAddress(): String = link.wifiAddress()
         @JavascriptInterface fun netInfo(): String = link.netInfo()
+        @JavascriptInterface fun setMeterClassic(on: Boolean) = link.setMeterClassic(on)
         @JavascriptInterface fun discover(hint: String?) = link.discover(hint)
         @JavascriptInterface fun connect(ip: String) = link.connect(ip)
         @JavascriptInterface fun disconnect() = link.disconnect()

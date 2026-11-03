@@ -887,6 +887,7 @@ class App extends Component {
     this.reqIds(P);
   }
   onNativeOpen() {
+    if (this.state.prefs.meterRandom && !this.meterModeSent && typeof NATIVE.setMeterClassic === 'function') { this.meterModeSent = true; try { NATIVE.setMeterClassic(false); } catch (e) {} }
     setTimeout(() => this.reqG(['/$syscfg/']), 400);
     this.logLine('sys', 'reading the desk (native link)');
     for (let s = 0; s < 76; s++) this.reqStrip(s, 'core');
@@ -4198,6 +4199,10 @@ class App extends Component {
               <button class="small" style="height:32px;font-size:11px" disabled=${!c.live} onClick=${() => this.testWrite()}>TEST · CH 33</button>
               <button class="small" style="height:32px;font-size:11px" onClick=${() => { NATIVE.copy((this.logLines || []).join('\n')); this.toast('היומן הועתק. אפשר להדביק אותו בצ׳אט'); }}>COPY LOG</button>
             </div>
+            ${typeof NATIVE.setMeterClassic === 'function' && html`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;border:1px dashed #8a6a3a;background:#1a1510">
+              <span style="font-size:11px;font-weight:800;letter-spacing:.12em;color:#f3c27a">DIAG · METER IDS</span><span style="flex:1"></span>
+              ${[[true, '1 · 2 · 3'], [false, 'RANDOM']].map(([v, t]) => { const on = !st.prefs.meterRandom === v; return html`<button onClick=${() => { this.setPref({ meterRandom: !v }); try { NATIVE.setMeterClassic(v); } catch (e) {} }} aria-pressed=${String(on)}
+                style=${`height:32px;padding:0 10px;border-radius:7px;font:800 12px/1 var(--mono);cursor:pointer;${on ? 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass)' : 'background:#141210;color:#9b927f;border:1px solid #2c2721'}`}>${t}</button>`; })}</div>`}
             <pre style="flex:1;min-height:0;margin:0;padding:8px 10px;overflow:auto;touch-action:pan-y;overscroll-behavior:contain;border-radius:8px;background:#0a0908;border:1px solid #2c2721;font-family:var(--mono);font-size:11px;line-height:1.45;color:#b9ad95;white-space:pre-wrap;word-break:break-all">${(this.logLines || []).slice(-60).join('\n') || 'No messages yet.'}</pre>
           </div>
         </div>
