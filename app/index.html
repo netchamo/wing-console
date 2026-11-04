@@ -167,6 +167,33 @@ function posOf(d) {
 const NATIVE_NAME = {}; for (const k in NATIVE_IDS) NATIVE_NAME[NATIVE_IDS[k]] = k;
 /* the desk's gate/comp key level arrives at twice the dB value (measured 3.11): scale it; 1 = as the document says */
 const fxNum = x => { const v = +x; return isFinite(v) && String(x).length > 6 ? String(+v.toFixed(2)) : String(x); };
+/* the look of each effect model in the rack: [kind of picture, colour, label, second colour] */
+const FXLOOK = {
+  EXT: ['ext', '#3a3836', 'EXTERNAL', '#999'],
+  HALL: ['rack', '#cfd3d8', 'HALL', '#1d2a19'], ROOM: ['rack', '#b9c4cf', 'ROOM', '#1d2a19'], CHAMBER: ['rack', '#a7b3a0', 'CHAMBER', '#1d2a19'],
+  PLATE: ['plate', '#d6d0c2', 'PLATE'], CONCERT: ['rack', '#3c4250', 'CONCERT', '#0f1620'], AMBI: ['rack', '#8fa3b8', 'AMBIENCE', '#14202a'],
+  'V-ROOM': ['vint', '#2c2a28', 'V-ROOM'], 'V-REV': ['vint', '#3a3226', 'V-REVERB'], 'V-PLATE': ['plate', '#b7a77d', 'VINTAGE PLATE'],
+  GATED: ['rack', '#5a2a2a', 'GATED', '#1a0a0a'], REVERSE: ['rack', '#3a2a4a', 'ESREVER', '#120a1a'], 'DEL/REV': ['rack', '#2f4a3a', 'DLY+REV', '#0a140e'],
+  SHIMMER: ['rack', '#e6e0f2', 'SHIMMER', '#1b1426'], SPRING: ['spring', '#5a4630', 'SPRING TANK'], VSS3: ['rack', '#1f2226', 'VSS3', '#0c1a24'], BPLATE: ['plate', '#c9c9c9', 'BRIGHT PLATE'],
+  DIMCRS: ['vint', '#cfc8b8', 'DIM C'], CHORUS: ['pedal', '#4a8fd0', 'CHORUS', '#0e1e30'], FLANGER: ['pedal', '#8a5ab0', 'FLANGER', '#1a0e26'],
+  'ST-DL': ['rack', '#2d5a36', 'STEREO DLY', '#0a1a0e'], 'TAP-DL': ['rack', '#335a6a', 'TAP DELAY', '#0a1820'], 'TAPE-DL': ['tape', '#5a4a3a', 'TAPE ECHO', '#e9dcc2'],
+  OILCAN: ['can', '#7a8a6a', 'OIL CAN', '#4a5a3a'], 'BBD-DL': ['pedal', '#3aa05a', 'ANALOG DLY', '#0a200e'],
+  PITCH: ['pitch', '#3a2a5a', 'PITCH', '#d8c8ff'], 'D-PITCH': ['pitch', '#4a2a6a', 'DUAL PITCH', '#d8c8ff'], PCORR: ['pitch', '#2a3a6a', 'PITCH FIX', '#c8d8ff'],
+  DOUBLE: ['pedal', '#c9a03a', 'DOUBLER', '#2a1e05'], SUB: ['pitch', '#2a2a3a', 'SUB OCT', '#c8c8ff'], 'P-BASS': ['pedal', '#2a5a8a', 'BASS ENH', '#081828'],
+  GEQ: ['geq', '#3a3e44', 'GEQ', '#e6e4dc'], PIA: ['pult', '#6a7f96', 'PROGRAM EQ', '#1a2430'],
+  LIMITER: ['meter', '#2a2a2a', 'LIMITER', '#e8c45a'], 'DE-S2': ['meter', '#3a3f44', 'DE-ESSER', '#e9dcc2'],
+  ENHANCE: ['rack', '#1e2e4a', 'ENHANCER', '#0a1426'], EXCITER: ['rack', '#6a2a1e', 'EXCITER', '#200a06'],
+  ROTARY: ['leslie', '#8a5a2a', 'ROTARY'], PHASER: ['pedal', '#e07a2a', 'PHASER', '#2a1405'], PANNER: ['mod2', '#4a6a8a', 'PANNER', '#9fd0ff'],
+  TAPE: ['tape', '#4a3a2a', 'TAPE MACHINE', '#e9dcc2'], MOOD: ['pedal', '#3a8a5a', 'MOOD FILTER', '#08200e'],
+  RACKAMP: ['amp', '#2a2a2a', 'RACK AMP', '#141414'], UKROCK: ['amp', '#3a2a1a', 'UK ROCK', '#1a1410'], ANGEL: ['amp', '#5a1a1a', 'ANGEL', '#1a0a0a'],
+  JAZZC: ['amp', '#4a4a4a', 'JAZZ CLEAN', '#202020'], DELUXE: ['amp', '#8a7a4a', 'DELUXE', '#3a2e18'], BODY: ['amp', '#9a6a3a', 'ACOUSTIC BODY', '#3a2614'],
+  SOUL: ['module', '#3a3a3e', 'SOUL', '#a33'], E88: ['module', '#4a5a6a', 'E88', '#246'], E84: ['module', '#5a5a5a', 'E84', '#555'],
+  F110: ['module', '#2a2a2a', 'F110', '#8a1a1a'], PULSAR: ['pult', '#5a6a4a', 'PULSAR', '#1a2010'], MACH4: ['rack', '#3a3a5a', 'MACH EQ4', '#0e0e1a'],
+  'C5-CMB': ['multi', '#26303a', 'COMBINATOR', '#e8c45a'], 'SUB-M': ['multi', '#2a2a3a', 'SUB MONSTER', '#9a9aff'],
+  'V-IMG': ['img', '#1e2a3a', 'IMAGER', '#9fd0ff'], SPKMAN: ['spk', '#2a2a2a', 'SPEAKER MGR', '#e9dcc2'], DEQ3: ['curve', '#1a2224', 'TRIPLE DEQ', '#f6b45e'],
+  '*EVEN*': ['strip', '#4a5a6a', 'EVEN STRIP', '#e9dcc2'], '*SOUL*': ['strip', '#3a3a3e', 'SOUL STRIP', '#e9dcc2'], '*VINTAGE*': ['strip', '#6a5a3a', 'VINTAGE STRIP', '#1a1205'],
+  '*BUS*': ['strip', '#3a4a3a', 'BUS STRIP', '#e9dcc2'], '*MASTER*': ['strip', '#2a2a2a', 'MASTER STRIP', '#e8c45a'],
+};
 const FXU = { seconds: 's', ms: 'ms', Hz: 'Hz', '%': '%', dB: 'dB', meters: 'm' };
 const DYN_KEY_SCALE = 0.5;   /* comp detector only: the desk reports it about twice as deep; the gate key is already in dB */
 const rTxtG = r => r >= 100 ? '∞:1' : (Math.round(r * 10) / 10) + ':1';
@@ -262,6 +289,10 @@ const MODELS = [
   { name: 'BDX 160', kind: 'Compressor' }, { name: 'LA Leveler', kind: 'Leveler' }, { name: 'Even 88 Comp', kind: 'Compressor' },
   { name: 'One Knob Comp', kind: 'Compressor' }, { name: 'LMT Comp', kind: 'Compressor' }, { name: DEQ, kind: 'Dynamic EQ' }
 ];
+function makeDeq3() {
+  const d = makeDeq(), C = ['#ef6f5a', '#4fc9b7', '#c58bff'];
+  return { ...d, n: 0, bands: [0, 1, 2].map(k => ({ ...d.bands[k % 2], id: String(k + 1), color: C[k], f: [180, 1200, 6500][k] })) };
+}
 function makeDeq() {
   const e = makeEq();
   return { ...e, sel: 0, lc: { on: false, f: 60 }, hc: { on: false, f: 16000 },
@@ -449,7 +480,7 @@ class App extends Component {
       conn: { ip: (() => { try { return localStorage.getItem('wing.ip') || ''; } catch (e) { return ''; } })(), status: 'demo', name: '', model: '', fw: '', found: [], searching: false, wifi: null, lastRx: 0, update: false, live: false, apk: null, dl: -1 }, logV: 0, liveAsk: false,
       prefs: (() => { try { return { back: 'home', ...JSON.parse(localStorage.getItem('wing.prefs') || '{}') }; } catch (e) { return { back: 'home' }; } })(),
       recMain: 1, recPrev: null, recMainPop: false, outs: {}, routeGrp: 'LCL', routeFlt: 'all', pick: null, busCh: 48, outDest: null,
-      deq: makeDeq(), cdeq: makeDeq(), slots: { gate: 'GATE', comp: 'COMP' }, mdlv: { gate: {}, comp: {} }, srcNm: {}, eqMdl: 'STD', busNm: {},
+      deq: makeDeq(), cdeq: makeDeq(), fdeq: makeDeq3(), slots: { gate: 'GATE', comp: 'COMP' }, mdlv: { gate: {}, comp: {} }, srcNm: {}, eqMdl: 'STD', busNm: {},
       comp: { on: true, thr: -20, ratio: 3, knee: 2, det: 'PEAK', att: 10, hld: 20, rel: 150, env: 'LOG', auto: false, mix: 100, gain: 0, fs: false, sc: { on: false, type: 'HP12', f: 120, q: 1, src: 'SELF', tap: 'IN' } },
       rec: { state: 'STOP', time: 0, file: '', path: '', res: '24', chans: '2', src: [{ grp: 'MAIN', n: 1 }, { grp: 'MAIN', n: 2 }, { grp: 'OFF', n: 1 }, { grp: 'OFF', n: 1 }] },
       play: { state: 'STOP', song: '', artist: '', album: '', file: '', pos: 0, total: 0, repeat: false, format: '', rate: '', res: '', chans: '' }, dynSlot: 'gate', modelPop: false, keyPop: false, chPick: false,
@@ -487,6 +518,9 @@ class App extends Component {
 
   componentDidUpdate(pp, ps) {
     const st = this.state;
+    /* FX DEQ3 on screen: its controls follow the desk, and changes on the graph go back to them */
+    { const fn = this.fdeqOn(st), fw = this.fdeqOn(ps);
+      if (fn) { if (fw !== fn || ps.monv !== st.monv) this.fdeqPull(fn, fw !== fn); else if (ps.fdeq.bands !== st.fdeq.bands && st.fdeq.n === fn) this.fdeqPush(fn); } }
     if (st.sofOn && !ps.sofOn) setTimeout(() => { const r = document.querySelector('.sofrow'), b = r && r.children[st.sof]; if (b) r.scrollLeft = Math.max(0, b.offsetLeft - 140); }, 30);
     if (st.eqCh !== ps.eqCh || st.eq.bands.length !== EQ_IDS(st.eqCh).length) { const nb = this.eqBands(st.eqCh, st.eq.bands); if (nb !== st.eq.bands) this.setState(s0 => ({ eq: { ...s0.eq, bands: this.eqBands(s0.eqCh, s0.eq.bands), sel: Math.min(s0.eq.sel, EQ_IDS(s0.eqCh).length - 1) } })); }
     if (this.isLinked()) {
@@ -508,10 +542,12 @@ class App extends Component {
       if (st.screen === 'fx' && ps.screen !== 'fx') this.reqIds(Object.keys(GID).filter(p => /^\/fx\/\d+\/(mdl|fxmix|\$a_chn|\$a_pos)$/.test(p)).map(p => GID[p]));
       if ((st.screen === 'ins' && ps.screen !== 'ins') || (st.screen === 'ins' && ps.insSlot !== st.insSlot)) { this.reqIds(Object.keys(GID).filter(p => /^\/fx\/\d+\/(mdl|fxmix|\$a_chn|\$a_pos)$/.test(p)).map(p => GID[p])); this.reqStrip(st.eqCh, 'all'); }
       /* the analyser follows the channel on the EQ and the dynamic EQ screens: after the EQ there; for a dynamic EQ in the gate slot (before the EQ) after the filters */
-      const tapOf = x => (x.screen === 'eq' || x.screen === 'home') && x.eq.pre ? 'POSTEQ'
+      const fdq = x => this.fdeqOn(x) && x.fdeq.pre ? (x.screen === 'ins' && x.insSlot === 'postins' ? 'POSTEQ' : 'PREEQ') : null;
+      const tapOf = x => fdq(x) ? (this.fdeqStrip(x) >= 0 ? fdq(x) : null) : (x.screen === 'eq' || x.screen === 'home') && x.eq.pre ? 'POSTEQ'
         : x.screen === 'dyn' && isDeq(x.slots[x.dynSlot]) && x[x.dynSlot === 'gate' ? 'deq' : 'cdeq'].pre ? (x.dynSlot === 'gate' ? 'FILT' : 'POSTEQ') : null;
       const eqOn = tapOf(st), eqWas = tapOf(ps);
-      if (eqOn && (eqOn !== eqWas || ps.eqCh !== st.eqCh)) { this.reqG(['/cfg/rta/']); clearTimeout(this.rtaT); this.rtaT = setTimeout(() => this.rtaFollow(true, eqOn), 400); }
+      const rs = fdq(st) ? this.fdeqStrip(st) : st.eqCh, rsWas = fdq(ps) ? this.fdeqStrip(ps) : ps.eqCh;
+      if (eqOn && (eqOn !== eqWas || rs !== rsWas)) { this.reqG(['/cfg/rta/']); clearTimeout(this.rtaT); this.rtaT = setTimeout(() => this.rtaFollow(true, eqOn, rs), 400); }
       if (!eqOn && eqWas) this.rtaFollow(false);
       if (st.screen === 'osc' && ps.screen !== 'osc') { this.reqG(['/io/in/OSC/']); [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) this.reqStrip(k, 'all'); }); }
       if (st.screen === 'rec' && ps.screen !== 'rec') this.reqStrip(this.playerCh(), 'all');
@@ -810,13 +846,13 @@ class App extends Component {
         const q = st.eq, hit = Math.exp(-(Date.now() % 650) / 170);
         return { lv, pk, cLv, cPk, cfgLv, eq: { ...q, spec: q.base.map((b, k) => q.spec[k] * 0.45 + Math.max(0.03, b * (0.55 + 0.6 * hit) + (Math.random() - 0.5) * 0.08) * 0.55) } };
       }
-      const key = st.screen === 'eq' || st.screen === 'home' ? 'eq' : st.screen === 'dyn' && isDeq(st.slots[st.dynSlot]) ? (st.dynSlot === 'gate' ? 'deq' : 'cdeq') : null;
+      const key = this.fdeqOn(st) ? 'fdeq' : st.screen === 'eq' || st.screen === 'home' ? 'eq' : st.screen === 'dyn' && isDeq(st.slots[st.dynSlot]) ? (st.dynSlot === 'gate' ? 'deq' : 'cdeq') : null;
       if (!key) return { lv, pk, cLv, cPk };
-      const q = st[key];
+      const q = st[key], ks = key === 'fdeq' ? this.fdeqStrip(st) : st.eqCh;
       if (this.isLinked()) {
         // connected: only what the desk measures (channel level); no invented spectrum
-        const db = this.realLv(st.eqCh), lvP = db === null ? 0 : clamp((db + 60) / 60, 0, 1) * 100;
-        const RT = this.rtaFor(st.eqCh), spec = RT ? RT.map((d, k) => q.spec[k] * 0.4 + clamp((d + 66) / 60, 0.02, 1) * 0.6) : q.spec.map(() => 0);
+        const db = ks >= 0 ? this.realLv(ks) : null, lvP = db === null ? 0 : clamp((db + 60) / 60, 0, 1) * 100;
+        const RT = ks >= 0 ? this.rtaFor(ks) : null, spec = RT ? RT.map((d, k) => q.spec[k] * 0.4 + clamp((d + 66) / 60, 0.02, 1) * 0.6) : q.spec.map(() => 0);
         return { lv, pk, cLv, cPk, [key]: { ...q, spec, bl: q.bl.map(() => db === null ? -90 : db), mIn: lvP, mOut: q.bypass ? lvP : lvP } };
       }
       const hit = Math.exp(-(Date.now() % 650) / 170), ph = Date.now() / 1000;
@@ -1444,8 +1480,6 @@ class App extends Component {
         <div style="flex:1;min-width:0;display:flex;gap:6px">${strips}</div>
         <div style=${`width:140px;flex:none;display:flex;flex-direction:column;gap:6px;border-radius:10px;transition:box-shadow .45s,background .45s,outline-color .45s;outline:1.5px solid ${SO ? tcol : 'transparent'};outline-offset:3px;${SO ? `box-shadow:0 0 22px ${tcol}66,inset 0 0 26px ${tcol}22;background:${tcol}10` : ''}`}>
           <span style=${`font-size:11px;letter-spacing:.16em;color:${SO ? tcol : '#b8a78a'};text-transform:uppercase;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${SO ? 700 : 400}`}>${SO ? 'Sends → ' + this.busLabel(SK) : 'Layers'}</span>
-          ${!SO && html`<button onClick=${() => this.setPref({ meterPost: !st.prefs.meterPost })} aria-label=${'Meters ' + (st.prefs.meterPost ? 'after' : 'before') + ' the fader. Tap to change'}
-            style=${`height:26px;flex:none;border-radius:5px;cursor:pointer;white-space:nowrap;font:700 11px/1 var(--mono);letter-spacing:.12em;${st.prefs.meterPost ? 'background:#1a1714;border:1px solid #5a5144;color:#cbbd9f' : 'background:#16221a;border:1px solid #4f8a5c;color:#9fe0a8'}`}>${st.prefs.meterPost ? 'POST' : 'PRE'} FADER</button>`}
           ${banks.map((l, n) => SO && (SK < 16 ? n > 5 : n === 8) ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${bankCol(n)}`}></i>${l}</button>` : html`<button class=${'layer' + (n === b ? ' on' : '')} onClick=${() => this.setState({ bank: n, lv: Array.from({ length: 9 }, () => [0, 0]), pk: Array.from({ length: 9 }, () => [0, 0]) })}><i style=${`background:${bankCol(n)};opacity:${n === b ? 1 : 0.7};box-shadow:${n === b ? '0 0 8px ' + bankCol(n) : 'none'}`}></i>${l}</button>`)}
         </div>
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
@@ -1823,8 +1857,8 @@ class App extends Component {
     const close = () => this.setState({ sendPop: null });
     return html`
       <button class="scrim" aria-label="Close sends" onClick=${close}></button>
-      <div class="pop" style=${`left:24px;top:8px;width:1132px;height:${Hd - 16}px;padding:12px 14px;gap:12px;flex-direction:row`}>
-        <div style="width:150px;flex:none;display:flex;flex-direction:column;gap:8px">
+      <div class="pop" style=${`left:70px;top:34px;width:1040px;height:${Hd - 68}px;padding:12px 14px;gap:10px;flex-direction:row`}>
+        <div style="width:122px;flex:none;display:flex;flex-direction:column;gap:8px">
           ${sp.i < 48 && (() => { const go = d => this.setState({ sendPop: { i: (sp.i + d + 48) % 48, bank: sb } }); const ab = 'flex:1;height:58px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#2e2924,#1a1714);border:1px solid #5a4630;color:var(--brass-hi)';
             return html`<div style="display:flex;gap:8px">
               <button aria-label="Previous channel" style=${ab} onClick=${() => go(-1)}><svg width="30" height="30" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1836,16 +1870,16 @@ class App extends Component {
           <span style="flex:1"></span>
           ${sp.i < 48 && html`<button aria-pressed=${String(!!st.prefs.sendMeters)} onClick=${() => this.setPref({ sendMeters: !st.prefs.sendMeters })}
             style=${`height:46px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;letter-spacing:.08em;${st.prefs.sendMeters ? 'background:#16221a;border:1px solid #4f8a5c;color:#9fe0a8' : 'background:#141210;border:1px solid #3a342c;color:#8a8170'}`}>${st.prefs.sendMeters ? 'METERS ON' : 'METERS OFF'}</button>`}
-          <button class="small" style="height:50px;font-size:16px;border-color:#5a4630" onClick=${close}>DONE</button>
+          <button onClick=${close} style="height:66px;border-radius:12px;cursor:pointer;font-size:20px;font-weight:800;letter-spacing:.14em;color:#1a1405;background:linear-gradient(180deg,#f3c27a,#c9933f);border:1px solid #f3c27a;box-shadow:0 0 18px rgba(243,194,122,.45),inset 0 1px 0 rgba(255,255,255,.4)">DONE</button>
         </div>
         <div style="flex:1;min-height:0;display:flex;gap:10px">
           ${lbls[sb].map((l, k) => { const v = sc.sends[sb * 8 + k]; return html`
-            <div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:8px;background:#161412;border:1px solid #2c2721">
+            <div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border-radius:8px;background:#161412;border:1px solid #2c2721">
               <span style="max-width:100%;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</span>
               ${(() => { const kk = sb * 8 + k, isOn = (sc.sendOn || [])[kk] !== false; return html`<button aria-pressed=${String(isOn)} aria-label=${l + ' send ' + (isOn ? 'on' : 'off')} onClick=${() => this.setSendArr(sp.i, 'sendOn', kk, !isOn)}
                 style=${`width:100%;height:32px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>`; })()}
               <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(v)}</span>
-              <div style="flex:1;min-height:0;display:flex;gap:4px;align-items:stretch">
+              <div style="flex:1;min-height:0;display:flex;gap:2px;align-items:stretch">
               <button class="fader" style="width:60px;min-height:0" aria-label=${l + ' send ' + dbText(v)}
                 onPointerDown=${e => { capture(e); this.sr = e.currentTarget.getBoundingClientRect(); this.busSend(k, e.clientY); }}
                 onPointerMove=${e => this.busSend(k, e.clientY)} onPointerUp=${() => { this.sr = null; }} onPointerCancel=${() => { this.sr = null; }}>
@@ -1853,15 +1887,15 @@ class App extends Component {
                 <span style=${`position:absolute;left:27px;width:6px;bottom:12px;height:calc(${v.toFixed(4)} * (100% - 52px) + 2px);border-radius:3px;background:#c9a25a;opacity:.55`}></span>
                 <span class="cap" style=${`left:12px;width:36px;height:28px;top:calc(${(1 - v).toFixed(4)} * (100% - 52px) + 12px)`}></span>
               </button>
-              ${st.prefs.sendMeters && sp.i < 48 && (() => { const m = (st.sendLv || [])[k] || [0, 0]; return this.mtr(m[0], m[1], Hd - 186, 0, 0, 'position:relative;left:auto;top:auto;flex:none;align-self:center'); })()}
+              ${st.prefs.sendMeters && sp.i < 48 && (() => { const m = (st.sendLv || [])[k] || [0, 0]; return this.mtr(m[0], m[1], Hd - 238, 0, 0, 'position:relative;left:auto;top:auto;flex:none;align-self:center'); })()}
               </div>
             </div>`; })}
-          <div style="width:140px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 6px;border-radius:8px;background:#1a1714;border:1.5px solid #6a5232;margin-left:4px">
+          <div style="width:124px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:8px;background:#1a1714;border:1.5px solid #6a5232;margin-left:2px">
             <span style=${`width:100%;padding:5px 4px;border-radius:5px;text-align:center;font-size:13px;font-weight:800;color:#121110;background:${sc.color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${sc.name}</span>
             <button onClick=${() => this.upd(sp.i, { mute: !sc.mute })} aria-pressed=${String(sc.mute)} style=${`width:100%;height:32px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${sc.mute ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
             <span style="font-family:var(--mono);font-size:12px;color:var(--brass-hi)">${dbText(sc.v)}</span>
-            <div style="display:flex;gap:6px;align-items:center">${this.vfader('sendch' + sp.i, sc.v, v => this.upd(sp.i, { v }), Math.max(200, Hd - 16 - 24 - 32 - 38 - 30 - 20), sc.color, sc.name)}
-              ${(() => { const m = st.spLv || [0, 0]; return this.mtr(m[0], m[1], Math.max(200, Hd - 16 - 24 - 32 - 38 - 30 - 20) - 44, 0, 0, 'position:relative;left:auto;top:auto;flex:none'); })()}</div>
+            <div style="display:flex;gap:6px;align-items:center">${this.vfader('sendch' + sp.i, sc.v, v => this.upd(sp.i, { v }), Math.max(180, Hd - 68 - 24 - 32 - 38 - 30 - 20), sc.color, sc.name)}
+              ${(() => { const m = st.spLv || [0, 0]; return this.mtr(m[0], m[1], Math.max(180, Hd - 68 - 24 - 32 - 38 - 30 - 20) - 44, 0, 0, 'position:relative;left:auto;top:auto;flex:none'); })()}</div>
             <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#9b927f">FADER</span>
           </div>
         </div>
@@ -2087,7 +2121,7 @@ class App extends Component {
     const live = this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, this.liveG(i)), 0));
     const stat = this.path(f => this.filt(f) + q.bands.reduce((a, b) => a + this.resp(b, f, b.g), 0));
     const showDyn = sb.dyn && sb.on;
-    const ref = D && st.prefs.deqRef !== false ? st.eq : null;
+    const ref = D && st.prefs.deqRef !== false && (this.ek !== 'fdeq' || this.fdeqStrip(st) === st.eqCh) ? st.eq : null;
     const refCurve = ref ? this.path(f => ref.bands.reduce((a, b) => a + this.resp(b, f, b.g), 0)) : '';
     const rangeCurve = showDyn ? this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, i === si ? b.g + b.range : b.g), 0)) : 'M 0 0';
     const y0 = this.Y(0).toFixed(1);
@@ -2118,7 +2152,7 @@ class App extends Component {
     };
 
     return html`
-      ${!q.fs ? this.chanHeader(activeTab, html`
+      ${this.eqNoHdr && !q.fs ? '' : !q.fs ? this.chanHeader(activeTab, html`
           ${D && this.modelBtn()}
           ${!D && this.isLinked() && st.eqMdl !== 'STD' && html`<span style="padding:4px 10px;border-radius:6px;border:1px solid #8a6a3a;font-size:13px;color:#f3c27a">Desk runs EQ model ${st.eqMdl} · shown: STD</span>`}
           ${!D && rangeBtn(36)}${!D && rtaBtn(36)}${!D && bypBtn('', 'small')}
@@ -2159,10 +2193,10 @@ class App extends Component {
           ${ref && ref.bands.filter(b => b.on).map(b => { const y = clamp(this.Y(b.g), 14, H - 14); return html`
             <span aria-hidden="true" style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(y)}px;width:24px;height:24px;margin:-12px 0 0 -12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid rgba(159,208,220,.7);background:rgba(12,18,20,.55);color:#bfe0e8;font-size:11px;font-weight:700;pointer-events:none`}>${b.id}</span>`; })}
           ${D && html`<div style="position:absolute;left:8px;top:8px;display:flex;gap:6px">
-            <button onClick=${() => this.setState({ chPick: true })} aria-label=${'Key source: ' + this.keySrcName()} style="height:38px;max-width:250px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #4fc9b7;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden">
+            ${this.ek !== 'fdeq' && html`<button onClick=${() => this.setState({ chPick: true })} aria-label=${'Key source: ' + this.keySrcName()} style="height:38px;max-width:250px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #4fc9b7;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden">
               <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#4fc9b7">KEY</span><span style="overflow:hidden;text-overflow:ellipsis">${this.keySrcName()}</span></button>
             <button onClick=${() => this.setState({ keyPop: true })} aria-label="Key filter" style="height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #8fd3e0;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap">
-              <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#8fd3e0">FILTER</span>${!this.curSc().on ? 'Flat' : (KEYT[this.curSc().type] || this.curSc().type) + ' · ' + fmtF(this.curSc().f)}</button>
+              <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#8fd3e0">FILTER</span>${!this.curSc().on ? 'Flat' : (KEYT[this.curSc().type] || this.curSc().type) + ' · ' + fmtF(this.curSc().f)}</button>`}
             ${!q.fs && html`<button onClick=${() => this.updEq({ pre: !q.pre })} aria-pressed=${String(q.pre)} style=${`height:38px;padding:0 10px;border-radius:7px;border:1px solid ${q.pre ? '#7fa6b4' : '#3a342c'};background:rgba(12,16,15,.85);color:${q.pre ? '#cfe0e5' : '#8a8170'};font-size:12px;font-weight:700;letter-spacing:.1em;cursor:pointer`}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`}
           </div>`}
           ${['lc', 'hc'].filter(k => q[k].on && (D || st.eqCh < 48)).map(k => html`
@@ -2195,7 +2229,7 @@ class App extends Component {
         <div style="flex:1;min-height:0;display:flex;gap:8px;padding:10px 14px">
           <section class="sec" style="flex:480 1 0">
             <div style="display:flex;gap:6px;height:44px">${chips(44, false)}
-              <button class="pill" aria-pressed=${String(sb.on)} style=${`width:64px;border-radius:6px;font-size:15px;font-weight:800;${sb.on ? `background:${sb.color};color:#121110;border:1px solid ${sb.color};box-shadow:0 0 12px ${sb.color}66` : `background:#141210;color:${sb.color};border:1px dashed ${sb.color}88;opacity:.8`}`} onClick=${() => this.updBand(si, { on: !sb.on })}>${sb.on ? 'ON' : 'OFF'}</button>
+              ${this.ek !== 'fdeq' && html`<button class="pill" aria-pressed=${String(sb.on)} style=${`width:64px;border-radius:6px;font-size:15px;font-weight:800;${sb.on ? `background:${sb.color};color:#121110;border:1px solid ${sb.color};box-shadow:0 0 12px ${sb.color}66` : `background:#141210;color:${sb.color};border:1px dashed ${sb.color}88;opacity:.8`}`} onClick=${() => this.updBand(si, { on: !sb.on })}>${sb.on ? 'ON' : 'OFF'}</button>`}
             </div>
             <div style="display:flex;gap:4px;height:44px">
               ${D ? [['BP', 'Band'], ['LP6', 'Low 6'], ['LP12', 'Low 12'], ['HP6', 'High 6'], ['HP12', 'High 12'], ['OFF', 'Wide']].map(t => html`<button class=${'pill' + (sb.filt === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:14px;font-weight:600;padding:0" onClick=${() => this.updBand(si, { filt: t[0], type: /^LP/.test(t[0]) ? 'losh' : /^HP/.test(t[0]) ? 'hish' : 'bell' })}>${t[1]}</button>`)
@@ -2210,7 +2244,7 @@ class App extends Component {
           </section>
           ${D ? html`
           <section class="sec" style="flex:420 1 0">
-            <div style="display:flex;gap:6px">${bypBtn('flex:1;border-radius:6px', 'pill')}
+            <div style="display:flex;gap:6px">${this.ek !== 'fdeq' && bypBtn('flex:1;border-radius:6px', 'pill')}
               ${[['high', 'Above thr'], ['low', 'Below thr']].map(([v, l]) => html`<button onClick=${() => this.updBand(si, { mode: v })} aria-pressed=${String(sb.mode === v)} class="pill" style=${`flex:1;border-radius:6px;font-size:15px;${sb.mode === v ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : 'background:#141210'}`}>${l}</button>`)}</div>
             <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
               ${this.box('thr', 'Thr', sb.thr.toFixed(1) + ' dB', '#f3c27a', 1)}
@@ -2261,12 +2295,12 @@ class App extends Component {
     return src === this.rtaIdx(s) ? R.b : null;
   }
   /* point the desk's analyser at the channel being edited (live only); give the old source back on leaving */
-  rtaFollow(on, tap) {
+  rtaFollow(on, tap, strip) {
     if (!this.isLinked() || GID['/cfg/rta/rtasrc'] === undefined) return;
     this.rtaTap(on, tap);
     const cur = this.gx['/cfg/rta/rtasrc'];
     if (on) {
-      const want = this.rtaIdx(this.state.eqCh); if (cur === undefined || +cur === want) return;
+      const want = this.rtaIdx(strip ?? this.state.eqCh); if (cur === undefined || +cur === want) return;
       if (!this.state.conn.live) return;
       if (this.rtaPrev === undefined) this.rtaPrev = +cur;
       this.logLine('sys', 'RTA source on the desk: ' + cur + ' → ' + want); this.mxSend(-1, '/cfg/rta/rtasrc', want);
@@ -2810,19 +2844,62 @@ class App extends Component {
     if (/^\*/.test(m)) return 'chan';
     return 'eq';
   }
+  /* a small picture for each model (rack, pedal, tape, amp, console module...), each with its own colours and label */
   fxMini(m, w = 150, h = 60) {
-    const c = this.fxCat(m), col = { rev: '#d9d6cf', dly: '#3d9a4a', mod: '#4a78c9', pitch: '#7a5ab0', amp: '#a83a2c', dyn: '#c9c2b0', eq: '#4b4f56', chan: '#2d4f3a', ext: '#333', none: '#1a1816' }[c];
-    if (c === 'none') return html`<span style=${`width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px dashed #3a342c;color:#5a5144;font-size:12px;letter-spacing:.14em`}>EMPTY</span>`;
-    return html`<svg width=${w} height=${h} viewBox="0 0 150 60" style="display:block;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.6)">
-      <rect width="150" height="60" rx="4" fill=${col}/><rect x="2" y="2" width="146" height="56" rx="3" fill="none" stroke="rgba(255,255,255,.25)"/>
-      ${c === 'rev' && html`<rect x="10" y="9" width="80" height="16" rx="2" fill="#20281f"/><text x="14" y="21" font-size="9" fill="#9fe08a" style="font-family:var(--mono)">${m.slice(0, 8)}</text>${[0, 1, 2, 3, 4].map(k => html`<rect x=${14 + k * 16} y="32" width="3" height="20" fill="#555"/><rect x=${10 + k * 16} y=${36 + (k * 7) % 12} width="11" height="6" rx="1" fill="#f4f1e8" stroke="#666"/>`)}<rect x="104" y="10" width="34" height="40" rx="3" fill="#2a2a2a"/><text x="121" y="35" text-anchor="middle" font-size="14" font-weight="800" fill="#5fd0ff">FX</text>`}
-      ${c === 'dly' && html`${[30, 75, 120].map(x => html`<circle cx=${x} cy="32" r="13" fill="#1a1a1a" stroke="#ccc" stroke-width="1.5"/><line x1=${x} y1="32" x2=${x + 6} y2="22" stroke="#fff" stroke-width="2"/>`)}<rect x="48" y="8" width="54" height="10" rx="2" fill="#0d1a0d"/>`}
-      ${(c === 'mod' || c === 'pitch') && html`${[25, 60, 95, 128].map(x => html`<circle cx=${x} cy="34" r="10" fill="#f0f0f0"/><circle cx=${x} cy="34" r="4" fill="#888"/>`)}<rect x="10" y="8" width="40" height="8" rx="2" fill="rgba(0,0,0,.35)"/>`}
-      ${c === 'amp' && html`<rect x="6" y="6" width="138" height="14" rx="2" fill="#d9c08a"/>${[18, 40, 62, 84, 106, 128].map(x => html`<circle cx=${x} cy="40" r="8" fill="#1a1a1a" stroke="#d9c08a" stroke-width="1.5"/>`)}`}
-      ${(c === 'eq' || c === 'chan') && html`${Array.from({ length: 15 }, (_, k) => html`<rect x=${10 + k * 9} y="10" width="2" height="40" fill="#222"/><rect x=${7 + k * 9} y=${20 + Math.round(Math.sin(k * 1.3) * 10)} width="8" height="5" rx="1" fill="#e6e4dc"/>`)}`}
-      ${c === 'dyn' && html`<rect x="92" y="8" width="48" height="30" rx="2" fill="#f1d98e" stroke="#222" stroke-width="2"/><line x1="116" y1="36" x2="126" y2="16" stroke="#222" stroke-width="1.5"/>${[18, 44, 70].map(x => html`<circle cx=${x} cy="32" r="10" fill="#1a1a1a"/>`)}`}
-      ${c === 'ext' && html`<text x="75" y="36" text-anchor="middle" font-size="16" font-weight="800" fill="#ccc">EXT</text>`}
-    </svg>`;
+    if (!m || m === 'NONE') return html`<span style=${`width:${w}px;height:${h}px;display:flex;align-items:center;justify-content:center;border-radius:4px;border:1px dashed #3a342c;color:#5a5144;font-size:12px;letter-spacing:.14em`}>EMPTY</span>`;
+    const [t, c, lab, c2] = FXLOOK[m] || ['rack', '#8a8f96', m.replace(/\*/g, ''), '#1d2a19'];
+    const knobs = (xs, y, r, fill = '#1a1a1a', ring = '#ccc') => xs.map(x => html`<circle cx=${x} cy=${y} r=${r} fill=${fill} stroke=${ring} stroke-width="1.2"/><line x1=${x} y1=${y} x2=${x + r * 0.5} y2=${y - r * 0.8} stroke="#f3efe6" stroke-width="1.4"/>`);
+    const lcd = (x, y, wd, txt, col = '#9fe08a', bg = c2) => html`<rect x=${x} y=${y} width=${wd} height="14" rx="2" fill=${bg}/><text x=${x + 4} y=${y + 10.5} font-size="8.5" fill=${col} style="font-family:var(--mono)">${txt}</text>`;
+    let body;
+    if (t === 'rack') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="3" y="3" width="144" height="54" rx="3" fill="none" stroke="rgba(255,255,255,.22)"/>
+      <circle cx="9" cy="9" r="2" fill="rgba(0,0,0,.35)"/><circle cx="141" cy="9" r="2" fill="rgba(0,0,0,.35)"/><circle cx="9" cy="51" r="2" fill="rgba(0,0,0,.35)"/><circle cx="141" cy="51" r="2" fill="rgba(0,0,0,.35)"/>
+      ${lcd(16, 9, 70, lab)}<circle cx="96" cy="16" r="2.5" fill="#ff5a3a"/>${knobs([24, 50, 76, 102, 128], 40, 8)}`;
+    else if (t === 'vint') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="0" y="0" width="150" height="10" fill="rgba(0,0,0,.25)"/>
+      ${lcd(10, 16, 56, lab, '#ff6a4a', '#1a0a08')}${Array.from({ length: 6 }, (_, k) => html`<rect x=${74 + k * 11} y="16" width="8" height="14" rx="1.5" fill=${k === 1 ? '#e0513f' : '#d8d2c4'}/>`)}
+      ${Array.from({ length: 8 }, (_, k) => html`<rect x=${12 + k * 16} y="38" width="12" height="9" rx="1.5" fill="#2a2622" stroke="#777"/>`)}`;
+    else if (t === 'plate') body = html`<rect width="150" height="60" rx="4" fill="#2a2725"/><rect x="8" y="7" width="134" height="46" rx="2" fill=${c} stroke="#555"/>
+      ${[14, 136].map(x => [12, 48].map(y => html`<circle cx=${x} cy=${y} r="2.5" fill="#444"/><line x1=${x} y1=${y} x2=${x < 75 ? 2 : 148} y2=${y < 30 ? 2 : 58} stroke="#777"/>`))}
+      <circle cx="54" cy="30" r="5" fill="#333"/><circle cx="98" cy="30" r="5" fill="#333"/><text x="75" y="50" text-anchor="middle" font-size="9" font-weight="800" fill="#2a2725">${lab}</text>`;
+    else if (t === 'spring') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="8" y="8" width="134" height="44" rx="3" fill="#1c1a18"/>
+      ${[20, 34].map(y => { let d = `M 20 ${y}`; for (let k = 0; k <= 44; k++) d += ` L ${20 + k * 2.5} ${y + (k % 2 ? -4 : 4)}`; return html`<path d=${d} stroke="#c9c2b0" stroke-width="1.5" fill="none"/>`; })}
+      <rect x="12" y="14" width="8" height="28" fill="#555"/><rect x="130" y="14" width="8" height="28" fill="#555"/><text x="75" y="50" text-anchor="middle" font-size="8" fill="#9b927f">${lab}</text>`;
+    else if (t === 'pedal') body = html`<rect width="150" height="60" rx="4" fill="#141210"/><rect x="38" y="2" width="74" height="56" rx="6" fill=${c} stroke="rgba(0,0,0,.5)"/>
+      ${knobs([54, 75, 96], 14, 6, '#111', '#eee')}<text x="75" y="33" text-anchor="middle" font-size="8.5" font-weight="800" fill=${c2}>${lab}</text>
+      <circle cx="75" cy="46" r="7" fill="#bbb" stroke="#555"/><circle cx="75" cy="25" r="1.8" fill="#ff3a2a"/>`;
+    else if (t === 'tape') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${[44, 106].map(x => html`<circle cx=${x} cy="26" r="17" fill="#1a1a1a" stroke="#999"/><circle cx=${x} cy="26" r="5" fill="#ccc"/>${[0, 120, 240].map(a => html`<line x1=${x} y1="26" x2=${(x + 13 * Math.cos(a * Math.PI / 180)).toFixed(1)} y2=${(26 + 13 * Math.sin(a * Math.PI / 180)).toFixed(1)} stroke="#666" stroke-width="2"/>`)}`)}
+      <path d="M 44 43 L 75 50 L 106 43" stroke="#6a4a2a" stroke-width="2" fill="none"/><text x="75" y="58" text-anchor="middle" font-size="7" fill=${c2}>${lab}</text>`;
+    else if (t === 'can') body = html`<rect width="150" height="60" rx="4" fill="#1c1916"/><rect x="45" y="6" width="60" height="48" rx="4" fill=${c}/><ellipse cx="75" cy="6" rx="30" ry="4" fill=${c2}/><ellipse cx="75" cy="54" rx="30" ry="4" fill=${c2}/>
+      ${[18, 30, 42].map(y => html`<line x1="45" x2="105" y1=${y} y2=${y} stroke="rgba(0,0,0,.35)"/>`)}<text x="75" y="33" text-anchor="middle" font-size="8" font-weight="800" fill="#1a1a1a">${lab}</text>`;
+    else if (t === 'leslie') body = html`<rect width="150" height="60" rx="4" fill="#1c1916"/><rect x="48" y="3" width="54" height="54" rx="4" fill=${c}/><rect x="54" y="8" width="42" height="18" rx="2" fill="#2a1f15"/>
+      ${[58, 66, 74, 82, 90].map(x => html`<line x1=${x} x2=${x} y1="9" y2="25" stroke="#5a4630" stroke-width="2"/>`)}<circle cx="75" cy="41" r="11" fill="#2a1f15"/><circle cx="75" cy="41" r="4" fill="#5a4630"/>`;
+    else if (t === 'geq') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${Array.from({ length: 15 }, (_, k) => html`<rect x=${10 + k * 9} y="8" width="2" height="44" fill="#1a1a1a"/><rect x=${7 + k * 9} y=${24 + Math.round(Math.sin(k * 0.9) * 9)} width="8" height="5" rx="1" fill=${c2}/>`)}`;
+    else if (t === 'pult') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="3" y="3" width="144" height="54" rx="3" fill="none" stroke="rgba(0,0,0,.25)"/>
+      ${knobs([24, 54, 84, 114], 30, 11, '#1a1a1a', '#e8e4da')}<text x="138" y="54" text-anchor="end" font-size="7" font-weight="700" fill=${c2}>${lab}</text>`;
+    else if (t === 'mod2') body = html`<rect width="150" height="60" rx="4" fill="#161412"/>${[0, 1, 2].map(k => html`<rect x=${8 + k * 46} y="3" width="42" height="54" rx="3" fill=${c} stroke="rgba(0,0,0,.4)"/>
+      ${knobs([29 + k * 46], 15, 6, '#222', '#ddd')}${knobs([29 + k * 46], 33, 6, '#222', '#ddd')}<rect x=${16 + k * 46} y="44" width="26" height="6" rx="1" fill=${c2}/>`)}`;
+    else if (t === 'amp') body = html`<rect width="150" height="60" rx="5" fill=${c2}/><rect x="4" y="4" width="142" height="30" rx="3" fill=${c}/>
+      ${Array.from({ length: 13 }, (_, k) => html`<line x1=${8 + k * 11} y1="6" x2=${2 + k * 11} y2="32" stroke="rgba(0,0,0,.18)" stroke-width="3"/>`)}
+      <text x="75" y="24" text-anchor="middle" font-size="10" font-style="italic" font-weight="800" fill="#f3e6cc" opacity=".9">${lab}</text>
+      <rect x="4" y="37" width="142" height="19" rx="2" fill="#c9b07a"/>${knobs([16, 34, 52, 70, 88, 106, 124], 46.5, 5.5, '#1a1612', '#1a1612')}`;
+    else if (t === 'meter') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="82" y="7" width="58" height="34" rx="2" fill="#f1d98e" stroke="#222" stroke-width="2"/>
+      <path d="M 88 37 A 26 26 0 0 1 134 37" stroke="#222" fill="none"/><line x1="111" y1="39" x2="122" y2="15" stroke="#c0392b" stroke-width="1.5"/>
+      ${knobs([20, 46, 20, 46].slice(0, 2), 22, 9)}<text x="12" y="52" font-size="8" font-weight="800" fill=${c2}>${lab}</text>`;
+    else if (t === 'multi') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${[0, 1, 2, 3, 4].map(k => html`<rect x=${10 + k * 27} y="8" width="20" height="34" rx="2" fill="#0e0d0b"/><rect x=${10 + k * 27} y=${8 + [14, 6, 18, 10, 22][k]} width="20" height=${34 - [14, 6, 18, 10, 22][k]} rx="2" fill=${c2}/>`)}<text x="75" y="54" text-anchor="middle" font-size="8" font-weight="800" fill="#e9dcc2">${lab}</text>`;
+    else if (t === 'module') body = html`<rect width="150" height="60" rx="4" fill="#141210"/>${[0, 1, 2, 3, 4].map(k => html`<rect x=${6 + k * 28.4} y="3" width="26" height="54" rx="2" fill=${c}/>
+      ${knobs([19 + k * 28.4], 16, 6, k % 2 ? '#a33' : '#246', '#ddd')}${knobs([19 + k * 28.4], 36, 6, '#222', '#ddd')}`)}<rect x="6" y="49" width="138" height="8" fill=${c2}/><text x="75" y="56" text-anchor="middle" font-size="6.5" font-weight="800" fill="#f3efe6">${lab}</text>`;
+    else if (t === 'strip') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${[0, 1, 2, 3].map(k => html`<rect x=${5 + k * 35.5} y="5" width="33" height="42" rx="2" fill="rgba(0,0,0,.25)"/>${knobs([14 + k * 35.5, 30 + k * 35.5], 18, 5, '#1a1a1a', '#ddd')}${knobs([22 + k * 35.5], 35, 6, '#1a1a1a', '#ddd')}`)}
+      <text x="75" y="56" text-anchor="middle" font-size="8" font-weight="800" fill=${c2} letter-spacing="1">${lab}</text>`;
+    else if (t === 'pitch') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${lcd(10, 8, 80, lab, '#d8c8ff', '#1b1426')}<text x="122" y="22" text-anchor="middle" font-size="16" font-weight="800" fill=${c2}>♯</text>
+      ${Array.from({ length: 13 }, (_, k) => html`<rect x=${10 + k * 10} y="32" width="9" height="20" rx="1" fill=${[1, 3, 6, 8, 10].includes(k % 12) ? '#1a1a1a' : '#f1efe8'}/>`)}`;
+    else if (t === 'curve') body = html`<rect width="150" height="60" rx="4" fill=${c}/><path d="M 8 32 C 30 32 34 20 46 20 S 60 32 72 32 S 92 44 102 44 S 120 32 142 32" stroke=${c2} stroke-width="2.5" fill="none"/>
+      ${[[46, 20, '#ef6f5a'], [102, 44, '#4fc9b7'], [126, 32, '#c58bff']].map(([x, y, cc]) => html`<circle cx=${x} cy=${y} r="4.5" fill=${cc}/>`)}<text x="10" y="54" font-size="8" font-weight="800" fill="#e9dcc2">${lab}</text>`;
+    else if (t === 'img') body = html`<rect width="150" height="60" rx="4" fill=${c}/><circle cx="50" cy="30" r="18" fill="none" stroke=${c2} stroke-width="2"/><circle cx="76" cy="30" r="18" fill="none" stroke=${c2} stroke-width="2" opacity=".7"/>
+      <text x="104" y="34" font-size="9" font-weight="800" fill="#e9dcc2">${lab}</text>`;
+    else if (t === 'spk') body = html`<rect width="150" height="60" rx="4" fill=${c}/><rect x="14" y="6" width="38" height="48" rx="3" fill="#1a1a1a"/><circle cx="33" cy="20" r="7" fill="#333" stroke="#777"/><circle cx="33" cy="40" r="11" fill="#333" stroke="#777"/>
+      <text x="62" y="34" font-size="9" font-weight="800" fill=${c2}>${lab}</text>`;
+    else if (t === 'ext') body = html`<rect width="150" height="60" rx="4" fill=${c}/>${[50, 100].map(x => html`<circle cx=${x} cy="26" r="11" fill="#1a1a1a" stroke="#aaa" stroke-width="2"/><circle cx=${x} cy="26" r="4" fill="#666"/>`)}<text x="75" y="54" text-anchor="middle" font-size="8" font-weight="800" fill="#e9dcc2">${lab}</text>`;
+    else body = html`<rect width="150" height="60" rx="4" fill=${c}/>${lcd(16, 9, 70, lab)}${knobs([24, 50, 76, 102, 128], 40, 8)}`;
+    return html`<svg width=${w} height=${h} viewBox="0 0 150 60" style="display:block;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.6)" aria-hidden="true">${body}</svg>`;
   }
   makeFx() {
     const o = {}, demo = [['HALL', 60, 59], ['ST-DL', 60, 60], ['NONE', 0, 0], ['DEL/REV', 61, 61], ['DEQ3', 8, 8], ['SOUL', 57, 57], ['ROOM', 62, 62], ['DEQ3', 7, 7],
@@ -2902,13 +2979,7 @@ class App extends Component {
   }
   /* the strip's number on the desk's insert list (ASSGN CH), the reverse of fxStrip */
   deskA(s) { return s < 48 ? s + 1 : s === 48 ? 65 : s <= 64 ? s : s <= 72 ? s + 4 : s - 7; }
-  insOf(i, w) {   // w: 'preins' (INS 1) or 'postins' (INS 2) -> { fx: 0..16, on }
-    const c = i === 48 ? this.state.main : this.state.chans[i], I = c && c.ins && c.ins[w];
-    if (I) return I;
-    const M = this.state.monv, a = this.deskA(i);
-    for (let n = 1; n <= 16; n++) if (+M[`/fx/${n}/$a_chn`] === a && (+M[`/fx/${n}/$a_pos`] === 1) === (w === 'postins')) return { fx: n, on: true };
-    return { fx: 0, on: false };
-  }
+  insOf(i, w) { return this.insOfSt(this.state, i, w); }   // w: 'preins' (INS 1) or 'postins' (INS 2) -> { fx: 0..16, on }
   setIns(i, w, p) {
     if (this.isLinked() && !this.state.conn.live) { this.toast('קריאה בלבד: הדלק Live control כדי לשנות את המיקסר'); return; }
     const cur = this.insOf(i, w), nx = { ...cur, ...p }, a = this.deskA(i);
@@ -3165,6 +3236,40 @@ class App extends Component {
       onPointerUp=${() => { this.fxd = null; }} onPointerCancel=${() => { this.fxd = null; }}>
       <b>FX MIX</b><em>${Math.round(mix)} %</em><s style=${`width:${Math.round(mix)}%;background:#c9a25a`}></s></button>`;
   }
+  /* FX DEQ3 drawn and handled by the same screen as the channel's dynamic EQ: its 27 controls <-> three bands */
+  fdeqLay(n) {
+    const P = this.fxParams('DEQ3');
+    return [1, 2, 3].map(b => { const L = {}; ['thr', 'ratio', 'att', 'rel', 'filt', 'g', 'f', 'q', 'mode'].forEach(k => { const e = P.find(x => x[1] === b + '-' + k); if (e) L[k] = `/fx/${n}/p${e[0]}`; }); return L; });
+  }
+  fdeqVals(n) { const o = {}; this.fxParams('DEQ3').forEach(e => { o[`/fx/${n}/p${e[0]}`] = this.fxGet(n, e); }); return o; }
+  fdeqPull(n, force) {
+    const vals = this.fdeqVals(n), sig = n + JSON.stringify(vals);
+    if (!force && sig === this.fdeqSig) return;
+    this.fdeqSig = sig;
+    this.setState(s => ({ fdeq: { ...this.deqIn(s.fdeq.n === n ? s.fdeq : { ...makeDeq3(), R: s.fdeq.R, pre: s.fdeq.pre }, this.fdeqLay(n), vals, '__none__'), n } }));
+  }
+  fdeqPush(n) {
+    const st = this.state, d = {}; this.deqOut(st.fdeq, this.fdeqLay(n), d);
+    const vals = this.fdeqVals(n), patch = {};
+    for (const k in d) if (!near(+d[k] === +d[k] ? +d[k] : d[k], vals[k])) patch[k] = d[k];
+    if (!Object.keys(patch).length) return;
+    if (this.isLinked() && !st.conn.live) { this.toast('קריאה בלבד: הדלק Live control כדי לשנות את המיקסר'); this.fdeqPull(n, true); return; }
+    this.fxPrep(n); this.uAct = Date.now();
+    this.fdeqSig = n + JSON.stringify({ ...vals, ...patch });
+    this.setState(s => ({ monv: { ...s.monv, ...patch } }));
+  }
+  /* which effect slot a DEQ3 screen shows right now (0 = none) */
+  fdeqOn(st) {
+    if (st.screen === 'fxed' && st.fxEd) return this.fxModelOf(st, st.fxEd.n) === 'DEQ3' ? st.fxEd.n : 0;
+    if (st.screen === 'ins' && !st.insPick) { const I = this.insOfSt(st, st.eqCh, st.insSlot || 'preins'); return I.fx && this.fxModelOf(st, I.fx) === 'DEQ3' ? I.fx : 0; }
+    return 0;
+  }
+  fxModelOf(st, n) { return String(st.monv[`/fx/${n}/mdl`] || 'NONE'); }
+  insOfSt(st, i, w) { const c = i === 48 ? st.main : st.chans[i], I = c && c.ins && c.ins[w]; if (I) return I;
+    const a = this.deskA(i); for (let n = 1; n <= 16; n++) if (+st.monv[`/fx/${n}/$a_chn`] === a && (+st.monv[`/fx/${n}/$a_pos`] === 1) === (w === 'postins')) return { fx: n, on: true }; return { fx: 0, on: false }; }
+  /* the strip whose sound a DEQ3 screen works on */
+  fdeqStrip(st) { if (st.screen === 'ins') return st.eqCh; const si = st.fxEd ? this.fxStrip(st.monv[`/fx/${st.fxEd.n}/$a_chn`]) : -1; return si; }
+  renderFdeq(Hd) { this.ek = 'fdeq'; this.eqNoHdr = true; try { return this.renderEQ(Hd); } finally { this.eqNoHdr = false; } }
   /* the full-screen editor (from the FX rack) */
   renderFxEd(Hd) {
     const st = this.state, n = st.fxEd.n, mdl = this.fxModel(n), col = this.fxCol(mdl), si = this.fxStrip(st.monv[`/fx/${n}/$a_chn`]);
@@ -3186,7 +3291,7 @@ class App extends Component {
         ${mdl !== 'NONE' && this.fxMixBar(n, 190)}
         ${!this.isLinked() && html`<span style="font:700 12px/1 var(--mono);letter-spacing:.16em;padding:5px 8px;border-radius:5px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
       </header>
-      <div style="flex:1;min-height:0;padding:10px 14px">${this.fxEditor(n, DW - 28, Hd - 60 - 20)}</div>
+      ${mdl === 'DEQ3' ? this.renderFdeq(Hd - 8) : html`<div style="flex:1;min-height:0;padding:10px 14px">${this.fxEditor(n, DW - 28, Hd - 60 - 20)}</div>`}
       ${st.fxPick && this.renderFxPick(Hd)}${st.fxEnum && this.renderFxEnum(Hd)}`;
   }
   /* the channel's INS 1 / INS 2 tab: the inserted effect, or a slot to choose */
@@ -3198,6 +3303,7 @@ class App extends Component {
       ${I.fx > 0 && html`<button class="pill" aria-pressed=${String(I.on)} onClick=${() => this.setIns(i, w, { on: !I.on })} style=${`width:120px;height:40px;border-radius:8px;${I.on ? 'background:#1d2a19;color:#a6e39c;border-color:#62b85c' : 'background:#141210;color:#8a8170'}`}>${I.on ? 'INSERT ON' : 'INSERT OFF'}</button>
         <button class="small" style="height:40px" onClick=${() => this.setState({ insPick: !st.insPick })}>${st.insPick ? 'BACK TO FX ' + I.fx : 'FX ' + I.fx + ' ▾'}</button>
         ${this.fxMixBar(I.fx, 150)}`}`);
+    if (!pickSlot && this.fxModel(I.fx) === 'DEQ3') return html`${head}${this.renderFdeq(Hd)}${st.fxPick && this.renderFxPick(Hd)}`;
     if (!pickSlot) return html`${head}<div style="flex:1;min-height:0;padding:10px 14px">${this.fxEditor(I.fx, W, H)}</div>${st.fxPick && this.renderFxPick(Hd)}${st.fxEnum && this.renderFxEnum(Hd)}`;
     return html`${head}
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px 14px">
@@ -3232,7 +3338,7 @@ class App extends Component {
         </div>
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
           <span style="align-self:flex-start;pointer-events:none">${this.fxMini(m, 150, 56)}</span>
-          <span style="font-size:13px;font-weight:700;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lname(m)}</span>
+          <span style="font-size:15.5px;font-weight:800;letter-spacing:.02em;color:#f3e6cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lname(m)}</span>
           ${m !== 'NONE' && html`<button class="box" style="height:30px;cursor:ew-resize;touch-action:none" aria-label=${'FX ' + n + ' mix ' + Math.round(mix) + ' %'}
             onPointerDown=${e => { e.stopPropagation(); capture(e); this.fxd = { n, sx: e.clientX, v0: mix, w: e.currentTarget.getBoundingClientRect().width }; }} onClick=${e => e.stopPropagation()}
             onPointerMove=${e => { const d = this.fxd; if (!d || d.n !== n) return; this.uAct = Date.now(); this.monSet(P('fxmix'), Math.round(clamp(d.v0 + (e.clientX - d.sx) / d.w * 100, 0, 100))); }}
@@ -4612,7 +4718,7 @@ class App extends Component {
         ${this.renderLights()}
         <section class="sec" style="gap:12px;padding:16px">
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">מיטרים ליד הפיידרים</span>
-          <span style="font-size:15px;color:#9b927f;text-align:center">מה המיטרים במסך הראשי ובערוץ מראים. אפשר להחליף גם בכפתור הקטן מעל השכבות במסך הראשי.</span>
+          <span style="font-size:15px;color:#9b927f;text-align:center">מה המיטרים במסך הראשי ובערוץ מראים.</span>
           <div style="display:flex;gap:12px">
             ${opt(!P.meterPost, 'לפני הפיידר', 'כמה סאונד נכנס לערוץ, גם כשהפיידר למטה או במיוט.', () => this.setPref({ meterPost: false }))}
             ${opt(!!P.meterPost, 'אחרי הפיידר', 'מה הערוץ שולח הלאה, לפי הפיידר והמיוט.', () => this.setPref({ meterPost: true }))}
