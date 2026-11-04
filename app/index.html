@@ -503,8 +503,11 @@ class App extends Component {
       if (st.screen === 'routing' && st.routeTab === 'ch' && (ps.routeTab !== 'ch' || ps.screen !== 'routing')) { const K = ['in/conn/grp', 'in/conn/in', 'in/conn/altgrp', 'in/conn/altin', 'in/set/altsrc']; const ids = []; for (let s = 0; s < 48; s++) K.forEach(k => ids.push(wid(s, k))); this.reqIds(ids); }
       if (st.screen === 'routing' && st.routeTab === 'src' && (ps.routeTab !== 'src' || ps.routeSrc !== st.routeSrc || ps.screen !== 'routing')) this.reqG([`/io/in/${wgrp(st.routeSrc || 'LCL')}/`]);
       if (st.screen === 'fx' && ps.screen !== 'fx') this.reqG(['/fx/']);
-      const eqOn = (st.screen === 'eq' || st.screen === 'home') && st.eq.pre, eqWas = (ps.screen === 'eq' || ps.screen === 'home') && ps.eq.pre;
-      if (eqOn && (!eqWas || ps.eqCh !== st.eqCh)) { this.reqG(['/cfg/rta/']); clearTimeout(this.rtaT); this.rtaT = setTimeout(() => this.rtaFollow(true), 400); }
+      /* the analyser follows the channel on the EQ and the dynamic EQ screens: after the EQ there; for a dynamic EQ in the gate slot (before the EQ) after the filters */
+      const tapOf = x => (x.screen === 'eq' || x.screen === 'home') && x.eq.pre ? 'POSTEQ'
+        : x.screen === 'dyn' && isDeq(x.slots[x.dynSlot]) && x[x.dynSlot === 'gate' ? 'deq' : 'cdeq'].pre ? (x.dynSlot === 'gate' ? 'FILT' : 'POSTEQ') : null;
+      const eqOn = tapOf(st), eqWas = tapOf(ps);
+      if (eqOn && (eqOn !== eqWas || ps.eqCh !== st.eqCh)) { this.reqG(['/cfg/rta/']); clearTimeout(this.rtaT); this.rtaT = setTimeout(() => this.rtaFollow(true, eqOn), 400); }
       if (!eqOn && eqWas) this.rtaFollow(false);
       if (st.screen === 'osc' && ps.screen !== 'osc') { this.reqG(['/io/in/OSC/']); [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) this.reqStrip(k, 'all'); }); }
       if (st.screen === 'rec' && ps.screen !== 'rec') this.reqStrip(this.playerCh(), 'all');
@@ -543,11 +546,25 @@ class App extends Component {
     if (this.state.conn.live) { this.toast('כבה קודם את Live control'); return; }
     const r = NATIVE.downloadUpdate();
     if (r === 'perm') { this.toast('אשר "התקנת אפליקציות לא מוכרות" עבור Wing Console, חזור ולחץ שוב על UPDATE APP'); return; }
+    const t0 = Date.now();
+    /* the real reason in Hebrew; when it is not about space, the phone's browser gets the download link instead */
+    const fail = () => {
+      const why = typeof NATIVE.updateReason === 'function' ? String(NATIVE.updateReason() || '') : '';
+      this.logLine('err', 'app update download failed' + (why ? ': ' + why : ''));
+      const he = why === 'space' ? 'אין מספיק מקום פנוי בטלפון. פנה מקום ולחץ שוב על UPDATE APP'
+        : why === 'net' || /^http/.test(why) ? 'ההורדה נקטעה בדרך. פותח את קישור ההורדה בדפדפן'
+        : why === 'file' ? 'הטלפון לא הצליח לשמור את הקובץ. פותח את קישור ההורדה בדפדפן'
+        : why ? 'ההורדה לא הצליחה. פותח את קישור ההורדה בדפדפן' : 'ההורדה נכשלה. נסה שוב בעוד רגע';
+      this.toast(he);
+      if (why && why !== 'space' && typeof NATIVE.openUpdateLink === 'function') setTimeout(() => NATIVE.openUpdateLink(), 1500);
+    };
+    if (r === 'space' || r === 'err') { fail(); return; }
     clearInterval(this.dlT);
     this.dlT = setInterval(() => {
       const pr = NATIVE.updateProgress();
+      if (pr < 0 && Date.now() - t0 < 4000) return;   // a moment for the phone's downloader to pick it up
       this.setState(st => ({ conn: { ...st.conn, dl: pr } }));
-      if (pr >= 100 || pr < 0) { clearInterval(this.dlT); if (pr < 0) this.toast('ההורדה נכשלה. נסה שוב כשיש אינטרנט'); }
+      if (pr >= 100 || pr < 0) { clearInterval(this.dlT); if (pr < 0) fail(); }
     }, 500);
   }
   myAddr() { try { return typeof NATIVE.wifiAddress === 'function' ? NATIVE.wifiAddress() : ''; } catch (e) { return ''; } }
@@ -2033,6 +2050,8 @@ class App extends Component {
     const live = this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, this.liveG(i)), 0));
     const stat = this.path(f => this.filt(f) + q.bands.reduce((a, b) => a + this.resp(b, f, b.g), 0));
     const showDyn = sb.dyn && sb.on;
+    const ref = D && st.prefs.deqRef !== false ? st.eq : null;
+    const refCurve = ref ? this.path(f => ref.bands.reduce((a, b) => a + this.resp(b, f, b.g), 0)) : '';
     const rangeCurve = showDyn ? this.path(f => this.filt(f) + q.bands.reduce((a, b, i) => a + this.resp(b, f, i === si ? b.g + b.range : b.g), 0)) : 'M 0 0';
     const y0 = this.Y(0).toFixed(1);
     const selFill = sb.on ? this.path(f => this.resp(sb, f, this.liveG(si))) + ` L ${W} ${y0} L 0 ${y0} Z` : 'M 0 0';
@@ -2070,7 +2089,7 @@ class App extends Component {
         `) : html`
         <header style="height:52px;flex:none;display:flex;align-items:center;gap:8px;padding:0 14px;background:#161412;border-bottom:1px solid #2c2721">
           <span style=${'font-size:15px;font-weight:700;letter-spacing:.08em;color:' + ch.color}>${ch.name.toUpperCase()} · ${D ? 'DYNAMIC EQ' : 'EQ'}</span>
-          <span style="width:12px"></span>${chips(32, true)}<span style="flex:1"></span>${rangeBtn(36)}${!D && rtaBtn(36)}
+          <span style="width:12px"></span>${chips(32, true)}<span style="flex:1"></span>${rangeBtn(36)}${rtaBtn(36)}
           <button class="small" aria-label="Exit full screen" onClick=${() => this.updEq({ fs: false })} style="width:56px;height:40px;display:flex;align-items:center;justify-content:center;padding:0;border-color:#8a6a3a;background:#2a2014;color:var(--brass-hi)">${IC.unfull}</button>
         </header>`}
 
@@ -2086,6 +2105,7 @@ class App extends Component {
               <path d=${gm} stroke="#223239" stroke-width="1" fill="none"/>
               <path d=${`M 0 ${y0} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
               ${q.pre && (!this.isLinked() || q.spec.some(v => v > 0.03)) && html`<path d=${sp} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".55" stroke-width="1"/>`}
+              ${ref && html`<path d=${refCurve} fill="none" stroke="#9fd0dc" stroke-width="1.5" stroke-dasharray="6 4" opacity=".55"/>`}
               <path d=${selFill} fill=${sb.color} fill-opacity=".16"/>
               <path d=${rangeCurve} fill="none" stroke=${sb.color} stroke-width="1.5" stroke-dasharray="4 4" opacity=".8"/>
               <path d=${stat} fill="none" stroke="#d9cdb3" stroke-width="1.5" opacity=".35"/>
@@ -2099,6 +2119,15 @@ class App extends Component {
           ${showDyn && !D && html`
             <span style=${`position:absolute;left:${Math.round(bx)}px;top:${Math.round(clamp(this.Y(sb.g + sb.range), 8, H - 8))}px;width:12px;height:12px;margin:-6px 0 0 -6px;transform:rotate(45deg);background:${sb.color};pointer-events:none`}></span>
             <span style=${`position:absolute;left:${Math.round(bx + 12)}px;top:${Math.round(clamp(this.Y(sb.g + sb.range), 8, H - 8)) - 8}px;font-size:13px;font-weight:700;letter-spacing:.06em;color:${sb.color};pointer-events:none`}>RANGE ${(sb.range > 0 ? '+' : '') + sb.range.toFixed(1)}</span>`}
+          ${ref && ref.bands.filter(b => b.on).map(b => { const y = clamp(this.Y(b.g), 14, H - 14); return html`
+            <span aria-hidden="true" style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(y)}px;width:24px;height:24px;margin:-12px 0 0 -12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid rgba(159,208,220,.7);background:rgba(12,18,20,.55);color:#bfe0e8;font-size:11px;font-weight:700;pointer-events:none`}>${b.id}</span>`; })}
+          ${D && html`<div style="position:absolute;left:8px;top:8px;display:flex;gap:6px">
+            <button onClick=${() => this.setState({ chPick: true })} aria-label=${'Key source: ' + this.keySrcName()} style="height:38px;max-width:250px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #4fc9b7;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden">
+              <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#4fc9b7">KEY</span><span style="overflow:hidden;text-overflow:ellipsis">${this.keySrcName()}</span></button>
+            <button onClick=${() => this.setState({ keyPop: true })} aria-label="Key filter" style="height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #8fd3e0;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap">
+              <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#8fd3e0">FILTER</span>${!this.curSc().on ? 'Flat' : (KEYT[this.curSc().type] || this.curSc().type) + ' · ' + fmtF(this.curSc().f)}</button>
+            ${!q.fs && html`<button onClick=${() => this.updEq({ pre: !q.pre })} aria-pressed=${String(q.pre)} style=${`height:38px;padding:0 10px;border-radius:7px;border:1px solid ${q.pre ? '#7fa6b4' : '#3a342c'};background:rgba(12,16,15,.85);color:${q.pre ? '#cfe0e5' : '#8a8170'};font-size:12px;font-weight:700;letter-spacing:.1em;cursor:pointer`}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`}
+          </div>`}
           ${['lc', 'hc'].filter(k => q[k].on && (D || st.eqCh < 48)).map(k => html`
             <button aria-label=${k.toUpperCase() + ' frequency'} onPointerDown=${e => this.filtDown(k, e)} ...${gEv}
               style=${`position:absolute;left:${Math.round(this.X(q[k].f))}px;top:${Math.round(clamp(this.Y(-3), 14, H - 14))}px;width:34px;height:24px;margin:-12px 0 0 -17px;padding:0;border-radius:6px;border:1px solid #8fa3aa;background:#1b272b;color:#cfe0e5;font-weight:700;font-size:12px;letter-spacing:.06em;cursor:ew-resize;touch-action:none`}>${k.toUpperCase()}</button>`)}
@@ -2169,7 +2198,8 @@ class App extends Component {
             <span style="font-family:var(--mono);font-size:16px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${summary}</span>
           </div>
           ${D && lisBtn('width:110px')}${bypBtn('width:110px', 'pill')}
-        </div>`}`;
+        </div>`}
+      ${D && st.keyPop && this.renderKeyPop(Hd)}${D && st.chPick && this.renderChPick(Hd)}`;
   }
 
   /* ---------- meters: two columns (L/R), fine segments, peak hold ---------- */
@@ -2192,9 +2222,9 @@ class App extends Component {
     return src === this.rtaIdx(s) ? R.b : null;
   }
   /* point the desk's analyser at the channel being edited (live only); give the old source back on leaving */
-  rtaFollow(on) {
+  rtaFollow(on, tap) {
     if (!this.isLinked() || GID['/cfg/rta/rtasrc'] === undefined) return;
-    this.rtaTap(on);
+    this.rtaTap(on, tap);
     const cur = this.gx['/cfg/rta/rtasrc'];
     if (on) {
       const want = this.rtaIdx(this.state.eqCh); if (cur === undefined || +cur === want) return;
@@ -2207,13 +2237,13 @@ class App extends Component {
     }
   }
   /* the analyser after the EQ while editing it (the curve and the sound agree); the old tap goes back on leaving */
-  rtaTap(on) {
+  rtaTap(on, tap = 'POSTEQ') {
     const K = '/cfg/rta/rtatap'; if (GID[K] === undefined) return;
     const cur = this.gx[K];
     if (on) {
-      if (cur === undefined || !this.state.conn.live || String(cur).toUpperCase() === 'POSTEQ') return;
+      if (cur === undefined || !this.state.conn.live || String(cur).toUpperCase() === tap) return;
       if (this.tapPrev === undefined) this.tapPrev = cur;
-      this.logLine('sys', 'RTA tap on the desk: ' + cur + ' → POSTEQ'); this.mxSend(-1, K, 'POSTEQ');
+      this.logLine('sys', 'RTA tap on the desk: ' + cur + ' → ' + tap); this.mxSend(-1, K, tap);
     } else if (this.tapPrev !== undefined) {
       if (this.state.conn.live && String(cur) !== String(this.tapPrev)) { this.logLine('sys', 'RTA tap back to ' + this.tapPrev); this.mxSend(-1, K, this.tapPrev); }
       this.tapPrev = undefined;
@@ -4150,6 +4180,14 @@ class App extends Component {
           </div>
         </section>
         ${this.renderLights()}
+        <section class="sec" style="gap:12px;padding:16px">
+          <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">האיקיו הרגיל בתוך האיקיו הדינמי</span>
+          <span style="font-size:15px;color:#9b927f;text-align:center">במסך האיקיו הדינמי, העקומה והנקודות של האיקיו הרגיל של הערוץ מופיעות בקו מקווקו, רק לצפייה.</span>
+          <div style="display:flex;gap:12px">
+            ${opt(P.deqRef !== false, 'להציג', 'רואים איפה האיקיו הרגיל עובד.', () => this.setPref({ deqRef: true }))}
+            ${opt(P.deqRef === false, 'להסתיר', 'רק הפסים הדינמיים.', () => this.setPref({ deqRef: false }))}
+          </div>
+        </section>
         <section class="sec" style="gap:12px;padding:16px">
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">כניסה לערוץ מהמיקסר</span>
           <span style="font-size:15px;color:#9b927f">לאיזה מסך להגיע כשלוחצים על שם הערוץ במסך הראשי.</span>

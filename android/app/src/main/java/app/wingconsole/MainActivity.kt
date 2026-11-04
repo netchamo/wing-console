@@ -217,10 +217,12 @@ class MainActivity : Activity() {
     }
 
     @Volatile private var updateId = -1L
+    @Volatile private var updateFail = ""
     private var updateReceiver: BroadcastReceiver? = null
 
     private fun startUpdateDownload() {
         val dm = getSystemService(DownloadManager::class.java)
+        updateFail = ""
         if (updateId >= 0) runCatching { dm.remove(updateId) }
         val req = DownloadManager.Request(Uri.parse(APK_URL))
             .setTitle("Wing Console")
@@ -294,18 +296,35 @@ class MainActivity : Activity() {
                 main.post { runCatching { startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))) } }
                 return "perm"
             }
-            main.post { startUpdateDownload() }
-            return "ok"
+            // not enough room for the download (about 1.6 MB) and the install that follows
+            val free = runCatching { (getExternalFilesDir(null) ?: filesDir).usableSpace }.getOrDefault(Long.MAX_VALUE)
+            if (free < 20L * 1024 * 1024) { updateFail = "space"; return "space" }
+            // queued right here, so the progress the page asks for next already finds it
+            return try { startUpdateDownload(); "ok" } catch (e: Exception) { updateFail = "start: ${e.message}"; "err" }
         }
+        /** Why the last download failed, in short words the page turns into Hebrew: space, net, http NNN, file, start... */
+        @JavascriptInterface fun updateReason(): String = updateFail
+        /** Opens the download link in the phone's browser (when the built-in download does not work). */
+        @JavascriptInterface fun openUpdateLink() { main.post { runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(APK_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } } }
         /** 0–99 while downloading, 100 when done, -1 if it failed or nothing is running. */
         @JavascriptInterface fun updateProgress(): Int {
             val id = updateId
             if (id < 0) return -1
             val dm = getSystemService(DownloadManager::class.java)
             dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
-                if (!c.moveToFirst()) return -1
+                if (!c.moveToFirst()) { updateFail = "gone"; return -1 }
                 val status = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-                if (status == DownloadManager.STATUS_FAILED) return -1
+                if (status == DownloadManager.STATUS_FAILED) {
+                    val why = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                    updateFail = when (why) {
+                        DownloadManager.ERROR_INSUFFICIENT_SPACE, DownloadManager.ERROR_DEVICE_NOT_FOUND -> "space"
+                        DownloadManager.ERROR_HTTP_DATA_ERROR, DownloadManager.ERROR_TOO_MANY_REDIRECTS, DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> "net"
+                        DownloadManager.ERROR_FILE_ERROR, DownloadManager.ERROR_FILE_ALREADY_EXISTS -> "file"
+                        in 400..599 -> "http $why"
+                        else -> "other $why"
+                    }
+                    return -1
+                }
                 if (status == DownloadManager.STATUS_SUCCESSFUL) return 100
                 val done = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
                 val total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
