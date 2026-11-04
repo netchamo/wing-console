@@ -254,6 +254,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                 val mR = DoubleArray(4) { -90.0 }
                 // per strip (40 ch, 8 aux, 4 mains, 16 buses, 8 matrices): what the gate / comp hears, and their gain reduction
                 val rta = DoubleArray(120) { -90.0 }
+                val oL = DoubleArray(76) { -90.0 }; val oR = DoubleArray(76) { -90.0 }   // after the fader, per strip
                 val gK = DoubleArray(80) { -90.0 }; val gG = DoubleArray(80); val dK = DoubleArray(80) { -90.0 }; val dG = DoubleArray(80)
                 var mainL = -90.0
                 var mainR = -90.0
@@ -290,6 +291,7 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                         val bo = mo + 4 * 8
                         for (i in 0 until 24) { bL[i] = v(bo + i * 8); bR[i] = v(bo + i * 8 + 1) }
                         for (k in 0 until 120) rta[k] = v(76 * 8 + k)   // 76 strips (40+8+4+16+8) of 8 words, then the 120 rta bands
+                        for (i in 0 until 76) { oL[i] = v(i * 8 + 2); oR[i] = v(i * 8 + 3) }
                         for (i in 0 until 76) { gK[i] = v(i * 8 + 4); gG[i] = v(i * 8 + 5); dK[i] = v(i * 8 + 6); dG[i] = v(i * 8 + 7) }
                         if (!gotFirst) { gotFirst = true; log("sys", "meters: first levels received ($n values, expected ${76 * 8 + 120})") }
                         if (now - lastEmit >= 50) {
@@ -304,7 +306,8 @@ class WingMeters(private val emit: (JSONObject) -> Unit, private val log: (Strin
                             val gk = JSONArray(); val gg = JSONArray(); val dk = JSONArray(); val dg = JSONArray()
                             for (i in 0 until 80) { gk.put(Math.round(gK[i] * 10) / 10.0); gg.put(Math.round(gG[i] * 1000) / 1000.0); dk.put(Math.round(dK[i] * 10) / 10.0); dg.put(Math.round(dG[i] * 1000) / 1000.0) }
                             val ra = JSONArray(); for (k in 0 until 120) ra.put(Math.round(rta[k] * 10) / 10.0)
-                            emit(JSONObject().put("type", "meters").put("rta", ra).put("l", l).put("r", r).put("gk", gk).put("gg", gg).put("dk", dk).put("dg", dg)
+                            val ol = JSONArray(); val orr = JSONArray(); for (i in 0 until 76) { ol.put(Math.round(oL[i] * 10) / 10.0); orr.put(Math.round(oR[i] * 10) / 10.0) }
+                            emit(JSONObject().put("type", "meters").put("rta", ra).put("ol", ol).put("or", orr).put("l", l).put("r", r).put("gk", gk).put("gg", gg).put("dk", dk).put("dg", dg)
                                 .put("ml", Math.round(mainL * 10) / 10.0).put("mr", Math.round(mainR * 10) / 10.0).put("bl", bl).put("br", br).put("mL", ml4).put("mR", mr4))
                         }
                     } catch (_: SocketTimeoutException) { }

@@ -109,6 +109,15 @@ for p, r in by.items():
         G[p] = r
     elif (p.startswith('/cfg/mon/1/') or p.startswith('/cfg/mon/2/')) and r.get('type') != 'node' and p.split('/')[-1] not in ('tags', '$lvlact'):
         G[p] = r
+# effect parameters: like the gate/dyn slots, ids go by position (/fx/N/p1..p33 hold whatever the model puts there)
+FXD, FXSTD = {}, []
+for p, r in by.items():
+    pp = p.split('/')
+    if p.startswith('/fx/') and len(pp) == 5 and 'index' in r:
+        G.setdefault(f'/fx/{pp[2]}/p{r["index"]}', r)
+        if pp[2] == '1': FXD.setdefault(pp[3], []).append((r['index'], pp[4], r))
+FXD = {m: [[i, n, meta(r)] for i, n, r in sorted(L)] for m, L in FXD.items()}
+if '/fx/9/mdl' in by: FXSTD = [x['item'] for x in by['/fx/9/mdl']['items']]
 GIDS = {p: b36(r['id']) for p, r in G.items()}
 GMETA = {}
 for p, r in G.items():
@@ -123,5 +132,5 @@ for p in by:
 
 # nodes the app asks the desk to describe (newer firmware adds children, e.g. the monitor direct input)
 GN = {p: b36(by[p]['id']) for p in ['/cfg/mon/1', '/cfg/mon/2'] if p in by}
-out = {'MD': MODS, 'S': SUF, 'I': ','.join(ids), 'M': META, 'G': GIDS, 'GM': GMETA, 'IN': INCOUNT, 'GN': GN}
+out = {'FXD': FXD, 'FXSTD': FXSTD, 'MD': MODS, 'S': SUF, 'I': ','.join(ids), 'M': META, 'G': GIDS, 'GM': GMETA, 'IN': INCOUNT, 'GN': GN}
 print('const WMAP = ' + json.dumps(out, separators=(',', ':')) + ';')
