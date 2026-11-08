@@ -535,7 +535,7 @@ function makeEq() {
       { id: 'H', type: 'hish', f: 9000, g: 1.5, q: 0.7, on: true, dyn: false, thr: -30, range: 4, att: 5, rel: 120, color: '#a993d9' }
     ],
     sel: 1, fs: false, R: 18, bypass: false, listen: false, pre: true,
-    lc: { on: true, f: 60 }, hc: { on: false, f: 16000 }, tilt: 0,
+    lc: { on: true, f: 60, s: '12' }, hc: { on: false, f: 16000, s: '12' }, tilt: 0, tool: { on: true, mdl: 'TILT' },
     spec, base: spec.slice(), bl: [-40,-40,-40,-40,-40,-40], mIn: 60, mOut: 55
   };
 }
@@ -986,7 +986,7 @@ class App extends Component {
       else if (!this.coreDone) { this.coreDone = true; this.logLine('sys', 'colours: 76/76 read'); }
     }                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     /* names and colours: over the native link they come from the desk itself (below); the OSC copy is only for when that link is down */
-    if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
+    if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/icon', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1 && st.bank < 6 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
@@ -1053,7 +1053,7 @@ class App extends Component {
         const chans = (out.chans || st.chans).slice(); let main = out.main || st.main, touched = false;
         for (const m of osc) {
           const a = m.args || [];
-          let mm = /^\/(ch|aux)\/(\d+)\/(\$?name|\$?col|fdr|mute|\$solo)$/.exec(m.address);
+          let mm = /^\/(ch|aux)\/(\d+)\/(\$?name|\$?col|\$?icon|fdr|mute|\$solo)$/.exec(m.address);
           if (mm) {
             const i = mm[1] === 'ch' ? +mm[2] - 1 : 39 + +mm[2];
             if (i < 0 || i >= 48) continue;
@@ -1062,6 +1062,7 @@ class App extends Component {
             else if (mm[3] === 'mute') ch.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
             else if (mm[3] === '$solo') ch.solo = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
             else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') ch.name = this.nameIn(i, a[0]);
+            else if (mm[3] === 'icon' || mm[3] === '$icon') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 0 && k <= 999) { ch.icon = k; (this.oscIcon || (this.oscIcon = {}))[i] = true; } }
             else if (mm[3] === 'col' || mm[3] === '$col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
             chans[i] = ch; touched = true; continue;
           }
@@ -1326,7 +1327,7 @@ class App extends Component {
       if (has('name')) c.name = this.nameIn(s, mx.name);
       /* channels and aux take their colour from OSC: the native colour answer comes back as the first colour (blue) and made them flicker */
       if (has('col') && s >= 48) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
-      if (has('icon')) c.icon = +mx.icon;
+      if (has('icon') && !(this.oscIcon || {})[s]) c.icon = +mx.icon;
       const sends = c.sends.slice(); let sc = false;
       for (let k = 0; k < 24; k++) { const key = k < 16 ? `send/${k + 1}/lvl` : `send/MX${k - 15}/lvl`; if (has(key)) { sends[k] = posOf(+mx[key]); sc = true; } }
       if (sc) c.sends = sends;
@@ -1378,8 +1379,9 @@ class App extends Component {
         if (b.type === 'notch') b.type = 'bell'; b.on = true; });
       const e = { ...q, bands };
       if (has('eq/on')) e.bypass = +mx['eq/on'] === 0;
-      if (has('flt/lc')) e.lc = { on: +mx['flt/lc'] === 1, f: has('flt/lcf') ? +mx['flt/lcf'] : q.lc.f };
-      if (has('flt/hc')) e.hc = { on: +mx['flt/hc'] === 1, f: has('flt/hcf') ? +mx['flt/hcf'] : q.hc.f };
+      if (has('flt/lc')) e.lc = { on: +mx['flt/lc'] === 1, f: has('flt/lcf') ? +mx['flt/lcf'] : q.lc.f, s: has('flt/lcs') ? String(mx['flt/lcs']) : q.lc.s };
+      if (has('flt/hc')) e.hc = { on: +mx['flt/hc'] === 1, f: has('flt/hcf') ? +mx['flt/hcf'] : q.hc.f, s: has('flt/hcs') ? String(mx['flt/hcs']) : q.hc.s };
+      if (has('flt/tf') || has('flt/mdl')) e.tool = { on: has('flt/tf') ? +mx['flt/tf'] === 1 : (q.tool || {}).on !== false, mdl: has('flt/mdl') ? String(mx['flt/mdl']) : (q.tool || {}).mdl || 'TILT' };
       if (mx['flt/mdl'] === 'TILT' && has('flt/TILT/tilt')) e.tilt = +mx['flt/TILT/tilt'];
       if (s >= 48 && has('eq/STD/tilt')) e.tilt = +mx['eq/STD/tilt'];
       o.eq = e;
@@ -1540,6 +1542,7 @@ class App extends Component {
       if (bh) d['eq/STD/heq'] = bh.type === 'hish' ? 'SHV' : 'PEQ';
       d['eq/on'] = q.bypass ? 0 : 1;
       d['flt/lc'] = q.lc.on ? 1 : 0; d['flt/lcf'] = q.lc.f; d['flt/hc'] = q.hc.on ? 1 : 0; d['flt/hcf'] = q.hc.f;
+      if (q.lc.s) d['flt/lcs'] = q.lc.s; if (q.hc.s) d['flt/hcs'] = q.hc.s; if (q.tool) { d['flt/tf'] = q.tool.on ? 1 : 0; d['flt/mdl'] = q.tool.mdl; }
       if (mx['flt/mdl'] === 'TILT') d['flt/TILT/tilt'] = q.tilt;
       if (s >= 48) d['eq/STD/tilt'] = q.tilt;
     }
@@ -1657,11 +1660,12 @@ class App extends Component {
     const sk = noLong ? null : this.sofK(i), k = this.state.sof;
     const r = e.currentTarget.getBoundingClientRect(), start = sk !== null ? (this.state.chans[i].sends[k] || 0) : this.get(i).v;
     /* on the main screen a tap beside the knob opens the channel; the knob itself still moves and resets on a double tap */
-    const yy = (e.clientY - r.top) * FH / r.height, capTop = (1 - start) * T, onCap = yy >= capTop - 8 && yy <= capTop + 52;
+    const yy = (e.clientY - r.top) * FH / r.height, capTop = (1 - start) * T, onCap = yy >= capTop - 30 && yy <= capTop + 74; /* the knob catches a finger well beyond its drawing */
     if (onCap || noLong) { if (this.dbl('f' + i)) { if (sk !== null) this.setSend(i, k, 0.75); else this.upd(i, { v: 0.75 }); this.fd = null; return; } }
     this.fd = { i, y: e.clientY, start, px: r.height * T / FH, moved: false, send: sk !== null ? k : null, tapOpen: !noLong && !onCap && sk === null && i >= -1 };
     clearTimeout(this.ft);
-    if (i !== -1 && this.hasSends(i) && !noLong) this.ft = setTimeout(() => { if (this.fd && !this.fd.moved) { this.fd = null; this.setState({ sendPop: { i, bank: 0 } }); } }, 500);
+    /* a long press on the knob is a slow drag, never the sends window; beside the knob it opens the sends */
+    if (i !== -1 && this.hasSends(i) && !noLong && !onCap) this.ft = setTimeout(() => { if (this.fd && !this.fd.moved) { this.fd = null; this.setState({ sendPop: { i, bank: 0 } }); } }, 500);
   }
   faderMove(e) {
     const f = this.fd; if (!f) return;
@@ -1714,7 +1718,7 @@ class App extends Component {
 
   renderMain(Hd) {
     const st = this.state, b = st.bank;
-    const FH = Math.round(Hd - 232 - (this.state.prefs.showIcons ? 46 : 0)), T = FH - 44;
+    const FH = Math.round(Hd - 232 - (this.state.prefs.showIcons ? 28 : 0)), T = FH - 44;
     const marks = [[1,'+10'],[0.875,'+5'],[0.75,'0'],[0.625,'-5'],[0.5,'-10'],[0.375,'-20'],[0.25,'-30'],[0.125,'-50'],[0,'-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const segs = lv => { const o = []; for (let s = 17; s >= 0; s--) { const lit = lv > s / 18; o.push(s >= 16 ? (lit ? '#e0513f' : '#2f1714') : s >= 12 ? (lit ? '#e8a33d' : '#2f2414') : (lit ? '#62b85c' : '#16261a')); } return o; };
@@ -1723,10 +1727,10 @@ class App extends Component {
     const lpEnd = () => clearTimeout(this.lpT);
     const strip = (i, c0, j, isMain, tgt) => { const snd = SO && !tgt && i >= 0, c = snd ? { ...c0, v: c0.sends[SK] || 0, mute: (c0.sendOn || [])[SK] === false, pan: SK < 16 ? ((c0.sendPan || [])[SK] || 0) : 0 } : c0; return html`
       <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
-        <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? (i >= 65 && i < 73 ? '#4fc9b7' : '#d9b56a') + ';font-size:15px;letter-spacing:.02em' : c.color) + (SI ? ';height:80px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px 4px' : '')} aria-label=${'Open ' + (i === -1 ? st.chans[48].name : c.name) + '. Hold to ' + (isMain ? 'choose this fader' : 'edit name')}
+        <button class="cname" style=${'background:' + (tgt ? tcol + ';font-size:15px;letter-spacing:.02em;color:#121110' : isMain ? (i >= 65 && i < 73 ? '#4fc9b7' : '#d9b56a') + ';font-size:15px;letter-spacing:.02em' : c.color) + (SI ? ';height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:4px 4px 3px' : '')} aria-label=${'Open ' + (i === -1 ? st.chans[48].name : c.name) + '. Hold to ' + (isMain ? 'choose this fader' : 'edit name')}
           onPointerDown=${() => { if (tgt) return; if (isMain) lpDown(() => this.setState({ mainPick: true })); else if (i >= 0 && i < 48) lpDown(() => this.setState({ nameEdit: { i } })); }} onPointerUp=${lpEnd} onPointerCancel=${lpEnd} onPointerLeave=${lpEnd}
           onClick=${() => { if (this.lpDone) { this.lpDone = false; return; } const s0 = i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
-            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${SI ? html`<span style="width:40px;height:40px;flex:none;color:#121110;opacity:.85">${i === -1 || i === 48 || i >= 73 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.main) : i >= 65 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.mtx) : i >= 49 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.bus) : this.wIcon(this.iconOf(i))}</span><span style="max-width:100%;overflow:hidden;text-overflow:ellipsis">${tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</span>` : tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</button>
+            this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot }); }}>${SI ? html`<span style="width:28px;height:28px;flex:none;color:#121110;opacity:.85">${i === -1 || i === 48 || i >= 73 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.main) : i >= 65 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.mtx) : i >= 49 ? (c.icon > 0 ? this.wIcon(c.icon) : STRIPICON.bus) : this.wIcon(this.iconOf(i))}</span><span style="max-width:100%;overflow:hidden;text-overflow:ellipsis">${tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</span>` : tgt ? c.name : i === -1 ? st.chans[48].name : c.name}</button>
         ${snd && SK >= 16 ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;gap:5px;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${this.busLabel(SK).toUpperCase().slice(0, 9)}</div>` : html`<button class="panmini" aria-label=${(snd ? 'Send pan ' : 'Pan ') + panText(c.pan)} style=${snd ? `border-color:${tcol}88;box-shadow:inset 0 0 8px ${tcol}33` : ''}
           onPointerDown=${e => this.panDown(i, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
@@ -2304,9 +2308,12 @@ class App extends Component {
   }
   filt(f) {
     const q = this.state[this.ek]; let d = 0;
-    if (q.lc.on) d += -10 * Math.log10(1 + Math.pow(q.lc.f / f, 4));
-    if (q.hc.on) d += -10 * Math.log10(1 + Math.pow(f / q.hc.f, 4));
-    return d + q.tilt * Math.log10(f / 1000) / Math.log10(20);
+    /* the slope in dB/oct: 6 per order */
+    if (q.lc.on) d += -10 * Math.log10(1 + Math.pow(q.lc.f / f, 2 * (+q.lc.s || 12) / 6));
+    if (q.hc.on) d += -10 * Math.log10(1 + Math.pow(f / q.hc.f, 2 * (+q.hc.s || 12) / 6));
+    /* the tool filter: only the tilt EQ changes the level; Maxer and the all-pass filters work on phase and transients */
+    const tl = q.tool || { on: true, mdl: 'TILT' };
+    return d + (tl.on && tl.mdl === 'TILT' ? q.tilt * Math.log10(f / 1000) / Math.log10(20) : 0);
   }
   path(fn) {
     const g = this.g, N = 220; let s = '';
@@ -2461,13 +2468,27 @@ class App extends Component {
     const rtaBtn = h => html`<button class="small" style=${`height:${h}px;border-color:${q.pre ? '#7fa6b4' : '#3a342c'}`} onClick=${() => this.updEq({ pre: !q.pre })}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`;
     const tabs = tabsOf(this.state.eqCh);
     const dop = sb.dyn ? 1 : 0.4;
+    const pillOn = on => on ? 'background:#1b272b;color:#cfe0e5;border-color:#8fa3aa' : 'background:#141210;color:#8a8170';
+    /* low cut 6/12/18/24, high cut 6/12 dB/oct: each slope is one tap */
+    const slopes = k => (k === 'lc' ? ['6', '12', '18', '24'] : ['6', '12']).map(x => html`<button aria-pressed=${String(String(q[k].s || '12') === x)} aria-label=${x + ' dB per octave'}
+      onClick=${() => this.updEq({ [k]: { ...q[k], s: x } })} class="pill" style=${`width:40px;height:44px;padding:0;font-size:14px;border-radius:6px;${pillOn(String(q[k].s || '12') === x)}`}>${x}</button>`);
     const frow = (k, short, label, value, hasT) => {
       const on = hasT ? q[k].on : true;
-      return html`<div style="display:flex;gap:6px">
-        ${hasT && html`<button aria-pressed=${String(on)} onClick=${() => this.updEq({ [k]: { ...q[k], on: !on } })} class="pill" style=${`width:64px;height:44px;font-size:15px;border-radius:6px;${on ? 'background:#1b272b;color:#cfe0e5;border-color:#8fa3aa' : 'background:#141210;color:#8a8170'}`}>${short}</button>`}
-        ${this.box(k, label, value, '#8fa3aa', on ? 1 : 0.4, 'flex:1;min-width:0')}
+      return html`<div style="display:flex;gap:5px">
+        ${hasT && html`<button aria-pressed=${String(on)} onClick=${() => this.updEq({ [k]: { ...q[k], on: !on } })} class="pill" style=${`width:56px;height:44px;font-size:15px;border-radius:6px;${pillOn(on)}`}>${short}</button>`}
+        ${this.box(k, label, value, '#8fa3aa', on ? 1 : 0.4, 'flex:1;min-width:0')}${hasT && slopes(k)}
       </div>`;
     };
+    const tl = q.tool || { on: true, mdl: 'TILT' };
+    const TOOLS = [['TILT', 'TILT EQ'], ['MAX', 'MAXER'], ['AP1', 'AP 90'], ['AP2', 'AP 180']];
+    /* the tool filter in one row: on/off, the type (tap for the next of the four), and the tilt amount when it is the tilt EQ */
+    const ti = Math.max(0, TOOLS.findIndex(t => t[0] === tl.mdl));
+    const toolRow = html`<div style="display:flex;gap:5px">
+      <button aria-pressed=${String(tl.on)} onClick=${() => this.updEq({ tool: { ...tl, on: !tl.on } })} class="pill" style=${`width:56px;height:44px;font-size:13px;border-radius:6px;${pillOn(tl.on)}`}>TOOL</button>
+      <button aria-label=${'Tool type ' + TOOLS[ti][1] + ', tap for the next'} onClick=${() => this.updEq({ tool: { ...tl, mdl: TOOLS[(ti + 1) % 4][0] } })} class="pill"
+        style=${`width:112px;height:44px;padding:0 6px;font-size:13px;border-radius:6px;white-space:nowrap;display:flex;align-items:center;justify-content:space-between;${pillOn(tl.on)}`}>${TOOLS[ti][1]}<span style="opacity:.7">›</span></button>
+      ${tl.mdl === 'TILT' ? this.box('tilt', 'Tilt', fmtDb(q.tilt), '#8fa3aa', tl.on ? 1 : 0.4, 'flex:1;min-width:0') : html`<span style="flex:1;align-self:center;font-size:12px;color:#7c8f95;text-align:center">${tl.mdl === 'MAX' ? 'transients' : 'phase only'}</span>`}
+    </div>`;
 
     return html`
       ${this.eqNoHdr && !q.fs ? '' : !q.fs ? this.chanHeader(activeTab, html`
@@ -2495,8 +2516,9 @@ class App extends Component {
               <path d=${`M 0 ${y0} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
               ${q.pre && (!this.isLinked() || q.spec.some(v => v > 0.03)) && html`<path d=${sp} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".55" stroke-width="1"/>`}
               ${ref && html`<path d=${refCurve} fill="none" stroke="#9fd0dc" stroke-width="1.5" stroke-dasharray="6 4" opacity=".55"/>`}
-              <path d=${selFill} fill=${sb.color} fill-opacity=".16"/>
-              <path d=${rangeCurve} fill="none" stroke=${sb.color} stroke-width="1.5" stroke-dasharray="4 4" opacity=".8"/>
+              ${q.bands.map((b, i) => i !== si && b.on && html`<path d=${this.path(f => this.resp(b, f, this.liveG(i))) + ` L ${W} ${y0} L 0 ${y0} Z`} fill=${b.color} fill-opacity=".12"/>`)}
+              <path d=${selFill} fill=${sb.color} fill-opacity=".18"/>
+              <path d=${rangeCurve} fill="none" stroke=${sb.color} stroke-width="1.6" opacity=".85"/>
               <path d=${stat} fill="none" stroke="#d9cdb3" stroke-width="1.5" opacity=".35"/>
               <path d=${live} fill="none" stroke="#f0a24a" stroke-width="9" stroke-linecap="round" opacity=${q.bypass ? 0.05 : 0.22}/>
               <path d=${live} fill="none" stroke="#f6b45e" stroke-width="2.5" stroke-linecap="round" opacity=${q.bypass ? 0.3 : 1}/>
@@ -2517,9 +2539,10 @@ class App extends Component {
               <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#8fd3e0">FILTER</span>${!this.curSc().on ? 'Flat' : (KEYT[this.curSc().type] || this.curSc().type) + ' · ' + fmtF(this.curSc().f)}</button>`}
             ${!q.fs && html`<button onClick=${() => this.updEq({ pre: !q.pre })} aria-pressed=${String(q.pre)} style=${`height:38px;padding:0 10px;border-radius:7px;border:1px solid ${q.pre ? '#7fa6b4' : '#3a342c'};background:rgba(12,16,15,.85);color:${q.pre ? '#cfe0e5' : '#8a8170'};font-size:12px;font-weight:700;letter-spacing:.1em;cursor:pointer`}>${q.pre ? 'RTA ON' : 'RTA OFF'}</button>`}
           </div>`}
-          ${['lc', 'hc'].filter(k => q[k].on && (D || st.eqCh < 48)).map(k => html`
-            <button aria-label=${k.toUpperCase() + ' frequency'} onPointerDown=${e => this.filtDown(k, e)} ...${gEv}
-              style=${`position:absolute;left:${Math.round(this.X(q[k].f))}px;top:${Math.round(clamp(this.Y(-3), 14, H - 14))}px;width:34px;height:24px;margin:-12px 0 0 -17px;padding:0;border-radius:6px;border:1px solid #8fa3aa;background:#1b272b;color:#cfe0e5;font-weight:700;font-size:12px;letter-spacing:.06em;cursor:ew-resize;touch-action:none`}>${k.toUpperCase()}</button>`)}
+          ${['lc', 'hc'].filter(k => (q[k].on || !D) && (D || st.eqCh < 48)).map(k => { const on = q[k].on; return html`
+            <button aria-label=${k.toUpperCase() + ' frequency' + (on ? '' : ', off')} onPointerDown=${e => this.filtDown(k, e)} ...${gEv}
+              style=${`position:absolute;left:${Math.round(clamp(this.X(q[k].f), 34, W - 34))}px;top:${Math.round(clamp(this.Y(-3), 26, H - 26))}px;width:60px;height:44px;margin:-22px 0 0 -30px;padding:0;border:none;background:transparent;cursor:ew-resize;touch-action:none`}>
+              <span style=${`position:absolute;left:8px;top:7px;width:44px;height:30px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:7px;font-weight:800;font-size:13px;letter-spacing:.06em;${on ? 'border:1.5px solid #bfe9f5;background:#2a4650;color:#f2fbff;box-shadow:0 0 12px rgba(143,211,224,.7)' : 'border:1px solid #4a5a60;background:#141a1c;color:#6f8188;opacity:.75'}`}>${k.toUpperCase()}</span></button>`; })}
           ${q.bands.map((b, i) => { const y = D ? this.Y(b.range) : b.type === 'notch' ? this.Y(-R * 0.55) : this.Y(b.g); return html`
             <button aria-label=${`Band ${b.id}, ${fmtF(b.f)}`} onPointerDown=${e => this.bandDown(i, e)} ...${gEv} onWheel=${wheel}
               style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(clamp(y, 18, H - 18))}px;width:54px;height:54px;margin:-27px 0 0 -27px;padding:0;border:none;border-radius:50%;background:transparent;cursor:grab;touch-action:none`}>
@@ -2537,7 +2560,7 @@ class App extends Component {
               onPointerDown=${e => { capture(e); this.thl = { y: e.clientY, t0: sb.thr }; }}
               onPointerMove=${e => { const d = this.thl; if (!d) return; this.updBand(this.state[this.ek].sel, { thr: Math.round(clamp(d.t0 - (e.clientY - d.y) / 5, -60, 0) * 10) / 10 }); }}
               onPointerUp=${() => { this.thl = null; }} onPointerCancel=${() => { this.thl = null; }}
-              style=${`position:absolute;left:${Math.round(tx > bx ? tx + 24 : tx - 132)}px;top:${clamp(railTop + thrY - 20, 4, H - 44)}px;height:40px;min-width:108px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;border-radius:8px;border:1px solid #c9a25a;background:rgba(42,32,20,.92);color:#f3c27a;font-family:var(--mono);font-size:16px;white-space:nowrap;cursor:ns-resize;touch-action:none;box-shadow:0 4px 10px rgba(0,0,0,.5)`}>THR ${sb.thr.toFixed(1)}<span style="font-size:14px;opacity:.8">⇕</span><span style="font-size:11px;font-weight:700;letter-spacing:.06em;padding:2px 5px;border-radius:4px;background:rgba(243,194,122,.18)">${sb.mode === 'low' ? '▼ BELOW' : '▲ ABOVE'}</span></button>`}
+              style=${`position:absolute;left:${Math.round(tx > bx ? tx + 24 : tx - 132)}px;top:${clamp(railTop + thrY - 20, 4, H - 44)}px;height:40px;min-width:96px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;border-radius:8px;border:1px solid #c9a25a;background:rgba(42,32,20,.92);color:#f3c27a;font-family:var(--mono);font-size:16px;white-space:nowrap;cursor:ns-resize;touch-action:none;box-shadow:0 4px 10px rgba(0,0,0,.5)`}>THR ${sb.thr.toFixed(1)}<span style="font-size:14px;opacity:.8">⇕</span></button>`}
         </div>
         <div style=${`width:40px;height:${H}px;flex:none;display:flex;gap:6px;padding:4px 6px;border-radius:8px;background:#0c0b0a;border:1px solid #2c2721`}>
           ${[q.mIn, q.bypass ? q.mIn : q.mOut].map(m => html`<span style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;background:#161412;border-radius:2px"><span style=${`height:${Math.round(m)}%;border-radius:2px;background:linear-gradient(0deg,#4fc9b7,#d6d860 70%,#f0a24a)`}></span></span>`)}
@@ -2579,7 +2602,7 @@ class App extends Component {
           <section class="sec" style="flex:360 1 0">
             ${st.eqCh < 48 && frow('lc', 'LC', 'Low cut', fmtF(q.lc.f), true)}
             ${st.eqCh < 48 && frow('hc', 'HC', 'High cut', fmtF(q.hc.f), true)}
-            ${frow('tilt', '', 'Tilt', fmtDb(q.tilt), false)}
+            ${st.eqCh < 48 ? toolRow : frow('tilt', '', 'Tilt', fmtDb(q.tilt), false)}
           </section>`}
         </div>` : html`
         <div style="flex:1;min-height:0;display:flex;align-items:center;gap:8px;padding:8px 14px">
@@ -5957,9 +5980,6 @@ class App extends Component {
                 <span style=${`display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:${on ? 'var(--brass-hi)' : '#e9dcc2'}`}><span style=${`width:16px;height:16px;border-radius:50%;border:2px solid ${on ? '#f3c27a' : '#5a5144'};background:${on ? '#f3c27a' : 'transparent'}`}></span>${t}</span></button>`; })}
           </div>
         </section>
-        ${this.renderClockStrip()}
-        ${this.renderMixerInfo()}
-        ${this.renderClockSync()}
         <section class="sec" style="gap:12px;padding:16px">
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">סמלים מעל שמות הערוצים</span>
           <span style="font-size:15px;color:#9b927f;text-align:center">במסך הראשי, כל שם ערוץ הופך לריבוע עם סמל (תוף, מיקרופון, גיטרה...). נוח בטאבלט גדול. הפיידרים מתקצרים מעט. לחיצה ארוכה על שם ערוץ בוחרת סמל.</span>
@@ -5968,6 +5988,9 @@ class App extends Component {
             ${opt(!!P.showIcons, 'עם סמלים', 'שם וסמל בריבוע צבעוני.', () => this.setPref({ showIcons: true }), html`${tag('KICK', '#e0566a', 31)}${tag('VOX', '#45aee8', 29)}`)}
           </div>
         </section>
+        ${this.renderClockStrip()}
+        ${this.renderMixerInfo()}
+        ${this.renderClockSync()}
         ${this.renderLights()}
         <section class="sec" style="gap:12px;padding:16px">
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">מיטרים ליד הפיידרים</span>
@@ -6200,6 +6223,13 @@ class App extends Component {
       <span style=${`position:absolute;right:4px;top:-1px;width:7px;height:7px;border-radius:50%;background:${act ? '#ffb347' : '#3a2a18'};box-shadow:${act ? '0 0 8px #ffb347' : 'none'}`}></span>
     </span>`;
   }
+  /* the little screen of a plugin in the gate or dynamics slot (LA Leveler, 76, D241...), small, for the home tiles */
+  slotMini(slot, w, h) {
+    const st = this.state, kind = SLOTK[slot], mdl = st.slots[slot], s = st.eqCh;
+    const own = DEFM[s] ? Object.entries(DEFM[s]).filter(([k]) => k.startsWith(kind + '/')).map(([k, m]) => [+k.split('/')[1], m.name, m]) : [];
+    const L = own.length ? own : (MD[kind][mdl] || MD.gate[mdl] || MD.dyn[mdl] || []), byName = Object.fromEntries(L.map(x => [x[1], x])), vals = st.mdlv[slot] || {};
+    try { return this.faceScreen(mdl, k => byName[k] ? vals[byName[k][0]] : undefined, -20, w, h, false); } catch (e) { return html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName(slot, mdl)}</span>`; }
+  }
   miniComp(W, H) {
     const C = this.state.comp, thr = C.thr, X = db => (clamp(db, -60, 0) + 60) / 60 * W, Y = db => (-clamp(db, -60, 0)) / 60 * H;
     let d = ''; for (let k = 0; k <= 60; k++) { const x = -60 + k, o = this.compOut(x, C); d += (k ? ' L ' : 'M ') + X(x).toFixed(1) + ' ' + Y(o).toFixed(1); }
@@ -6277,7 +6307,7 @@ class App extends Component {
       : /gtr|guit/i.test(n) ? 55 : /pno|piano/i.test(n) ? 75 : /key|synth|org/i.test(n) ? 77 : /vox|voc|sing/i.test(n) ? 29 : /mic/i.test(n) ? 16 : /iem|mon/i.test(n) ? 112 : /rev|dly|delay|fx/i.test(n) ? 6
       : /sax/i.test(n) ? 67 : /tp|trump/i.test(n) ? 69 : /play|mp3|music|pc/i.test(n) ? 120 : 0; }
   wIcon(n) { const e = WICON[n]; return e && e[2] ? html`<svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" dangerouslySetInnerHTML=${{ __html: e[2] }}></svg>`
-      : html`<svg width="100%" height="100%" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="4" fill="currentColor" opacity=".5"/></svg>`; }
+      : ''; }
   renderNameEdit(Hd) {
     Hd -= this.popCut();   // inside a channel screen the pop sits under the header
     const st = this.state, i = st.nameEdit.i, c = st.chans[i], close = () => this.setState({ nameEdit: null });
@@ -6474,7 +6504,7 @@ class App extends Component {
           <div style=${`height:${h1}px;display:flex;gap:10px`}>
             ${i < 48 && html`            ${tile('GATE', mName('gate', gSlot), onSw(this.slotOn('gate'), () => this.setSlotOn('gate', !this.slotOn('gate')), 'Gate'), () => this.goTab('Gate'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                ${gSlot === 'GATE' ? this.miniGate(224, mH) : isDeq(gSlot) ? this.miniEq('deq', 204, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
+                ${gSlot === 'GATE' ? this.miniGate(224, mH) : isDeq(gSlot) ? this.miniEq('deq', 204, mH) : this.slotMini('gate', 224, mH)}
               </span>
               <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:240px;flex:none', gFoot)}
 `}
@@ -6482,7 +6512,7 @@ class App extends Component {
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', i >= 48 ? 760 : 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
             ${tile('COMP', mName('comp', cSlot), onSw(this.slotOn('comp'), () => this.setSlotOn('comp', !this.slotOn('comp')), 'Comp'), () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(212, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}</span>
+                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(212, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : this.slotMini('comp', 212, mH)}</span>
                 ${this.grBars()}
               </span>
               <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:264px;flex:none', cFoot)}
