@@ -986,7 +986,7 @@ class App extends Component {
       else if (!this.coreDone) { this.coreDone = true; this.logLine('sys', 'colours: 76/76 read'); }
     }                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     /* names and colours: over the native link they come from the desk itself (below); the OSC copy is only for when that link is down */
-    if (n % 50 === 1) { for (let i = 0; i < 48; i++) { q.push(chAddr(i) + '/$name'); if (!this.natOpen) q.push(chAddr(i) + '/$col', chAddr(i) + '/$solo'); } for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
+    if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1 && st.bank < 6 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
@@ -1061,8 +1061,8 @@ class App extends Component {
             if (mm[3] === 'fdr' && typeof a[1] === 'number') ch.v = clamp(a[1], 0, 1);
             else if (mm[3] === 'mute') ch.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
             else if (mm[3] === '$solo') ch.solo = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
-            else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') ch.name = a[0].trim() || (i < 40 ? 'Ch ' + (i + 1) : 'Aux ' + (i - 39));
-            else if ((mm[3] === 'col' || mm[3] === '$col') && !this.natOpen) { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
+            else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') ch.name = this.nameIn(i, a[0]);
+            else if (mm[3] === 'col' || mm[3] === '$col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
             chans[i] = ch; touched = true; continue;
           }
           if (m.bus) continue;
@@ -1262,12 +1262,18 @@ class App extends Component {
     });
     this.reqIds(P);
   }
+  /* a strip name from the desk (native or OSC): a real name is kept; an empty answer never wipes a name the desk gave, and only replaces the demo name */
+  nameIn(i, v) {
+    const t = typeof v === 'string' ? v.trim() : '', N = this.deskNm || (this.deskNm = {});
+    if (t) { N[i] = t; return t; }
+    return N[i] || defName(i);
+  }
   onNativeOpen() {
     this.natOpenAt = Date.now(); this.coreTries = 0; this.coreDone = false;
     setTimeout(() => this.reqG(['/$syscfg/']), 400);
     this.logLine('sys', 'reading the desk (native link)');
     /* nothing from demo stays on screen: names and colours start plain until the desk tells its own (it answers right after) */
-    if (!this.deskNamed) { this.deskNamed = true; this.setState(s0 => ({ chans: s0.chans.map((c, i) => this.mx[i] && 'name' in this.mx[i] ? c : { ...c, name: defName(i), color: defColor(i) }) })); }
+    if (!this.deskNamed) { this.deskNamed = true; this.setState(s0 => ({ chans: s0.chans.map((c, i) => (this.deskNm || {})[i] ? c : { ...c, name: defName(i) }) })); }
     for (let s = 0; s < 76; s++) this.reqStrip(s, 'core');
     const st = this.state;
     if (st.screen !== 'main' && st.screen !== 'rec') { this.reqStrip(st.eqCh, 'all'); this.reqSlotDefs(st.eqCh); }
@@ -1317,7 +1323,7 @@ class App extends Component {
     if (has('wid')) { c.width = Math.abs(+mx.wid) / 100; c.swap = +mx.wid < 0; }
     if (!isMain) {
       if (has('$solo')) c.solo = +mx.$solo === 1;
-      if (has('name')) c.name = String(mx.name).trim() || defName(s);
+      if (has('name')) c.name = this.nameIn(s, mx.name);
       if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
       if (has('icon')) c.icon = +mx.icon;
       const sends = c.sends.slice(); let sc = false;
@@ -1335,7 +1341,7 @@ class App extends Component {
       o.main = c;
       const m = { ...st.chans[48] }, sends = m.sends.slice(), on = (m.sendOn || Array(24).fill(true)).slice(); let ch2 = false;
       for (let k = 16; k < 24; k++) { const b = `send/MX${k - 15}/`; if (has(b + 'lvl')) { sends[k] = posOf(+mx[b + 'lvl']); ch2 = true; } if (has(b + 'on')) { on[k] = +mx[b + 'on'] === 1; ch2 = true; } }
-      if (has('name')) { m.name = String(mx.name).trim() || defName(48); ch2 = true; }
+      if (has('name')) { m.name = this.nameIn(48, mx.name); ch2 = true; }
       if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) { m.color = WING_COLORS[k - 1]; ch2 = true; } }
       if (ch2) { const chans = st.chans.slice(); chans[48] = { ...m, sends, sendOn: on }; o.chans = chans; }
     } else { const chans = st.chans.slice(); chans[s] = c; o.chans = chans; }
