@@ -715,6 +715,9 @@ function metaOf(s, suf, mx) {
 }
 const wtype = meta => meta.t === 'int' ? 'i' : (meta.t === 'enum' || meta.t === 'str') ? 's' : 'f';
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number') ? Math.abs(a - b) <= Math.max(1e-3, Math.abs(b) * 2e-3) : String(a) === String(b);
+/* the name a strip has on the desk when nobody named it */
+const defName = i => i < 40 ? 'Ch ' + (i + 1) : i < 48 ? 'Aux ' + (i - 39) : i === 48 ? 'Main LR' : i < 65 ? 'Bus ' + (i - 48) : i < 73 ? 'Mtx ' + (i - 64) : 'Main ' + (i - 71);
+const defColor = i => i < 40 ? '#8c9bb0' : i < 48 ? '#a993d9' : i === 48 || i >= 73 ? '#d9b56a' : i < 65 ? '#c9a25a' : '#7aa7e0';
 const stripName = s => s < 40 ? 'CH ' + pad2(s + 1) : s < 48 ? 'AUX ' + (s - 39) : s === 48 ? 'MAIN 1' : s < 65 ? 'BUS ' + (s - 48) : s < 73 ? 'MTX ' + (s - 64) : 'MAIN ' + (s - 71);
 const fdrDb = v => { const d = dbOf(v); return d === -Infinity ? -144 : Math.round(d * 100) / 100; };
 /* WING source groups: app id <-> WING id */
@@ -983,7 +986,7 @@ class App extends Component {
       else if (!this.coreDone) { this.coreDone = true; this.logLine('sys', 'colours: 76/76 read'); }
     }                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     /* names and colours: over the native link they come from the desk itself (below); the OSC copy is only for when that link is down */
-    if (n % 50 === 1) { if (!this.natOpen) for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
+    if (n % 50 === 1) { for (let i = 0; i < 48; i++) { q.push(chAddr(i) + '/$name'); if (!this.natOpen) q.push(chAddr(i) + '/$col', chAddr(i) + '/$solo'); } for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1 && st.bank < 6 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
@@ -1263,6 +1266,8 @@ class App extends Component {
     this.natOpenAt = Date.now(); this.coreTries = 0; this.coreDone = false;
     setTimeout(() => this.reqG(['/$syscfg/']), 400);
     this.logLine('sys', 'reading the desk (native link)');
+    /* nothing from demo stays on screen: names and colours start plain until the desk tells its own (it answers right after) */
+    if (!this.deskNamed) { this.deskNamed = true; this.setState(s0 => ({ chans: s0.chans.map((c, i) => this.mx[i] && 'name' in this.mx[i] ? c : { ...c, name: defName(i), color: defColor(i) }) })); }
     for (let s = 0; s < 76; s++) this.reqStrip(s, 'core');
     const st = this.state;
     if (st.screen !== 'main' && st.screen !== 'rec') { this.reqStrip(st.eqCh, 'all'); this.reqSlotDefs(st.eqCh); }
@@ -1312,7 +1317,7 @@ class App extends Component {
     if (has('wid')) { c.width = Math.abs(+mx.wid) / 100; c.swap = +mx.wid < 0; }
     if (!isMain) {
       if (has('$solo')) c.solo = +mx.$solo === 1;
-      if (has('name') && String(mx.name).trim()) c.name = String(mx.name).trim();
+      if (has('name')) c.name = String(mx.name).trim() || defName(s);
       if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
       if (has('icon')) c.icon = +mx.icon;
       const sends = c.sends.slice(); let sc = false;
@@ -1330,7 +1335,7 @@ class App extends Component {
       o.main = c;
       const m = { ...st.chans[48] }, sends = m.sends.slice(), on = (m.sendOn || Array(24).fill(true)).slice(); let ch2 = false;
       for (let k = 16; k < 24; k++) { const b = `send/MX${k - 15}/`; if (has(b + 'lvl')) { sends[k] = posOf(+mx[b + 'lvl']); ch2 = true; } if (has(b + 'on')) { on[k] = +mx[b + 'on'] === 1; ch2 = true; } }
-      if (has('name') && String(mx.name).trim()) { m.name = String(mx.name).trim(); ch2 = true; }
+      if (has('name')) { m.name = String(mx.name).trim() || defName(48); ch2 = true; }
       if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) { m.color = WING_COLORS[k - 1]; ch2 = true; } }
       if (ch2) { const chans = st.chans.slice(); chans[48] = { ...m, sends, sendOn: on }; o.chans = chans; }
     } else { const chans = st.chans.slice(); chans[s] = c; o.chans = chans; }
