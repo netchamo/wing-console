@@ -1657,7 +1657,13 @@ class App extends Component {
     if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
     if (f.moved) { if (f.send !== null && f.send !== undefined) this.setSend(f.i, f.send, clamp(f.start - dy / f.px, 0, 1)); else this.upd(f.i, { v: clamp(f.start - dy / f.px, 0, 1) }); }
   }
-  faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) this.openStrip(f.i); }
+  faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) { this.eatClicks(); this.openStrip(f.i); } }
+  /* a tap that changes the screen on pointer-up: the browser's click for the same tap would land on the new screen (EQ, sends...) – swallow it */
+  eatClicks(ms = 450) {
+    const until = Date.now() + ms, eat = e => { if (Date.now() > until) { off(); return; } e.stopPropagation(); e.preventDefault(); };
+    const off = () => ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchend'].forEach(t => window.removeEventListener(t, eat, true));
+    ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchend'].forEach(t => window.addEventListener(t, eat, true)); setTimeout(off, ms + 20);
+  }
   panDown(i, e) {
     capture(e);
     const r = e.currentTarget.getBoundingClientRect();
@@ -6436,45 +6442,37 @@ class App extends Component {
     return html`
       ${this.chanHeader('Home', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">${stripName(i)}</span>`)}
       <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
-        ${i < 48 && html`<div style=${`width:168px;flex:none;height:${bodyH}px;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid #4a4036;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(0,0,0,.4);background:linear-gradient(180deg,#221f1b,#181614);overflow:hidden`}>
-          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="display:flex;align-items:center;gap:6px;padding:0;border:none;background:none;color:inherit;cursor:pointer">
-            <span style="flex:1;font-size:18px;font-weight:800;letter-spacing:.14em;color:#f3e6cc;text-align:left">INPUT</span><span style="color:#8a7d66;font-size:16px">›</span></button>
-          <div style="display:flex;gap:8px;align-items:stretch">
-            ${this.homeGain(src, pre, sv, Math.round(bodyH * 0.5))}
-            <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding-bottom:6px">
-              <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
-              <span style="font-family:var(--mono);font-size:21px;color:#6fb8ff;text-shadow:0 0 10px rgba(95,168,255,.35)">${pre ? gV(src) : '—'}</span>
-              ${pre && html`<button aria-pressed=${String(sv.ph)} aria-label=${'Phantom power ' + (sv.ph ? 'on' : 'off')} onClick=${() => this.updSrc(src, { ph: !sv.ph })}
-                style=${`height:44px;border-radius:9px;font-weight:900;font-size:15px;cursor:pointer;${sv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #ff6b5a;box-shadow:0 0 14px rgba(208,57,43,.6)' : 'background:#2a1513;color:#8a5a52;border:1px solid #4a2420'}`}>+48V</button>`}
-            </div>
-          </div>
-          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding:0;border:none;background:none;color:inherit;text-align:left;cursor:pointer">
-            <span style="display:flex;align-items:center;gap:6px">
-              <span style=${`padding:2px 7px;border-radius:5px;font-weight:700;font-size:12px;letter-spacing:.1em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
-              <span style="font-family:var(--mono);font-size:13px;color:var(--brass-hi);white-space:nowrap">${this.srcLabel(src)}</span></span>
-            <span style="font-size:15px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcName(src)}</span>
-            <span style="display:flex;flex-wrap:wrap;gap:4px">${chip('TRIM ' + (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1), cf.trim !== 0)}${chip('Ø', cf.inv)}${chip(cf.dlyOn ? 'DLY ' + cf.dly.toFixed(1) : 'DLY OFF', cf.dlyOn)}</span>
-            <span style="margin-top:auto;padding-top:6px;border-top:1px solid #2c2721;display:flex;flex-direction:column;gap:2px;font-size:12px;color:#9b927f">
-              <span style="letter-spacing:.1em">${cf.altOn ? 'MAIN' : 'ALT'} standby</span>
-              <span style="font-family:var(--mono);color:#cbbd9f">${other ? this.srcLabel(other) : 'none'}${opre ? ' · ' + gV(other) + ' dB' : ''}${opre && ov.ph ? ' · 48V' : ''}</span></span>
+        ${i < 48 && html`<div style=${`width:88px;flex:none;height:${bodyH}px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 4px;border-radius:10px;border:1px solid #4a4036;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(0,0,0,.4);background:linear-gradient(180deg,#221f1b,#181614);overflow:hidden`}>
+          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="display:flex;align-items:center;gap:3px;padding:0;border:none;background:none;color:inherit;cursor:pointer">
+            <span style="font-size:13px;font-weight:800;letter-spacing:.1em;color:#f3e6cc">INPUT</span><span style="color:#8a7d66;font-size:13px">›</span></button>
+          ${this.homeGain(src, pre, sv, Math.round(bodyH * 0.5))}
+          <span style="font-family:var(--mono);font-size:17px;color:#6fb8ff;text-shadow:0 0 10px rgba(95,168,255,.35)">${pre ? gV(src) : '—'}</span>
+          ${pre && html`<button aria-pressed=${String(sv.ph)} aria-label=${'Phantom power ' + (sv.ph ? 'on' : 'off')} onClick=${() => this.updSrc(src, { ph: !sv.ph })}
+            style=${`width:76px;height:40px;flex:none;border-radius:9px;font-weight:900;font-size:14px;cursor:pointer;${sv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #ff6b5a;box-shadow:0 0 14px rgba(208,57,43,.6)' : 'background:#2a1513;color:#8a5a52;border:1px solid #5a2a24'}`}>+48V</button>`}
+          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;color:inherit;cursor:pointer;overflow:hidden">
+            <span style=${`padding:1px 6px;border-radius:5px;font-weight:700;font-size:11px;letter-spacing:.08em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
+            <span style="max-width:100%;font-family:var(--mono);font-size:12px;color:var(--brass-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcLabel(src)}</span>
+            ${cf.trim !== 0 && html`<span style="font-family:var(--mono);font-size:11px;color:#cbbd9f">TRIM ${(cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1)}</span>`}
+            ${cf.inv && html`<span style="font-family:var(--mono);font-size:11px;color:var(--brass-hi)">Ø</span>`}
+            ${cf.dlyOn && html`<span style="font-family:var(--mono);font-size:11px;color:#cbbd9f">DLY ${cf.dly.toFixed(1)}</span>`}
           </button>
         </div>`}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
           <div style=${`height:${h1}px;display:flex;gap:10px`}>
             ${i < 48 && html`            ${tile('GATE', mName('gate', gSlot), onSw(this.slotOn('gate'), () => this.setSlotOn('gate', !this.slotOn('gate')), 'Gate'), () => this.goTab('Gate'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                ${gSlot === 'GATE' ? this.miniGate(204, mH) : isDeq(gSlot) ? this.miniEq('deq', 204, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
+                ${gSlot === 'GATE' ? this.miniGate(224, mH) : isDeq(gSlot) ? this.miniEq('deq', 204, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:220px;flex:none', gFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:240px;flex:none', gFoot)}
 `}
             ${tile('EQ', q.bypass ? 'Bypassed' : '', onSw(!q.bypass, () => this.setState(s0 => ({ eq: { ...s0.eq, bypass: !s0.eq.bypass } })), 'EQ'), () => this.goTab('EQ'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', i >= 48 ? 760 : 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
             ${tile('COMP', mName('comp', cSlot), onSw(this.slotOn('comp'), () => this.setSlotOn('comp', !this.slotOn('comp')), 'Comp'), () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(172, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}</span>
+                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(212, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}</span>
                 ${this.grBars()}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:220px;flex:none', cFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:264px;flex:none', cFoot)}
           </div>
           <div style=${`height:${h2}px;display:flex;gap:10px`}>
             ${i < 48 ? html`            ${tile('SENDS', '', null, () => { if (this.swLong) { this.swLong = false; return; } this.goTab('Sends'); }, html`
