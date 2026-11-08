@@ -62,13 +62,14 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .pill{height:44px;border-radius:8px;border:1px solid #3a342c;background:#1a1815;color:#e9dcc2;font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .pill.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .fxk{width:104px;height:100px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0 0;border:none;border-radius:8px;background:transparent;cursor:ns-resize;touch-action:none;color:inherit}.fxk:active{background:rgba(255,255,255,.03)}.fxkl{max-width:100px;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#b8a78a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fxkv{font-family:var(--mono);font-size:12.5px;color:#f3e6cc;white-space:nowrap}.fxch{flex:none;height:100px;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:0 6px;border:none;background:transparent;color:inherit}.fxsec{display:flex;flex-direction:column;gap:2px;padding:6px 8px 4px;border-radius:10px;border:1px solid;background:linear-gradient(180deg,#1a1714,#121110)}.fxsect{font-size:11px;font-weight:800;letter-spacing:.2em;padding-left:4px}
+.fxwet svg.fxpic{opacity:var(--wet,1);transition:opacity .12s}
 .box{position:relative;padding:0 10px;display:flex;align-items:center;justify-content:space-between;border-radius:6px;border:1px solid var(--line);background:#141210;cursor:ew-resize;touch-action:none;overflow:hidden;height:44px}
 .box b{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9b927f}
 .box em{font-style:normal;font-family:var(--mono);font-size:15px;color:var(--ink)}
 .box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.tab{height:36px;display:flex;align-items:center;gap:3px;padding:0 6px;border-radius:6px;border:1px solid var(--line);background:transparent;color:#cbbd9f;font-weight:600;font-size:14px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.tab{height:44px;display:flex;align-items:center;gap:3px;padding:0 9px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .topbar.backR>.backbtn{order:98}.topbar.backR>.wood:last-child{order:99}
 .tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
@@ -249,6 +250,136 @@ const FX_HE = {
   OILCAN: ['אויל קאן: דיליי ישן על תוף עם שמן. רך, רועד ובצבע וינטג׳.'],
   'BBD-DL': ['דיליי אנלוגי בסגנון פדל: חזרות כהות וחמות.'],
 };
+/* help for all the other units: shared control names first, then what each unit is and is used for, then the controls whose meaning is the unit's own */
+Object.assign(FXP_HE, {
+  mix: 'מיקס: כמה מהאפקט נכנס לצליל. 100 זה האפקט במלואו; בחלק מהמכשירים אפשר עד 125 כדי להגזים.', fxmix: 'מיקס: כמה מהאפקט נכנס לצליל.',
+  phase: 'פאזה: ההפרש בתנועה בין שמאל לימין. 0 זה ביחד, 180 זה הפוך לגמרי ונשמע הכי רחב.', spd: 'ספיד: כמה מהר התנועה. איטי זה גלי ורך, מהיר זה רועד.',
+  wave: 'צורת הגל של התנועה: עגול ורך או חד ומקפץ.', dlyl: 'דיליי שמאלי: כמה מילישניות הצד השמאלי מתעכב. מקובל 5 עד 20.', dlyr: 'דיליי ימני: כמה מילישניות הצד הימני מתעכב.',
+  depl: 'עומק שמאלי: כמה התנועה חזקה בצד שמאל.', depr: 'עומק ימני: כמה התנועה חזקה בצד ימין.',
+  semi: 'סמיטונים: כמה חצאי טונים להזיז את הקול, עד אוקטבה למעלה או למטה.', cent: 'סנט: הזזה עדינה מאוד בתוך חצי טון. כמה סנטים בלבד יוצרים עיבוי.',
+  pan: 'פאן: איפה הקול הזה יושב בין שמאל לימין.', trim: 'טרים: הגבר לפני המכשיר, כדי ליישר רמה.', g: 'גיין: עוצמת היציאה של המכשיר.', gain: 'גיין: עוצמת היציאה של המכשיר.',
+  thr: 'ת׳רשולד: מאיזו עוצמה המכשיר מתחיל לעבוד. נמוך יותר זה עובד יותר.', ratio: 'רישיו: כמה חזק הוא לוחץ מעל הת׳רשולד. 2:1 עדין, 10:1 כמעט לימיטר.',
+  rel: 'ריליס: כמה מהר הוא משחרר אחרי שהצליל נחלש.', hld: 'הולד: כמה זמן להחזיק פתוח לפני השחרור.', fast: 'פאסט: תגובה מהירה יותר, לצלילים חדים כמו תופים.',
+  on: 'הדלקה וכיבוי של החלק הזה במכשיר. כבוי, הצליל עובר דרכו בלי שינוי.', con: 'הדלקה וכיבוי של הקומפרסור.', lon: 'הדלקה וכיבוי של הלימיטר.',
+  range: 'רנג׳: כמה הגייט מחליש כשהוא סגור. מעט זה עדין, הרבה זה שקט מלא.', hyst: 'היסטרזיס: פער בין פתיחה לסגירה, כדי שהגייט לא ירצד.', m40: 'מוריד את הת׳רשולד ב־40 דציבל, לצלילים שקטים מאוד.',
+  peak: 'פיק: מגיב לשיאים ולא לממוצע, תופס מהר יותר.', knee: 'ני: כמה רך המעבר לפעולה. רך זה טבעי יותר.', again: 'אוטו גיין: מפצה לבד על ההחלשה כדי לשמור על עוצמה.',
+  gin: 'אין גיין: כמה דוחפים פנימה. יותר זה יותר לחיצה ועוצמה.', gout: 'אאוט גיין: התקרה ביציאה. המכשיר לא יעבור את הרמה הזו.', sqz: 'סקוויז: כמה הלימיטר לוחץ את הצליל לצפוף וחזק יותר.',
+  lthr: 'הת׳רשולד של הלימיטר: מעל זה שום דבר לא עובר.', lrec: 'זמן החזרה של הלימיטר. A1 ו־A2 אוטומטיים.', lfast: 'לימיטר מהיר, לשיאים חדים.',
+  cthr: 'הת׳רשולד של הקומפרסור.', crec: 'זמן החזרה של הקומפרסור. A1 ו־A2 אוטומטיים לפי המוזיקה.', cfast: 'קומפרסור מהיר.', in: 'אינפוט: כמה דוחפים לתוך המכשיר. יותר זה יותר לחיצה.',
+  ingain: 'גיין כניסה: כמה דוחפים פנימה. יותר זה יותר לחיצה.',
+  lf: 'תדר הנמוכים: איפה פועל הבס.', lg: 'גיין הנמוכים: הגברה או החלשה של הבס.', lq: 'רוחב הנמוכים: נמוך זה רחב ועדין, גבוה זה צר.', lt: 'סוג הנמוכים: בל זה גבעה סביב התדר, שלף מרים או מוריד את כל מה שמתחת.',
+  lmf: 'תדר הלואו מיד: האזור של חום ובוץ, בערך 200 עד 1000 הרץ.', lmg: 'גיין הלואו מיד.', lmq: 'רוחב הלואו מיד: גבוה זה צר ומדויק.', lmf3: 'מחלק את תדר הלואו מיד בשלוש, לטווח נמוך יותר.',
+  hmf: 'תדר ההיי מיד: האזור של נוכחות ובהירות, בערך 1 עד 7 קילו.', hmg: 'גיין ההיי מיד.', hmq: 'רוחב ההיי מיד.', hmf3: 'מכפיל את תדר ההיי מיד בשלוש, לטווח גבוה יותר.',
+  hf: 'תדר הגבוהים: איפה פועל הטרבל.', hg: 'גיין הגבוהים: הגברה או החלשה של הטרבל והאוויר.', hq: 'רוחב הגבוהים.', ht: 'סוג הגבוהים: בל או שלף.',
+  mf: 'תדר האמצע.', mg: 'גיין האמצע.', mq: 'רוחב האמצע: נמוך זה רחב, גבוה זה צר.', peq: 'הדלקה של הבנדים האמצעיים.', shv: 'הדלקה של השלפים, הנמוך והגבוה.',
+  eq1: 'הדלקה של החלק העליון, איקיו הנמוכים והגבוהים.', eq5: 'הדלקה של החלק התחתון, איקיו האמצעים.',
+  '1lb': 'בוסט בבס: מגביר את הנמוכים בתדר שנבחר.', '1latt': 'החלשה בבס. ביחד עם הבוסט יוצרת את הטריק המפורסם: בס מלא בלי בוץ.', '1lf': 'התדר של הבס.',
+  '1hb': 'בוסט בגבוהים: מוסיף ברק בתדר שנבחר.', '1hf': 'התדר של בוסט הגבוהים.', '1hw': 'רוחב בוסט הגבוהים: נמוך זה צר, גבוה זה רחב.', '1hatt': 'החלשה בגבוהים העליונים, לריכוך.', '1hattf': 'התדר של החלשת הגבוהים.',
+  '5lb': 'בוסט בלואו מיד, לחום ולגוף.', '5lf': 'התדר של בוסט הלואו מיד.', '5md': 'דיפ באמצע: מוריד את אזור הקופסה.', '5mf': 'התדר של הדיפ.', '5hb': 'בוסט בהיי מיד, לנוכחות.', '5hf': 'התדר של בוסט ההיי מיד.',
+  sub: 'סאב: הגברה או החלשה בתחתית העמוקה, סביב 25 הרץ.', 40: 'הבנד של 40 הרץ: הבעיטה והבס העמוק.', 160: 'הבנד של 160 הרץ: גוף וחום.', 650: 'הבנד של 650 הרץ: אזור הקופסה.', '2k5': 'הבנד של 2.5 קילו: נוכחות ועקיצה.',
+  air: 'אייר: כמה אוויר וברק להוסיף למעלה.', airm: 'מאיזה תדר מתחיל האייר. כבוי מבטל אותו.',
+  cab: 'קבינט: מדמה רמקול של מגבר. כבוי זה צליל ישיר וחד.', bass: 'בס.', mid: 'אמצע.', treb: 'טרבל: הגבוהים.', pres: 'פרזנס: חדות ונוכחות בגבוהים העליונים.',
+  mstr: 'מאסטר: העוצמה הכללית של המגבר. גבוה זה יותר רוויה של הספק.', sag: 'סאג: כמה המגבר ״מתכופף״ במכות חזקות, תחושה רכה ונושמת.', vol: 'ווליום: העוצמה, וגם כמה המגבר מתחיל להתלכלך.', bri: 'ברייט: מוסיף ברק לגבוהים.',
+  solo: 'סולו: שומעים רק את מה שהאפקט מוסיף, כדי לכוון אותו.',
+});
+Object.assign(FX_HE, {
+  EXT: ['אקסטרנל: חיבור של מכשיר אפקט חיצוני דרך יציאה וכניסה של המיקסר. משתמשים כשרוצים יחידה אמיתית במשבצת של אפקט.'],
+  DIMCRS: ['דיימנשן כורוס: כורוס עדין ורחב בסגנון שנות ה־80 עם ארבעה מתגים. מרחיב שירה, קלידים וגיטרות בלי תנועה גלית בולטת.'],
+  CHORUS: ['כורוס סטריאו: שני קולות מעט מוזזים בזמן ובגובה שיוצרים עיבוי ורוחב. נפוץ על גיטרות נקיות, קלידים ושירה ברקע.'],
+  FLANGER: ['פלנג׳ר: דיליי קצר מאוד שזז, עם פידבק, ויוצר צליל של מטוס סילון. אפקט בולט לגיטרות, לתופים ולמעברים.'],
+  PITCH: ['פיץ׳ סטריאו: מזיז את גובה הצליל. בהזזה קטנה של סנטים מעבה שירה, בהזזה גדולה יוצר הרמוניה או אוקטבה.'],
+  'D-PITCH': ['דואל פיץ׳: שני קולות נפרדים, לכל אחד גובה, דיליי, מיקום ורמה. נפוץ לעיבוי שירה עם שני קולות מוזזים מעט לשני הצדדים.'],
+  VSS3: ['VSS3: ריברב מתקדם עם החזרות ראשונות וזנב נפרדים, ורשימה גדולה של מקומות מוכנים. בוחרים פריסט ואז מכוונים את הזנב והגבוהים.'],
+  GEQ: ['איקיו גרפי: 31 בנדים קבועים של שליש אוקטבה. משמש בעיקר לכיוון מוניטורים ורמקולים ולהורדת פידבק.'],
+  PIA: ['איקיו גרפי של עשרה בנדים בסגנון 560: מוזיקלי ופשוט, לעיצוב טון של כלי או של קבוצה.'],
+  DOUBLE: ['דאבלר: מדמה הקלטה כפולה של אותו קול. מעבה שירה וגיטרות ומרחיב אותן.'],
+  PCORR: ['תיקון פיץ׳: מושך את השירה לתווים של הסולם שנבחר. איטי זה טבעי, מהיר זה הסאונד הרובוטי המוכר.'],
+  LIMITER: ['לימיטר מדויק: תקרה שאי אפשר לעבור, עם עוצמה גבוהה ושקיפות. מתאים לסוף שרשרת, לבאס ולמאסטר.'],
+  'DE-S2': ['די־אסר בשני בנדים: מנמיך את הסיביליות (ס, ש, צ) בשירה בלי לגעת בשאר הקול.'],
+  ENHANCE: ['אנהנסר: מוסיף בס, גוף ובהירות ומרחיב את התמונה. לשירה, לקבוצות ולמאסטר.'],
+  EXCITER: ['אקסייטר: מייצר הרמוניות עליונות שמוסיפות ברק ונוכחות בלי להגביר רעש. לשירה, לגיטרות אקוסטיות ולמאסטר.'],
+  'P-BASS': ['פסיכו בס: מייצר הרמוניות של הבס כך שמרגישים אותו גם ברמקולים קטנים. לקיק ולבאס.'],
+  ROTARY: ['רוטרי: מדמה את הרמקול המסתובב של אורגן, עם צופר ותוף שמסתובבים במהירויות שונות. לאורגן, לקלידים ולגיטרה.'],
+  PHASER: ['פייזר: מעבר של פילטרים זזים שיוצר צליל ״שוטף״. לגיטרות, לקלידים ולאפקטים.'],
+  PANNER: ['טרמולו ופאנר: משנה עוצמה או מזיז את הצליל בין הצדדים בקצב. יכול להגיב לעוצמת הנגינה.'],
+  TAPE: ['מכונת טייפ: הצבע, הרוויה והדחיסה העדינה של הקלטה על סרט. מחמם קבוצות ומאסטר.'],
+  MOOD: ['מוד פילטר: פילטר זז שנפתח לפי עוצמת הנגינה או לפי קצב. הסאונד של ״וואו״ אוטומטי לגיטרה, לבאס ולקלידים.'],
+  SUB: ['סאב אוקטבר: מייצר קול נמוך באוקטבה או בשתיים מתחת. מעבה באס וקיק.'],
+  'SUB-M': ['סאב מונסטר: מוסיף תחתית עמוקה בכמה בנדים סביב תדר הבסיס. לקיק ולבאס במוזיקה אלקטרונית.'],
+  RACKAMP: ['רק אמפ: מגבר גיטרה בסגנון יחידת מדף, מנקי ועד עיוות. לגיטרה או בס שנכנסים ישירות.'],
+  UKROCK: ['מגבר רוק בריטי: צליל קרנצ׳ קלאסי ועבה. לגיטרות רוק.'],
+  ANGEL: ['מגבר היי גיין: עיוות חזק ומודרני עם מתגים לצבע. לגיטרות כבדות ולסולו.'],
+  JAZZC: ['מגבר ג׳אז קלין: נקי, חם ועגול. לגיטרה נקייה ולג׳אז.'],
+  DELUXE: ['מגבר דלוקס: מגבר קטן וחם שמתלכלך בעדינות כשמגבירים. לבלוז ולקאנטרי.'],
+  BODY: ['בודי רז: מחזיר גוף לגיטרה אקוסטית עם פיקאפ, כך שתישמע כמו מיקרופון.'],
+  SOUL: ['סול אנלוג: איקיו קונסולה בריטי, מוזיקלי וחד. לכל ערוץ, בעיקר שירה ותופים.'],
+  E88: ['איבן 88: איקיו קונסולה קלאסי, חם ורך עם בנדים שנשמעים טוב גם בהגברה גדולה.'],
+  E84: ['איבן 84: איקיו בסגנון 1084 עם תדרים קבועים. חום ואופי, במיוחד לבס ולשירה.'],
+  F110: ['פורטיסימו 110: איקיו בסגנון קונסולה אמריקאית, חד ונוכח. לתופים ולגיטרות.'],
+  PULSAR: ['פולסר: איקיו פסיבי בסגנון הפולטק. בוסט והחלשה באותו תדר נותנים בס מלא ונקי, ואוויר רך בגבוהים.'],
+  MACH4: ['מאך איקיו 4: חמישה בנדים קבועים ואייר. עיצוב טון רחב למאסטר ולקבוצות.'],
+  'C5-CMB': ['קומבינטור: קומפרסור בחמישה בנדים. שולט בכל אזור תדר בנפרד, למאסטר ולקבוצות.'],
+  'V-IMG': ['ולווט אימג׳ר: מרחיב או מצמצם את התמונה הסטריאופונית. לקלידים, לקבוצות ולמאסטר.'],
+  SPKMAN: ['ספיקר מנג׳ר: כל מה שצריך לרמקול: פילטרים, טילט, פאזה ויישור זמן, איקיו דינמי ולימיטר. לרמקולי במה ומוניטורים.'],
+  DEQ3: ['טריפל דינמיק איקיו: שלושה בנדים שמגיבים לעוצמה, ופועלים רק כשצריך. לסיביליות, לבוץ שמגיע ונעלם ולתהודה.'],
+  '*EVEN*': ['איבן צ׳אנל: ערוץ קונסולה שלם: גייט, איקיו 88 וקומפרסור עם לימיטר. בלשוניות למעלה בוחרים איזה חלק לערוך.'],
+  '*SOUL*': ['סול צ׳אנל: ערוץ קונסולה בריטי שלם: גייט, איקיו וקומפרסור.'],
+  '*VINTAGE*': ['וינטג׳ צ׳אנל: קומפרסור 76, איקיו פולסר ולוולר 2A ברצף אחד. ערוץ קלאסי לשירה.'],
+  '*BUS*': ['בוס צ׳אנל: צבע, איקיו 84 וקומפרסור של קבוצה, לחיבור הכלים יחד.'],
+  '*MASTER*': ['מאסטרינג: טייפ, איקיו, אנהנסר ולימיטר לסוף השרשרת של המיקס.'],
+});
+/* what a control does in this unit when the shared meaning does not fit */
+const ENH_HE = { stlvl: 'רמת הסטריאו: כמה מהחלק הרחב נכנס.', lmf: 'פיזור הלואו מיד בין הצדדים.', mlvl: 'רמת המונו: כמה מהמרכז נכנס.', st: 'מיקום החלק הסטריאו.', m: 'מיקום החלק המונו.',
+  bass: 'כמה בס להוסיף.', mid: 'כמה אמצע להוסיף.', high: 'כמה גבוהים להוסיף.', bassf: 'תדר הבס שמוסיפים.', midq: 'רוחב האמצע שמוסיפים.', highf: 'תדר הגבוהים שמוסיפים.' };
+const FXM_HE = {
+  EXT: { egrp: 'מאיזו קבוצת כניסות חוזר המכשיר החיצוני.', ein: 'מספר הכניסה בקבוצה.', emode: 'מונו, סטריאו או מיד/סייד.', lat: 'השהיה של המכשיר החיצוני, כדי ליישר את הזמן.', trim: 'טרים של החזרה.' },
+  DIMCRS: { sw1: 'מתג 1: העדין ביותר.', sw2: 'מתג 2.', sw3: 'מתג 3.', sw4: 'מתג 4: העמוק ביותר. אפשר לשלב כמה מתגים.', in: 'כניסה מונו או סטריאו.', drysw: 'מבטל את הצליל הנקי ומשאיר רק את האפקט.' },
+  'D-PITCH': { dly1: 'כמה הקול הראשון מתעכב.', dly2: 'כמה הקול השני מתעכב.', lvl1: 'רמת הקול הראשון.', lvl2: 'רמת הקול השני.' },
+  PITCH: { dly: 'דיליי לפני הקול המוזז.' },
+  VSS3: { preset: 'פריסט: מקום מוכן מהרשימה. בוחרים ולוחצים לואד.', load: 'טוען את הפריסט שנבחר.', erpdly: 'פרי דיליי של ההחזרות הראשונות.', ertype: 'סוג ההחזרות הראשונות: המקום שהן מדמות.',
+    ersize: 'גודל ההחזרות הראשונות.', erpos: 'קרוב או רחוק מהמקור.', erbal: 'איזון שמאל וימין של ההחזרות.', erlc: 'לואו קאט להחזרות.', ercol: 'צבע ההחזרות: כהה או בהיר.',
+    rvtype: 'סוג הזנב.', rvwid: 'רוחב הזנב.', rvbal: 'איזון שמאל וימין של הזנב.', rvlvl: 'רמת הזנב.', ldcy: 'דיקיי של הנמוכים, יחסית לזנב.', lmdcy: 'דיקיי של הלואו מיד.', hmdcy: 'דיקיי של ההיי מיד.', hdcy: 'דיקיי של הגבוהים.',
+    hsoft: 'ריכוך של הגבוהים בזנב.', lxo: 'תדר החלוקה בין הנמוכים ללואו מיד.', mxo: 'תדר החלוקה באמצע.', hxo: 'תדר החלוקה לגבוהים.', lshv: 'תדר השלף הנמוך.', lsdmp: 'כמה להנמיך את הנמוכים מתחת לשלף.',
+    hcut: 'היי קאט לכל הריברב.', mtype: 'סוג המודולציה בזנב.', mrate: 'קצב המודולציה.', mwid: 'עומק המודולציה.', view: 'מה מוצג בתצוגה.' },
+  GEQ: { type: 'סטנדרט: כל בנד פועל לבד. טרו: העקומה יוצאת בדיוק כמו הפיידרים, גם כשבנדים שכנים זזים.' },
+  PIA: { g: 'גיין כללי ביציאה.' },
+  PCORR: { spd: 'מהירות התיקון: איטי זה טבעי, מהיר זה רובוטי.', amnt: 'כמה חזק התיקון.', a4: 'הכיוון של הלה, בדרך כלל 440.' },
+  LIMITER: { rel: 'ריליס: כמה מהר הלימיטר משחרר. מהיר זה חזק יותר, איטי זה חלק יותר.' },
+  'DE-S2': { lo: 'כמה להחליש בבנד הנמוך של הסיביליות.', hi: 'כמה להחליש בבנד הגבוה.', los: 'רמת הזיהוי בבנד הנמוך.', his: 'רמת הזיהוי בבנד הגבוה.', gdr: 'קול נשי או גברי: מזיז את התדרים לקול.' },
+  ENHANCE: { ...ENH_HE, g: 'גיין היציאה.' },
+  '*MASTER*': { ...ENH_HE, spd: 'מהירות הטייפ: 7.5 חם ועבה, 30 נקי ומדויק.', hi: 'שלף גבוהים של הטייפ.', bass: 'כמה בס להוסיף.', mid: 'כמה אמצע להוסיף.' },
+  EXCITER: { tune: 'מאיזה תדר מתחילות ההרמוניות.', peak: 'כמה ההרמוניות חדות.', zero: 'מילוי של האזור מתחת לתדר.', tmb: 'צבע: כהה או בהיר.', hrm: 'כמה הרמוניות לייצר.', solo: 'מבטל את הצליל הנקי, לשמוע רק את התוספת.' },
+  'P-BASS': { int: 'כמה הרמוניות בס לייצר.', bass: 'כמה מהבס המקורי להשאיר.', xf: 'מתחת לאיזה תדר עובדים.' },
+  ROTARY: { sw: 'עצירה, איטי או מהיר: כמו הפדל של האורגן.', lo: 'המהירות האיטית.', hi: 'המהירות המהירה.', bal: 'האיזון בין התוף הנמוך לצופר הגבוה.', dist: 'מרחק המיקרופונים מהרמקול.', dac: 'כמה מהר התוף מאיץ ומאט.', hac: 'כמה מהר הצופר מאיץ ומאט.' },
+  PHASER: { range: 'הטווח שבו הפילטרים נעים.', emod: 'כמה עוצמת הנגינה מזיזה את הפייזר.', stg: 'מספר השלבים: יותר זה עמוק ובולט יותר.', reso: 'רזוננס: מחדד את השוטף.', hld: 'הולד של המעקב אחרי העוצמה.', rel: 'ריליס של המעקב אחרי העוצמה.' },
+  PANNER: { espd: 'כמה עוצמת הנגינה משנה את המהירות.', edep: 'כמה עוצמת הנגינה משנה את העומק.', hld: 'הולד של המעקב אחרי העוצמה.', rel: 'ריליס של המעקב אחרי העוצמה.', depth: 'עומק: כמה חזק השינוי.' },
+  TAPE: { spd: 'מהירות הטייפ: 7.5 חם ועבה, 30 נקי ומדויק.', hi: 'שלף גבוהים של הטייפ.' },
+  MOOD: { fbase: 'התדר שממנו הפילטר מתחיל.', filt: 'סוג הפילטר: לואו פאס, היי פאס, באנד פאס או נוץ׳.', slope: 'כמה חד הפילטר.', reso: 'רזוננס: השריקה בתדר של הפילטר.', env: 'כמה עוצמת הנגינה פותחת את הפילטר, ולאיזה כיוון.',
+    hld: 'הולד של המעקב אחרי העוצמה.', rel: 'ריליס של המעקב אחרי העוצמה.', lfo: 'כמה הקצב הקבוע מזיז את הפילטר.', wave: 'צורת הגל של הקצב.' },
+  SUB: { rng: 'הטווח של הקול המקורי, כדי שהזיהוי יעבוד טוב.', oct1: 'רמת האוקטבה הראשונה מתחת.', oct2: 'רמת האוקטבה השנייה מתחת.' },
+  'SUB-M': { freq: 'תדר הבסיס.', bd1: 'בנד 1, העמוק ביותר.', bd2: 'בנד 2.', bd3: 'בנד 3.', bd4: 'בנד 4.', bd5: 'בנד 5, הגבוה ביותר.' },
+  RACKAMP: { pre: 'פריאמפ: כמה מתלכלך.', buzz: 'באז: גרגר עדין.', punch: 'פאנץ׳: מכה באמצעים.', crunch: 'קראנץ׳: עיוות של מגבר דחוף.', drive: 'דרייב: עיוות כללי.', leq: 'איקיו נמוכים.', heq: 'איקיו גבוהים.' },
+  UKROCK: { gain: 'גיין: כמה המגבר מתלכלך.' }, ANGEL: { gain: 'גיין: כמה עיוות.', midb: 'מגביר את האמצע, לסולו.', bot: 'מוסיף תחתית.' },
+  BODY: { body: 'כמה גוף להחזיר.' },
+  'C5-CMB': { att: 'אטאק: כמה מהר הבנדים מגיבים.', arel: 'ריליס אוטומטי לפי המוזיקה.', sbc: 'מהירות השליטה בין הבנדים.', sbcon: 'מונע מבנד אחד ללחוץ הרבה יותר מהאחרים.',
+    thr: 'ת׳רשולד כללי לכל הבנדים.', gain: 'גיין כללי.', bandsel: 'איזה בנד מוצג בגרף.', slope: 'כמה חדה החלוקה בין הבנדים.', byp: 'עוקף את הבנד הזה.', width: 'רוחב הסטריאו של הבנד.', $bdsolo: 'שומעים רק את הבנד שנבחר.' },
+  'V-IMG': { st: 'רוחב: מתחת ל־50 מצמצם, מעל מרחיב.', deep: 'מרחיב גם את הנמוכים.' },
+  SPKMAN: { hpf: 'היי פאס: חותך את הנמוכים מתחת לתדר, להגנה על הרמקול.', hptype: 'השיפוע והסוג של ההיי פאס. 24 לינקוויץ־ריילי הוא הנפוץ לחלוקת תדרים.', lpf: 'לואו פאס: חותך את הגבוהים מעל התדר.', lptype: 'השיפוע והסוג של הלואו פאס.',
+    tiltf: 'נקודת הציר של הטילט.', tiltg: 'טילט: מטה את כל הטון לבהיר או לכהה סביב הציר.', invert: 'הופך קוטביות.', dist: 'יישור זמן: המרחק בין הרמקולים, ההשהיה מחושבת לבד.', pos: 'מיקום הרמקול קדימה או אחורה.',
+    dyneq: 'הדלקה של האיקיו הדינמי.', deqthr: 'מאיזו עוצמה האיקיו הדינמי פועל.', deqratio: 'כמה חזק הוא פועל.', deqatt: 'כמה מהר הוא מגיב.', deqrel: 'כמה מהר הוא משחרר.', deqfilt: 'צורת הבנד: בל, או שלף נמוך או גבוה.',
+    deqg: 'כמה להגביר או להחליש כשהוא פועל.', deqf: 'התדר של הבנד.', deqq: 'רוחב הבנד.', deqmode: 'פועל מעל הת׳רשולד או מתחתיו.', lim: 'הדלקה של הלימיטר.', limthr: 'התקרה של הלימיטר.', limrms: 'RMS זה רך לפי הממוצע, פיק תופס כל שיא.', limrel: 'כמה מהר הלימיטר משחרר.' },
+  DEQ3: { att: 'כמה מהר הבנד מגיב.', filt: 'צורת הבנד: בל, או שלף נמוך או גבוה.', f: 'התדר של הבנד.', q: 'רוחב הבנד.', mode: 'פועל מעל הת׳רשולד או מתחתיו.' },
+  '*BUS*': { hrm: 'כמה הרמוניות וחום מוסיפים.', trim: 'טרים לפני החלק הצובע.' },
+  '*VINTAGE*': { peak: 'פיק רדקשן: כמה הלוולר לוחץ.' },
+};
+/* the help line of one control: the unit's own meaning, then the shared one; with or without the module prefix (g_thr, 1-thr, thr_1) */
+const fxHelpOf = (m, k) => {
+  const c = [k, k.replace(/^[a-z]+_/, ''), k.replace(/^\d-/, ''), k.replace(/_\d$/, ''), k.replace(/(\D)\d$/, '$1')], M = FXM_HE[m] || {};
+  for (const x of c) if (M[x]) return M[x]; for (const x of c) if (FXP_HE[x]) return FXP_HE[x];
+  if (/^sw_/.test(k)) return 'התו הזה בסולם: דלוק אומר שהשירה נמשכת אליו.';
+  if (/^\d/.test(k) || k === 'TRIM') return k === 'TRIM' ? 'טרים: עוצמה כללית של האיקיו.' : 'הגבר או החלש את התדר הזה. למעלה מגביר, למטה מחליש.';
+  return null;
+};
 /* panels built from a description: per model one or more modules (tabs on the channel strips), each with its look, its own on switch
    (inside the effect), the control rows, and a live picture. main = the switch on the panel that is the effect's main ON (the insert). */
 const LK = {
@@ -275,8 +406,8 @@ const LK = {
 const FXS = {
   EXT: [{ title: 'EXTERNAL EFFECT', look: 'black', rows: [['egrp', 'ein', 'emode'], ['lat', 'trim']], pic: 'ext' }],
   DIMCRS: [{ title: 'DIMENSION CHORUS', look: 'black', rows: [['sw1', 'sw2', 'sw3', 'sw4'], ['in', 'drysw']], pic: 'dim' }],
-  CHORUS: [{ title: 'STEREO CHORUS', look: 'blue', rows: [['spd', 'wave', 'sprd', 'phase'], ['dlyl', 'dlyr', 'depl', 'depr', 'mix'], ['lc', 'hc']], pic: 'mod', main: 'foot' }],
-  FLANGER: [{ title: 'STEREO FLANGER', look: 'gold', rows: [['flc', 'fhc', 'feed'], ['dlyl', 'dlyr', 'depl', 'depr', 'spd', 'phase', 'mix'], ['lc', 'hc']], pic: 'mod' }],
+  CHORUS: [{ title: 'STEREO CHORUS', look: 'blue', rows: [['spd', 'wave', 'sprd', 'phase'], ['dlyl', 'dlyr', 'depl', 'depr', 'mix'], ['lc', 'hc']], pic: 'mod', main: 'foot', resets: [['lc', 'hc']] }],
+  FLANGER: [{ title: 'STEREO FLANGER', look: 'gold', rows: [['flc', 'fhc', 'feed'], ['dlyl', 'dlyr', 'depl', 'depr', 'spd', 'phase', 'mix'], ['lc', 'hc']], pic: 'mod', resets: [['flc', 'fhc', 'feed'], ['lc', 'hc']] }],
   PITCH: [{ title: 'STEREO PITCH', look: 'black', rows: [['semi', 'cent', 'dly', 'mix'], ['lc', 'hc']], pic: 'pitch' }],
   'D-PITCH': [{ title: 'DUAL PITCH', look: 'steel', rows: [['dly1', 'pan1', 'semi1', 'cent1', 'lvl1'], ['dly2', 'pan2', 'semi2', 'cent2', 'lvl2'], ['lc', 'hc']], pic: 'pitch', main: 'toggle' }],
   VSS3: [{ title: 'VSS3 REVERB', look: 'steel', rows: [['preset', 'load', 'dcy', 'rvlvl', 'erlvl', 'hcut'], ['rvtype', 'rvwid', 'rvpdly', 'diff', 'rvbal', 'hsoft'], ['ertype', 'ersize', 'erpos', 'erpdly', 'erbal', 'erlc', 'ercol'], ['ldcy', 'lmdcy', 'hmdcy', 'hdcy', 'lxo', 'mxo', 'hxo', 'lshv', 'lsdmp'], ['mtype', 'mrate', 'mwid', 'view']], pic: 'rev' }],
@@ -331,7 +462,7 @@ const FXS = {
     { t: 'ENH', title: 'ENHANCER', look: 'gold', on: 'e_on', rows: [['e_bassf', 'e_midq', 'e_highf'], ['e_bass', 'e_mid', 'e_high'], ['e_lmf', 'e_stlvl', 'e_st', 'e_mlvl', 'e_m']], pic: 'enh' },
     { t: 'LIM', title: 'PRECISION LIMITER', look: 'steel', on: 'l_on', rows: [['l_gin', 'l_again', 'l_gout'], ['l_sqz', 'l_knee', 'l_att', 'l_rel']], pic: 'lim' }],
 };
-window.FXS = FXS;
+window.FXS = FXS; window.fxHelpOf = fxHelpOf; window.FX_HE = FX_HE;
 const FX_FDR = { t: 'lin', a: -60, b: 10, n: 701, u: 'dB' };   /* a level control: shown -60..+10 dB */
 const FXU = { seconds: 's', ms: 'ms', Hz: 'Hz', '%': '%', dB: 'dB', meters: 'm' };
 const DYN_KEY_SCALE = 0.5;   /* comp detector only: the desk reports it about twice as deep; the gate key is already in dB */
@@ -682,10 +813,14 @@ class App extends Component {
       if ((st.screen === 'ins' && ps.screen !== 'ins') || (st.screen === 'ins' && ps.insSlot !== st.insSlot)) { this.reqIds(Object.keys(GID).filter(p => /^\/fx\/\d+\/(mdl|fxmix|\$a_chn|\$a_pos)$/.test(p)).map(p => GID[p])); this.reqStrip(st.eqCh, 'all'); }
       /* the analyser follows the channel on the EQ and the dynamic EQ screens: after the EQ there; for a dynamic EQ in the gate slot (before the EQ) after the filters */
       const fdq = x => this.fdeqOn(x) && x.fdeq.pre ? (x.screen === 'ins' && x.insSlot === 'postins' ? 'POSTEQ' : 'PREEQ') : null;
-      const tapOf = x => fdq(x) ? (this.fdeqStrip(x) >= 0 ? fdq(x) : null) : (x.screen === 'eq' || x.screen === 'home') && x.eq.pre ? 'POSTEQ'
+      /* an effect with an EQ graph open in the editor: the analyser shows what goes into it, on the strip it sits on */
+      const fxq = x => { if (x.screen !== 'fxed' || !x.fxEd) return null; const n = x.fxEd.n, m = x.monv[`/fx/${n}/mdl`], W = this.fxWhere(n, x);
+        if (!W || !(/^(GEQ|PIA|SPKMAN)$/.test(m) || (FXS[m] || []).some(t => t.pic === 'eq'))) return null; return W.w === 'postins' ? 'POSTEQ' : 'PREEQ'; };
+      const tapOf = x => fxq(x) ? fxq(x) : fdq(x) ? (this.fdeqStrip(x) >= 0 ? fdq(x) : null) : (x.screen === 'eq' || x.screen === 'home') && x.eq.pre ? 'POSTEQ'
         : x.screen === 'dyn' && isDeq(x.slots[x.dynSlot]) && x[x.dynSlot === 'gate' ? 'deq' : 'cdeq'].pre ? (x.dynSlot === 'gate' ? 'FILT' : 'POSTEQ') : null;
       const eqOn = tapOf(st), eqWas = tapOf(ps);
-      const rs = fdq(st) ? this.fdeqStrip(st) : st.eqCh, rsWas = fdq(ps) ? this.fdeqStrip(ps) : ps.eqCh;
+      const rsOf = x => fxq(x) ? this.fxWhere(x.fxEd.n, x).si : fdq(x) ? this.fdeqStrip(x) : x.eqCh;
+      const rs = rsOf(st), rsWas = rsOf(ps);
       if (eqOn && (eqOn !== eqWas || rs !== rsWas)) { this.reqG(['/cfg/rta/']); clearTimeout(this.rtaT); this.rtaT = setTimeout(() => this.rtaFollow(true, eqOn, rs), 400); }
       if (!eqOn && eqWas) this.rtaFollow(false);
       if (st.screen === 'osc' && ps.screen !== 'osc') { this.reqG(['/io/in/OSC/']); [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) this.reqStrip(k, 'all'); }); }
@@ -1500,12 +1635,19 @@ class App extends Component {
   }
   /* in sends-on-faders mode a channel fader moves its send to the chosen bus/matrix */
   sofK(i) { const st = this.state; if (!st.sofOn || st.screen !== 'main' || i < 0 || i === sofIdx(st.sof)) return null; return i; }
+  /* open a strip's screen, as a tap on its name does */
+  openStrip(i) {
+    const s0 = i === -1 ? 48 : i, last = this.state.lastTab, ok = s0 < 48 || ['home', 'eq', 'dyn'].includes(last);
+    this.setState({ screen: this.state.prefs.back === 'last' && ok ? last : 'home', eqCh: s0, dynSlot: s0 >= 48 ? 'comp' : this.state.dynSlot });
+  }
   faderDown(i, e, T, FH, noLong) {
     capture(e);
     const sk = noLong ? null : this.sofK(i), k = this.state.sof;
-    if (this.dbl('f' + i)) { if (sk !== null) this.setSend(i, k, 0.75); else this.upd(i, { v: 0.75 }); this.fd = null; return; }
-    const r = e.currentTarget.getBoundingClientRect();
-    this.fd = { i, y: e.clientY, start: sk !== null ? (this.state.chans[i].sends[k] || 0) : this.get(i).v, px: r.height * T / FH, moved: false, send: sk !== null ? k : null };
+    const r = e.currentTarget.getBoundingClientRect(), start = sk !== null ? (this.state.chans[i].sends[k] || 0) : this.get(i).v;
+    /* on the main screen a tap beside the knob opens the channel; the knob itself still moves and resets on a double tap */
+    const yy = (e.clientY - r.top) * FH / r.height, capTop = (1 - start) * T, onCap = yy >= capTop - 8 && yy <= capTop + 52;
+    if (onCap || noLong) { if (this.dbl('f' + i)) { if (sk !== null) this.setSend(i, k, 0.75); else this.upd(i, { v: 0.75 }); this.fd = null; return; } }
+    this.fd = { i, y: e.clientY, start, px: r.height * T / FH, moved: false, send: sk !== null ? k : null, tapOpen: !noLong && !onCap && sk === null && i >= -1 };
     clearTimeout(this.ft);
     if (i !== -1 && this.hasSends(i) && !noLong) this.ft = setTimeout(() => { if (this.fd && !this.fd.moved) { this.fd = null; this.setState({ sendPop: { i, bank: 0 } }); } }, 500);
   }
@@ -1515,7 +1657,7 @@ class App extends Component {
     if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
     if (f.moved) { if (f.send !== null && f.send !== undefined) this.setSend(f.i, f.send, clamp(f.start - dy / f.px, 0, 1)); else this.upd(f.i, { v: clamp(f.start - dy / f.px, 0, 1) }); }
   }
-  faderUp() { clearTimeout(this.ft); this.fd = null; }
+  faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) this.openStrip(f.i); }
   panDown(i, e) {
     capture(e);
     const r = e.currentTarget.getBoundingClientRect();
@@ -2029,7 +2171,7 @@ class App extends Component {
         <div style="flex:1;min-height:0;display:flex;gap:10px">
           ${lbls[sb].map((l, k) => { const v = sc.sends[sb * 8 + k], self = sp.i >= 49 && sb * 8 + k === sp.i - 49; return html`
             <div aria-disabled=${String(self)} style=${`flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border-radius:8px;background:#161412;border:1px solid #2c2721;${self ? 'opacity:.25;pointer-events:none' : ''}`}>
-              <span style="max-width:100%;font-size:14px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l}</span>
+              ${(() => { const tc = (st.chans[sofIdx(sb * 8 + k)] || {}).color || '#5a5144'; return html`<span style=${`width:100%;box-sizing:border-box;padding:3px 4px;border-radius:5px;text-align:center;font-size:14px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:#121110;background:${tc};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${l}</span>`; })()}
               ${(() => { const kk = sb * 8 + k, isOn = (sc.sendOn || [])[kk] !== false; return html`<button aria-pressed=${String(isOn)} aria-label=${l + ' send ' + (isOn ? 'on' : 'off')} onClick=${() => this.setSendArr(sp.i, 'sendOn', kk, !isOn)}
                 style=${`width:100%;height:32px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${isOn ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>${isOn ? 'ON' : 'OFF'}</button>`; })()}
               <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(v)}</span>
@@ -2351,7 +2493,7 @@ class App extends Component {
           ${ref && ref.bands.filter(b => b.on).map(b => { const y = clamp(this.Y(b.g), 14, H - 14); return html`
             <span aria-hidden="true" style=${`position:absolute;left:${Math.round(this.X(b.f))}px;top:${Math.round(y)}px;width:24px;height:24px;margin:-12px 0 0 -12px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1.5px solid rgba(159,208,220,.7);background:rgba(12,18,20,.55);color:#bfe0e8;font-size:11px;font-weight:700;pointer-events:none`}>${b.id}</span>`; })}
           ${D && html`<div style="position:absolute;left:8px;top:8px;display:flex;gap:6px">
-            ${this.ek !== 'fdeq' && html`<button onClick=${() => this.setState({ chPick: true })} aria-label=${'Key source: ' + this.keySrcName()} style="height:38px;max-width:250px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #4fc9b7;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden">
+            ${this.ek !== 'fdeq' && html`<button onClick=${() => this.setState({ chPick: true })} aria-label=${'Key source: ' + this.keySrcName()} style="height:38px;max-width:250px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #4fc9b7;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap;overflow:hidden;${this.keyTint()}">
               <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#4fc9b7">KEY</span><span style="overflow:hidden;text-overflow:ellipsis">${this.keySrcName()}</span></button>
             <button onClick=${() => this.setState({ keyPop: true })} aria-label="Key filter" style="height:38px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:7px;border:1px solid #8fd3e0;background:rgba(12,16,15,.85);color:#e9dcc2;font-size:13px;cursor:pointer;white-space:nowrap">
               <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#8fd3e0">FILTER</span>${!this.curSc().on ? 'Flat' : (KEYT[this.curSc().type] || this.curSc().type) + ' · ' + fmtF(this.curSc().f)}</button>`}
@@ -2698,7 +2840,7 @@ class App extends Component {
               <span style="position:absolute;left:8px;top:6px;font-size:12px;font-weight:700;letter-spacing:.14em;color:#cfe0e5">KEY · ${!C.sc.on ? 'FILTER OFF' : KEYT[C.sc.type] + ' · ' + fmtF(C.sc.f)}</span>
               <span style="position:absolute;right:6px;top:6px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(0,0,0,.5);color:#cfe0e5">${IC.full}</span>
             </button>
-            <button class="box" style="cursor:pointer" onClick=${() => this.setState({ chPick: true })} aria-label="Choose key source">
+            <button class="box" style=${'cursor:pointer;' + this.keyTint()} onClick=${() => this.setState({ chPick: true })} aria-label="Choose key source">
               <b>Key source</b><em style="display:flex;align-items:center;gap:8px">${this.keySrcName()}<span style="color:#b8a78a">▾</span></em></button>
           </section>
         </div>` : html`
@@ -2952,8 +3094,8 @@ class App extends Component {
     const mix = X.mix ?? 100, gain = X.gain ?? 0, sc = X.sc || {};
     this.sbTxt = this.sb ? (this.sb.id === 'mix' ? Math.round(mix) + ' %' : (gain > 0 ? '+' : '') + gain.toFixed(1) + ' dB') : '';
     const keyTxt = !sc.on ? 'Flat' : (KEYT[sc.type] || sc.type) + ' · ' + fmtF(sc.f);
-    const btn = (label, value, onClick, col) => html`<button onClick=${onClick} aria-label=${label + ': ' + value}
-      style=${`height:46px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:0 12px;border-radius:8px;cursor:pointer;text-align:left;background:#100f0d;border:1px solid ${col};min-width:150px;max-width:230px`}>
+    const btn = (label, value, onClick, col, tint) => html`<button onClick=${onClick} aria-label=${label + ': ' + value}
+      style=${`height:46px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:0 12px;border-radius:8px;cursor:pointer;text-align:left;background:${tint ? `linear-gradient(90deg,${tint}38,${tint}14)` : '#100f0d'};border:1px solid ${tint || col};min-width:150px;max-width:230px`}>
       <span style=${`font-size:10px;font-weight:700;letter-spacing:.16em;color:${col}`}>${label}</span>
       <span style="max-width:100%;font-size:16px;font-weight:700;color:#f3e6cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${value} ›</span></button>`;
     return html`<div style="height:58px;flex:none;display:flex;align-items:center;gap:8px;padding:6px 12px 0">
@@ -2964,7 +3106,7 @@ class App extends Component {
         <span style="width:24px;height:24px;border-radius:50%;border:1.5px solid #c9a25a;color:var(--brass-hi);font:italic 700 14px/21px Georgia,serif">i</span>
         <span dir="rtl">אופי המכשיר</span></button>
       <span style="flex:1"></span>
-      ${btn('KEY SOURCE', this.keySrcName(), () => this.setState({ chPick: true }), '#4fc9b7')}
+      ${btn('KEY SOURCE', this.keySrcName(), () => this.setState({ chPick: true }), '#4fc9b7', this.keySrcColor())}
       ${btn('KEY FILTER', keyTxt, () => this.setState({ keyPop: true }), '#8fd3e0')}
     </div>`;
   }
@@ -3090,6 +3232,8 @@ class App extends Component {
     if (/^(hc|fhc|hi|lpf|hcut)$/i.test(name)) return b;
     if (/(^|_)mix$/i.test(name)) return Math.min(b, 100);
     if (a < 0 && b > 0) return 0;
+    /* controls whose 'nothing happens' is the bottom of the range start there: Pulsar boosts/cuts, air, enhancer gains, limiter in-gain and squeeze, envelope amounts */
+    if (a === 0 && (/^[15](lb|latt|hb|hatt|md)$|^(air|hrm|gin|l_gin|sqz|l_sqz|edep|espd)$|^e_(bass|mid|high)$/.test(name) || (/^(bass|mid|high)$/.test(name) && b === 100))) return 0;
     if (m.t === 'int' && a === 0 && b === 1) return /(^|_)(on|con)$|^(eq1|eq5|peq|shv|cab|sbcon|dyneq|lim)$/.test(name) ? 1 : 0;   // section switches start on
     if (m.t === 'log' && a > 0) return +(Math.sqrt(a * b)).toPrecision(3);
     const v = (a + b) / 2; return m.t === 'int' ? Math.round(v) : v;
@@ -3226,7 +3370,7 @@ class App extends Component {
         <div style="display:flex;align-items:center;gap:12px"><span style=${`font-size:24px;font-weight:800;color:${col}`}>${this.fxLong(m)}</span><span style="flex:1"></span><button class="small" onClick=${close}>סגור</button></div>
         <span style="font-size:18px;line-height:1.5;color:#f3e6cc">${intro}</span>
         <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-left:6px">
-          ${P.map(e => { const t = FXP_HE[e[1]] || FXP_HE[e[1].replace(/^[a-z]+[_-]/, '')]; return html`<div style="display:flex;gap:12px;align-items:baseline;padding:8px 12px;border-radius:8px;background:#141210;border:1px solid #2c2721">
+          ${P.map(e => { const t = fxHelpOf(m, e[1]); return html`<div style="display:flex;gap:12px;align-items:baseline;padding:8px 12px;border-radius:8px;background:#141210;border:1px solid #2c2721">
             <span dir="ltr" style=${`flex:none;width:130px;font-size:13px;font-weight:800;letter-spacing:.08em;color:${col};text-align:left`}>${this.fxLabel(e)}</span>
             <span style="font-size:16px;line-height:1.45;color:#e9dcc2">${t || 'שולט ב' + '־' + this.fxLabel(e).toLowerCase() + ' של המכשיר.'}</span></div>`; })}
         </div></div>`;
@@ -3246,7 +3390,11 @@ class App extends Component {
   /* GEQ / PIA: the bands are the picture and the controls at once */
   fxBands(n, P, W, H, col) {
     const B = P.filter(e => /^\d/.test(e[1]) && (FXU[e[2].u] ?? e[2].u) === 'dB'), w = W / B.length;
+    const fq = e => { const t = String(e[1]).toLowerCase(), m = /^(\d+(?:\.\d+)?)k(\d*)$/.exec(t); return m ? parseFloat(m[1] + '.' + (m[2] || 0)) * 1000 : parseFloat(t); };
+    const f0 = fq(B[0]) || 20, f1 = fq(B[B.length - 1]) || 20000, sx = f => w / 2 + Math.log(clamp(f, 20, 20000) / f0) / Math.log(f1 / f0) * (W - w);
+    const spP = this.fxSpecPath(n, sx, H - 36, H - 44);
     return html`<div style=${`position:relative;width:${W}px;height:${H}px;display:flex`}>
+      ${spP && html`<svg width=${W} height=${H} aria-hidden="true" style="position:absolute;left:0;top:0;pointer-events:none"><clipPath id=${'gq' + n}><rect x="0" y="0" width=${W} height=${H}/></clipPath><g clip-path=${'url(#gq' + n + ')'}>${spP}</g></svg>`}
       <span style=${`position:absolute;left:0;right:0;top:${H / 2}px;height:1px;background:#4a4238`}></span>
       ${B.map(e => { const m = e[2], v = +this.fxGet(n, e), q = this.fxN(m, v), id = `x:${n}:${e[0]}`, y = (1 - q) * (H - 44) + 8;
         this.fineReg(id, { id, label: e[1] + ' Hz', color: col, get: () => this.fxN(m, this.fxGet(n, e)), set: z => this.fxSet(n, e, this.fxDn(m, z)), text: () => this.fxTxt(m, this.fxGet(n, e)), home: 0.5 });
@@ -3597,8 +3745,8 @@ class App extends Component {
   }
   /* a pedal's RESET: its own knobs back to open (low cut down, high cut up) */
   pReset(n, names, x, y, o = {}) {
-    const go = () => names.forEach(k => { const e = this.fxE(n, k); if (e) this.fxSet(n, e, /hc|hcut|hi/.test(k) ? e[2].b : e[2].a); });
-    return html`<button aria-label="Reset this pedal: filters open" onClick=${ev => { ev.stopPropagation(); go(); }}
+    const go = () => names.forEach(k => { const e = this.fxE(n, k); if (e) this.fxSet(n, e, this.fxDef(e[2], k)); });
+    return html`<button aria-label=${'Reset this pedal: ' + names.join(', ')} onClick=${ev => { ev.stopPropagation(); go(); }}
       style=${`position:absolute;left:${x - 26}px;top:${y - 26}px;width:52px;height:66px;padding:0;border:none;background:transparent;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px`}>
       <span style="width:40px;height:40px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#f3f1ec,#9a968e 60%,#5a5852);box-shadow:0 3px 6px rgba(0,0,0,.6)"></span>
       <span style=${`font-size:10px;font-weight:800;letter-spacing:.12em;color:${o.lab || '#f3e6cc'}`}>RESET</span></button>`;
@@ -3835,6 +3983,7 @@ class App extends Component {
       </div>
       ${tabs.length > 0 && html`<span style=${`position:absolute;left:${px}px;top:${FH - 30}px;width:${pw}px;text-align:right;transform:translateY(-${ph - 22}px);font-size:11px;font-weight:900;letter-spacing:.2em;color:#e9e4d8;opacity:.8;pointer-events:none`}>${T.title}</span>`}
       ${T.on && this.pToggleK(n, T.on, px - 46, top + 30, { label: 'MODULE', lab: L.ink, on: '#7fe07a' })}
+      ${(T.resets || []).map(g => { const ri = rows.findIndex(r => r.includes(g[0])); return ri < 0 ? '' : this.pReset(n, g, px - 40, top + rh * (ri + 0.5) - 4, { lab: L.ink }); })}
       ${S[0].main && this.pPower(n, 60, FH - 46, S[0].main === 'button' ? 'toggle' : S[0].main, { lab: L.ink, label: S[0].main === 'button' ? 'IN' : S[0].main === 'foot' ? 'BYPASS' : 'POWER' })}
     </div>`;
   }
@@ -3886,7 +4035,7 @@ class App extends Component {
         fn = f => +v(0, 'g') + mix * B.reduce((a, b, i) => a + pk(f, b, +v(0, ks[i]), 1.4), 0);
       }
       const mixK = kk('mix'), mixT = mixK && this.fxE(n, mixK)[2].b > this.fxE(n, mixK)[2].a ? 'MIX ' + Math.round(+v(100, 'mix')) + ' %' : '';
-      return svg(html`${grid()}<line x1=${pl} x2=${W - pl} y1=${pt + ph / 2} y2=${pt + ph / 2} stroke="#3a342c"/>
+      return svg(html`${grid()}${this.fxSpecPath(n, fx, pt + ph, ph)}<line x1=${pl} x2=${W - pl} y1=${pt + ph / 2} y2=${pt + ph / 2} stroke="#3a342c"/>
         <path d=${curve(fn, '#f6b45e') + ` L ${W - pl} ${pt + ph / 2} L ${pl} ${pt + ph / 2} Z`} fill="#f0a24a" opacity=".14"/>
         <path d=${curve(fn, '#f6b45e')} stroke="#f6b45e" stroke-width="2.5" fill="none"/>
         ${MK.map(b => { const x = fx(b.f), y = pt + ph / 2 - clamp(b.g, -18, 18) / 18 * ph / 2, w = b.q ? clamp(60 / b.q, 6, 70) : 0;
@@ -4039,8 +4188,37 @@ class App extends Component {
       return -10 * Math.log10(1 + Math.pow(r, 2 * N)); };
     const tg = +v('tiltg', 0), tf = +v('tiltf', 1000);
     let d = filt(+v('hpf', 20), v('hptype', 'FLAT'), true) + filt(+v('lpf', 20000), v('lptype', 'FLAT'), false) + tg / 2 * Math.tanh(Math.log2(f / tf));
-    if (+v('dyneq', 0) === 1) { const g = +v('deqg', 0), fq = +v('deqf', 1000), q = +v('deqq', 1), r = f / fq, sh = 1 / (1 + Math.pow(q * (r - 1 / r), 2)); d += (live == null ? g : g * live) * sh; }
+    if (+v('dyneq', 0) === 1) { const g = +v('deqg', 0), fq = +v('deqf', 1000), q = +v('deqq', 1), r = f / fq, ft = String(v('deqfilt', 'BP'));
+      /* BP is a bell; LP/HP shapes act like shelves below/above the frequency, 12 dB steeper than 6 dB */
+      const N = /12/.test(ft) ? 2 : 1, sh = ft === 'OFF' ? 1 : /^LP/.test(ft) ? 1 / (1 + Math.pow(r, 2 * N)) : /^HP/.test(ft) ? 1 / (1 + Math.pow(1 / r, 2 * N)) : 1 / (1 + Math.pow(q * (r - 1 / r), 2));
+      d += (live == null ? g : g * live) * sh; }
     return d;
+  }
+  /* the Speaker Manager controls under the graph: every list as visible buttons, the rest as drag boxes */
+  spkCtl(n, tab, keys, W) {
+    const E = k => this.fxE(n, k), v = k => String(this.fxGet(n, E(k))), put = (k, x) => { const e = E(k); e && this.fxSet(n, e, x); };
+    const seg = (items, cur, pick, lab) => html`<div role="group" aria-label=${lab} style="display:flex;align-items:center;gap:3px;padding:3px;border-radius:8px;background:#0c0b0a;border:1px solid #2c2721">
+      <span style="padding:0 4px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#7c8f95">${lab}</span>
+      ${items.map(([t, val, dis]) => { const on = String(val) === String(cur); return html`<button disabled=${!!dis} onClick=${() => pick(val)} aria-pressed=${String(on)}
+        style=${`height:34px;min-width:34px;padding:0 6px;border-radius:6px;font-size:13px;font-weight:800;cursor:${dis ? 'default' : 'pointer'};opacity:${dis ? 0.3 : 1};${on ? 'background:#1b272b;color:#cfe0e5;border:1.5px solid #8fd3e0' : 'background:#141210;color:#9b927f;border:1px solid #2c2721'}`}>${t}</button>`; })}</div>`;
+    /* a filter type is split into slope and family, so all 11 choices are one tap away */
+    const ftype = (k, lab) => { const cur = v(k), sl = cur === 'FLAT' ? 'FLAT' : cur.replace(/\D/g, ''), fam = cur === 'FLAT' ? null : cur.replace(/\d/g, '');
+      const ok = { 6: ['BW'], 12: ['BW', 'BS', 'LR'], 18: ['BW'], 24: ['BW', 'BS', 'LR'], 48: ['BW', 'LR'] };
+      return html`<div style="display:flex;gap:4px;align-items:center">${seg([['OFF', 'FLAT'], ['6', '6'], ['12', '12'], ['18', '18'], ['24', '24'], ['48', '48']], sl, x => put(k, x === 'FLAT' ? 'FLAT' : (ok[x].includes(fam) ? fam : ok[x][0]) + x), lab)}
+        ${seg([['BW', 'BW', sl === 'FLAT' || !ok[sl].includes('BW')], ['BS', 'BS', sl === 'FLAT' || !ok[sl].includes('BS')], ['LR', 'LR', sl === 'FLAT' || !ok[sl].includes('LR')]], fam, x => put(k, x + sl), '')}</div>`; };
+    const boxes = k => this.fxRow(n, k, '#8fd3e0', W);
+    if (tab === 'FILTER') return html`<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:10px;flex-wrap:wrap">${ftype('hptype', 'HP')}${ftype('lptype', 'LP')}</div>
+      ${boxes(['hpf', 'lpf', 'tiltg', 'tiltf', 'phase', 'invert', 'dist', 'pos'])}</div>`;
+    if (tab === 'DYN EQ') { const R = (E('deqratio') || [0, 0, { i: [] }])[2].i;
+      return html`<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${seg([['OFF', 0], ['ON', 1]], v('dyneq'), x => put('dyneq', x), 'DYN EQ')}
+        ${seg([['FLAT', 'OFF'], ['BELL', 'BP'], ['LP6', 'LP6'], ['LP12', 'LP12'], ['HP6', 'HP6'], ['HP12', 'HP12']], v('deqfilt'), x => put('deqfilt', x), 'SHAPE')}
+        ${seg([['▼ BELOW', 'low'], ['▲ ABOVE', 'high']], v('deqmode'), x => put('deqmode', x), 'MODE')}
+        ${seg(R.map(r => [(Math.round(r * 10) / 10) + ':1', r]), (R.find(r => Math.abs(r - +v('deqratio')) < 0.01) ?? ''), x => put('deqratio', x), 'RATIO')}</div>
+        ${boxes(['deqthr', 'deqg', 'deqf', 'deqq', 'deqatt', 'deqrel'])}</div>`; }
+    return html`<div style="display:flex;flex-direction:column;gap:6px"><div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${seg([['OFF', 0], ['ON', 1]], v('lim'), x => put('lim', x), 'LIMITER')}${seg([['PEAK', 0], ['RMS', 1]], v('limrms'), x => put('limrms', x), 'DETECT')}</div>
+      ${boxes(['limthr', 'limrel'])}</div>`;
   }
   renderSpk(n, W, H) {
     const st = this.state, tab = st.spkTab || 'FILTER', v = (k, d) => this.fxV(n, k, d), E = k => this.fxE(n, k), hot = st.fxHot;
@@ -4048,7 +4226,8 @@ class App extends Component {
     const X = f => Math.log10(clamp(f, 20, 20000) / 20) / 3 * gw, F = x => 20 * Math.pow(1000, clamp(x / gw, 0, 1)), Y = d => GH / 2 - clamp(d, -R, R) / R * (GH / 2 - pad), G = y => (GH / 2 - y) / (GH / 2 - pad) * R;
     let path = '', pathS = ''; for (let k = 0; k <= 240; k++) { const f = 20 * Math.pow(1000, k / 240); path += (k ? ' L ' : 'M ') + X(f).toFixed(1) + ' ' + Y(this.spkResp(n, f, 0)).toFixed(1); pathS += (k ? ' L ' : 'M ') + X(f).toFixed(1) + ' ' + Y(this.spkResp(n, f)).toFixed(1); }
     const si = this.fxStrip(st.monv[`/fx/${n}/$a_chn`]), RT = si >= 0 ? this.rtaFor(si) : null;
-    let sp = ''; if (RT) { sp = `M 0 ${GH}`; RT.forEach((d, k) => { sp += ` L ${(gw * k / 119).toFixed(1)} ${(GH - clamp((d + 66) / 60, 0.02, 1) * GH * 0.72).toFixed(1)}`; }); sp += ` L ${gw} ${GH} Z`; }
+    const SP = RT ? RT.map(d => clamp((d + 66) / 60, 0.02, 1)) : this.fxSpec(n);
+    let sp = ''; if (SP) { sp = `M 0 ${GH}`; SP.forEach((d, k) => { sp += ` L ${(gw * k / 119).toFixed(1)} ${(GH - d * GH * 0.72).toFixed(1)}`; }); sp += ` L ${gw} ${GH} Z`; }
     const dyn = +v('dyneq', 0) === 1, lim = +v('lim', 0) === 1;
     /* a handle on the graph: drag sideways for frequency, up/down for gain where it has one */
     const handle = (id, f, g, col, lab, set) => html`<button aria-label=${lab} style=${`position:absolute;left:${X(f)}px;top:${Y(g)}px;width:52px;height:52px;margin:-26px 0 0 -26px;padding:0;border:none;background:transparent;cursor:grab;touch-action:none`}
@@ -4075,7 +4254,7 @@ class App extends Component {
             <path d=${path} stroke="#f0a24a" stroke-width="9" opacity=".2" fill="none"/><path d=${path} stroke="#f6b45e" stroke-width="2.5" fill="none"/>
             ${String(v('hptype', 'FLAT')) !== 'FLAT' && html`<text x=${X(+v('hpf', 20)) + 18} y="22" font-size="12" fill="#cfe0e5" style="font-family:var(--mono)">HP ${fmtF(+v('hpf', 20))} ${v('hptype', '')}</text>`}
             ${String(v('lptype', 'FLAT')) !== 'FLAT' && html`<text x=${Math.max(4, X(+v('lpf', 20000)) - 150)} y="22" font-size="12" fill="#cfe0e5" style="font-family:var(--mono)">LP ${fmtF(+v('lpf', 20000))} ${v('lptype', '')}</text>`}
-            <text x="8" y=${GH - 22} font-size="11" fill=${dyn ? '#ef6f5a' : '#5a4a44'} style="font-family:var(--mono)">DYN EQ ${dyn ? 'ON' : 'OFF'} · Q ${(+v('deqq', 1)).toFixed(2)} · ${fxNum(v('deqratio', 3))}:1 · A ${Math.round(+v('deqatt', 10))} ms · R ${Math.round(+v('deqrel', 200))} ms · KEY ${v('deqfilt', 'BP')}</text>
+            <text x="8" y=${GH - 22} font-size="11" fill=${dyn ? '#ef6f5a' : '#5a4a44'} style="font-family:var(--mono)">DYN EQ ${dyn ? 'ON' : 'OFF'} · ${(+v('deqg', 0)).toFixed(1)} dB @ ${fmtF(+v('deqf', 1000))} ${String(v('deqmode', 'high')) === 'low' ? 'BELOW' : 'ABOVE'} · Q ${(+v('deqq', 1)).toFixed(2)} · ${fxNum(v('deqratio', 3))}:1 · A ${Math.round(+v('deqatt', 10))} ms · R ${Math.round(+v('deqrel', 200))} ms · ${{ OFF: 'FLAT', BP: 'BELL' }[v('deqfilt', 'BP')] || v('deqfilt', 'BP')}</text>
             <text x="8" y=${GH - 36} font-size="11" fill=${lim ? '#f3c27a' : '#5a5144'} style="font-family:var(--mono)">LIMITER ${lim ? 'ON' : 'OFF'} · ${+v('limrms', 0) ? 'RMS' : 'PEAK'} · REL ${Math.round(+v('limrel', 200))} ms · TILT ${(+v('tiltg', 0)).toFixed(1)} dB @ ${fmtF(+v('tiltf', 1000))}</text>
             ${dyn && html`<text x=${clamp(X(+v('deqf', 1000)) + 18, 4, gw - 180)} y=${Y(+v('deqg', 0)) - 18} font-size="12" fill="#ef6f5a" style="font-family:var(--mono)">DYN ${(+v('deqg', 0)).toFixed(1)} dB ${String(v('deqmode', 'high')) === 'low' ? '▼ BELOW' : '▲ ABOVE'}</text>`}
           </svg>
@@ -4095,7 +4274,7 @@ class App extends Component {
               <span style="position:absolute;left:0;right:0;bottom:6px;font-size:10px;font-weight:800;letter-spacing:.06em;color:#9b927f;text-align:center">${lab}</span></button>`; })}
         </div>
       </div>
-      ${this.fxRow(n, keys, '#8fd3e0', W)}
+      ${this.spkCtl(n, tab, keys, W)}
     </div>`;
   }
   /* which models have a panel so far */
@@ -4166,14 +4345,25 @@ class App extends Component {
           <div style="display:flex;flex-wrap:wrap;gap:4px">${gr.P.map(e => this.isTgl(e[2]) ? this.fxSwitch(n, e, col) : ['enum', 'fenum'].includes(e[2].t) ? this.fxChoice(n, e, col) : this.fxKnob(n, e, col))}</div></div>`)}
       </div></div>`;
   }
+  /* FX MIX shows in the picture: with less mix the effect's picture fades towards the dry signal */
+  fxWet(n, node) {
+    const m = this.fxModel(n); if (m === 'NONE' || !this.fxHasMix(m)) return node;
+    const mix = +(this.state.monv[`/fx/${n}/fxmix`] ?? 100);
+    return html`<div class="fxwet" style=${`--wet:${(0.28 + 0.72 * clamp(mix, 0, 100) / 100).toFixed(2)};height:100%`}>${node}</div>`;
+  }
+  /* FX MIX from the app: read-only when connected without live control, like every other control */
+  fxMixSet(n, v) {
+    if (this.isLinked() && !this.state.conn.live) { if (Date.now() - (this.roT || 0) > 2500) { this.roT = Date.now(); this.toast('קריאה בלבד: הדלק Live control כדי לשנות את המיקסר'); } return; }
+    this.uAct = Date.now(); this.monSet(`/fx/${n}/fxmix`, v);
+  }
   fxMixBar(n, w) {
     const P = `/fx/${n}/fxmix`, mix = +(this.state.monv[P] ?? 100);
     return html`<button class="box" style=${`width:${w}px;height:44px;cursor:ew-resize;touch-action:none`} aria-label=${'FX ' + n + ' mix ' + Math.round(mix) + ' %'}
-      onPointerDown=${e => { e.stopPropagation(); capture(e); if (this.dbl('fxmix' + n)) { this.monSet(P, 100); return; } this.fxd = { n, sx: e.clientX, v0: mix, w: e.currentTarget.getBoundingClientRect().width }; }}
+      onPointerDown=${e => { e.stopPropagation(); capture(e); if (this.dbl('fxmix' + n)) { this.fxMixSet(n, 100); return; } this.fxd = { n, sx: e.clientX, v0: mix, w: e.currentTarget.getBoundingClientRect().width }; }}
       onClick=${e => e.stopPropagation()}
-      onPointerMove=${e => { const d = this.fxd; if (!d || d.n !== n) return; this.uAct = Date.now(); this.monSet(P, Math.round(clamp(d.v0 + (e.clientX - d.sx) / d.w * 100, 0, 100))); }}
+      onPointerMove=${e => { const d = this.fxd; if (!d || d.n !== n) return; this.fxMixSet(n, Math.round(clamp(d.v0 + (e.clientX - d.sx) / d.w * 100, 0, 100))); }}
       onPointerUp=${() => { this.fxd = null; }} onPointerCancel=${() => { this.fxd = null; }}>
-      <b>FX MIX</b><em>${Math.round(mix)} %</em><s style=${`width:${Math.round(mix)}%;background:#c9a25a`}></s></button>`;
+      <b>FX MIX</b><em>${mix <= 0 ? 'DRY' : Math.round(mix) + ' %'}</em><s style=${`width:${Math.round(mix)}%;background:#c9a25a`}></s></button>`;
   }
   /* FX DEQ3 drawn and handled by the same screen as the channel's dynamic EQ: its 27 controls <-> three bands */
   fdeqLay(n) {
@@ -4277,7 +4467,7 @@ class App extends Component {
         ${this.fxHelpBtn(n)}${mdl !== 'NONE' && this.fxHasMix(mdl) && this.fxMixBar(n, 190)}
         ${!this.isLinked() && html`<span style="font:700 12px/1 var(--mono);letter-spacing:.16em;padding:5px 8px;border-radius:5px;background:rgba(232,163,61,.18);color:#e8a33d;border:1px solid rgba(232,163,61,.5)">DEMO</span>`}
       </header>
-      ${mdl === 'DEQ3' ? this.renderFdeq(Hd - 8) : html`<div style="flex:1;min-height:0;padding:10px 14px">${this.fxEditor(n, DW - 28, Hd - 60 - 20)}</div>`}
+      ${mdl === 'DEQ3' ? this.renderFdeq(Hd - 8) : html`<div style="flex:1;min-height:0;padding:10px 14px">${this.fxWet(n, this.fxEditor(n, DW - 28, Hd - 60 - 20))}</div>`}
       ${st.fxPick && this.renderFxPick(Hd)}${st.fxEnum && this.renderFxEnum(Hd)}${st.fxHelp && this.renderFxHelp(Hd)}${st.fxAssign && this.renderFxAssign(Hd)}`;
   }
   /* effects with an FX MIX on the desk: the ones for slots 1-8 (reverb, delay, modulation, pitch), not the standard or channel ones */
@@ -4292,7 +4482,7 @@ class App extends Component {
         <button class="small" style="height:40px" onClick=${() => this.setState({ insPick: !st.insPick })}>${st.insPick ? 'BACK TO FX ' + I.fx : 'FX ' + I.fx + ' ▾'}</button>
         ${this.fxHelpBtn(I.fx)}${this.fxHasMix(this.fxModel(I.fx)) && this.fxMixBar(I.fx, 150)}`}`);
     if (!pickSlot && this.fxModel(I.fx) === 'DEQ3') return html`${head}${this.renderFdeq(Hd)}${st.fxPick && this.renderFxPick(Hd)}`;
-    if (!pickSlot) return html`${head}<div style="flex:1;min-height:0;padding:10px 14px">${this.fxEditor(I.fx, W, H)}</div>${st.fxPick && this.renderFxPick(Hd)}${st.fxEnum && this.renderFxEnum(Hd)}${st.fxHelp && this.renderFxHelp(Hd)}`;
+    if (!pickSlot) return html`${head}<div style="flex:1;min-height:0;padding:10px 14px">${this.fxWet(I.fx, this.fxEditor(I.fx, W, H))}</div>${st.fxPick && this.renderFxPick(Hd)}${st.fxEnum && this.renderFxEnum(Hd)}${st.fxHelp && this.renderFxHelp(Hd)}`;
     return html`${head}
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px 14px">
         <span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:17px;color:#cbbd9f">בחר משבצת אפקט לאינסרט ${w === 'preins' ? 'הראשון (לפני העיבוד)' : 'השני (אחרי העיבוד)'}. משבצת שכבר בשימוש תעבור לערוץ הזה.</span>
@@ -4331,7 +4521,7 @@ class App extends Component {
           <span style="font-size:15.5px;font-weight:800;letter-spacing:.02em;color:#f3e6cc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${lname(m)}</span>
           ${m !== 'NONE' && this.fxHasMix(m) && html`<button class="box" style="height:30px;cursor:ew-resize;touch-action:none" aria-label=${'FX ' + n + ' mix ' + Math.round(mix) + ' %'}
             onPointerDown=${e => { e.stopPropagation(); capture(e); this.fxd = { n, sx: e.clientX, v0: mix, w: e.currentTarget.getBoundingClientRect().width }; }} onClick=${e => e.stopPropagation()}
-            onPointerMove=${e => { const d = this.fxd; if (!d || d.n !== n) return; this.uAct = Date.now(); this.monSet(P('fxmix'), Math.round(clamp(d.v0 + (e.clientX - d.sx) / d.w * 100, 0, 100))); }}
+            onPointerMove=${e => { const d = this.fxd; if (!d || d.n !== n) return; this.fxMixSet(n, Math.round(clamp(d.v0 + (e.clientX - d.sx) / d.w * 100, 0, 100))); }}
             onPointerUp=${() => { this.fxd = null; }} onPointerCancel=${() => { this.fxd = null; }}>
             <b style="font-size:11px">MIX</b><em style="font-size:14px">${Math.round(mix)} %</em><s style=${`width:${Math.round(mix)}%;background:#c9a25a`}></s></button>`}
         </div>
@@ -4382,18 +4572,33 @@ class App extends Component {
         </div></div>`;
   }
   /* a model's small picture: its own panel shrunk when it has one, otherwise the drawn icon. n = the slot whose values to show (0 = defaults) */
+  /* the analyser behind an effect's EQ graph: the desk's RTA of the strip the effect sits on (live), the demo spectrum in demo.
+     Returns 120 values 0..1 from 20 Hz to 20 kHz, or null (no strip, RTA not on that strip, or a picker thumbnail) */
+  fxSpec(n) {
+    if (this.inThumb) return null;
+    const st = this.state, si = this.fxStrip(st.monv[`/fx/${n}/$a_chn`]);
+    if (this.isLinked()) { const RT = si >= 0 ? this.rtaFor(si) : null; return RT ? RT.map(d => clamp((d + 66) / 60, 0.02, 1)) : null; }
+    const q = st.eq, hit = Math.exp(-(Date.now() % 650) / 170);
+    return q.base.map((b, k) => Math.max(0.03, b * (0.55 + 0.6 * hit) * (0.92 + 0.08 * Math.sin(k * 1.7 + Date.now() / 300))));
+  }
+  /* the same as a filled shape: x(f) gives the frequency axis, the bottom of the graph is yb and its height h */
+  fxSpecPath(n, x, yb, h) {
+    const S = this.fxSpec(n); if (!S) return '';
+    let d = `M ${x(20).toFixed(1)} ${yb}`; S.forEach((v, k) => { d += ` L ${x(20 * Math.pow(1000, k / 119)).toFixed(1)} ${(yb - v * h * 0.72).toFixed(1)}`; });
+    return html`<path d=${d + ` L ${x(20000).toFixed(1)} ${yb} Z`} fill="#5e8796" fill-opacity=".2" stroke="#7fa6b4" stroke-opacity=".5" stroke-width="1"/>`;
+  }
   fxThumb(m, w = 150, h = 57, n = 0) {
     if (!this.hasFace(m)) return this.fxMini(m, w, h);
     const W = 1100, H = Math.round(W * h / w), prev = this.thumbM;
     /* drawn once per model and values: the picker and the rack do not redraw 20 panels on every meter tick */
     const key = m + '|' + w + '|' + (n ? this.fxParams(m).map(e => this.state.monv[`/fx/${n}/p${e[0]}`]).join(',') + '|' + JSON.stringify(this.fxWhere(n)) : '');
     const C = this.thumbC || (this.thumbC = new Map()); if (C.has(key)) return C.get(key); if (C.size > 200) C.clear();
-    this.thumbM = n ? null : m;
+    this.thumbM = n ? null : m; const pin = this.inThumb; this.inThumb = true;
     try {
       const out = html`<div aria-hidden="true" style=${`width:${w}px;height:${h}px;flex:none;overflow:hidden;border-radius:4px;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,.6)`}>
         <div style=${`width:${W}px;height:${H}px;transform:scale(${w / W});transform-origin:0 0`}>${this.fxFace(n, W, H, true)}</div></div>`;
       C.set(key, out); return out;
-    } finally { this.thumbM = prev; }
+    } finally { this.thumbM = prev; this.inThumb = pin; }
   }
   /* ===================== settings: about the mixer, and its lights ===================== */
   renderMixerInfo() {
@@ -4474,7 +4679,7 @@ class App extends Component {
         ${!isWing ? html`<span dir="rtl" style="font-family:'Heebo',sans-serif;font-size:17px;color:#cbbd9f">במקום הגייט של הערוץ הזה יושב עכשיו ${mName('gate', st.slots.gate)}. אפשר לפתוח אותו במסך מלא.</span>` : html`
         <div dir="rtl" style="font-family:'Heebo',sans-serif;font-size:15px;color:#9b927f">דוגמה לסיידצ׳יין: סינוס של 60 הרץ בערוץ הזה, ומקור הטריגר הוא מיקרופון הקיק. הגייט ייפתח רק כשהקיק מכה.</div>
         <div style="display:flex;gap:10px">
-          <button onClick=${() => this.setState({ chPick: true })} style="flex:1;height:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:10px;cursor:pointer;text-align:left;background:#100f0d;border:1.5px solid #4fc9b7">
+          <button onClick=${() => this.setState({ chPick: true })} style="flex:1;height:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:10px;cursor:pointer;text-align:left;${(c => c ? `background:linear-gradient(90deg,${c}38,${c}14);border:1.5px solid ${c}` : 'background:#100f0d;border:1.5px solid #4fc9b7')(this.keySrcColor())}">
             <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#4fc9b7">KEY SOURCE · מי פותח את הגייט</span><span style="font-size:20px;font-weight:700;color:#f3e6cc">${this.keySrcName()} ›</span></button>
           <button onClick=${() => this.setState({ keyPop: true })} style="flex:1;height:64px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 16px;border-radius:10px;cursor:pointer;text-align:left;background:#100f0d;border:1.5px solid #8fd3e0">
             <span style="font-size:11px;font-weight:700;letter-spacing:.16em;color:#8fd3e0">KEY FILTER · לאיזה תדר הוא מקשיב</span><span style="font-size:20px;font-weight:700;color:#f3e6cc">${!sc.on ? 'Flat' : (KEYT[sc.type] || sc.type) + ' · ' + fmtF(sc.f)} ›</span></button>
@@ -5694,6 +5899,20 @@ class App extends Component {
       ? html`<span style="width:74px;height:44px;display:grid;grid-template-columns:1fr 1.4fr 1fr;grid-template-rows:1fr 1fr;gap:3px">${['#3a342c', '#c9a25a', '#3a342c', '#3a342c', '#3a342c', '#3a342c'].map((c, k) => html`<span style=${`border-radius:2px;border:1px solid ${k === 1 ? '#c9a25a' : '#4a4036'};background:${k === 1 ? 'rgba(201,162,90,.15)' : '#1a1714'};${k === 3 ? 'grid-column:1/3' : ''}`}></span>`)}</span>`
       : html`<span style="width:74px;height:44px;display:flex;flex-direction:column;gap:3px"><span style="display:flex;gap:2px">${[0, 1, 2, 3].map(k => html`<span style=${`flex:1;height:7px;border-radius:2px;border:1px solid ${k === 1 ? '#c9a25a' : '#4a4036'};background:${k === 1 ? 'rgba(201,162,90,.3)' : 'transparent'}`}></span>`)}</span>
           <span style="flex:1;border-radius:2px;border:1px solid #4a4036;background:#1a1714;display:flex"><svg width="100%" height="100%" viewBox="0 0 72 30" preserveAspectRatio="none"><path d="M4 26 L30 26 L44 8 L68 8" fill="none" stroke="#f3c27a" stroke-width="2"/></svg></span></span>`;
+    /* a fader with its meter: before the fader the meter stays full when the fader is down; after the fader it follows it */
+    const mtrPic = post => html`<svg width="74" height="52" viewBox="0 0 74 52" aria-hidden="true">
+      <rect x="14" y="4" width="4" height="44" rx="2" fill="#2c2721"/><rect x="8" y="34" width="16" height="9" rx="2" fill="#d9cdb3"/><line x1="8" x2="24" y1="38.5" y2="38.5" stroke="#121110"/>
+      <rect x="34" y="4" width="8" height="44" rx="2" fill="#1a1714" stroke="#3a342c"/>
+      ${post ? html`<rect x="35" y="40" width="6" height="7" fill="#5fd36b"/>` : html`<rect x="35" y="10" width="6" height="37" fill="url(#mg)"/>`}
+      <defs><linearGradient id="mg" x1="0" x2="0" y1="1" y2="0"><stop offset="0" stop-color="#5fd36b"/><stop offset=".7" stop-color="#e6d24a"/><stop offset="1" stop-color="#ef6f5a"/></linearGradient></defs>
+      <path d="M50 14 C56 14 56 26 50 26" fill="none" stroke="#9b927f" stroke-width="1.6"/><text x="47" y="44" font-size="9" fill="#9b927f" style="font:700 9px sans-serif">${post ? 'POST' : 'PRE'}</text></svg>`;
+    /* our dynamic EQ screen in miniature, with or without the dashed curve of the regular EQ */
+    const deqPic = ref => html`<svg width="96" height="52" viewBox="0 0 96 52" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="95" height="51" rx="5" fill="#0c1214" stroke="#22302f"/>
+      ${[24, 48, 72].map(x => html`<line x1=${x} x2=${x} y1="2" y2="50" stroke="#16232a"/>`)}<line x1="2" x2="94" y1="26" y2="26" stroke="#35484f"/>
+      ${ref && html`<path d="M3 34 C14 34 18 26 26 26 S40 18 50 18 S62 26 70 26 S86 30 93 30" fill="none" stroke="#e9dcc2" stroke-width="1.3" stroke-dasharray="3 3" opacity=".75"/>`}
+      <path d="M3 26 L40 26 C48 26 50 38 56 38 C62 38 64 26 72 26 L93 26" fill="#f0a24a" fill-opacity=".14" stroke="#f6b45e" stroke-width="2"/>
+      <circle cx="56" cy="38" r="4" fill="#ef6f5a"/></svg>`;
     return html`
       <header class=${this.topCls()} style="height:52px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
@@ -5735,16 +5954,16 @@ class App extends Component {
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">מיטרים ליד הפיידרים</span>
           <span style="font-size:15px;color:#9b927f;text-align:center">מה המיטרים במסך הראשי ובערוץ מראים.</span>
           <div style="display:flex;gap:12px">
-            ${opt(!P.meterPost, 'לפני הפיידר', 'כמה סאונד נכנס לערוץ, גם כשהפיידר למטה או במיוט.', () => this.setPref({ meterPost: false }))}
-            ${opt(!!P.meterPost, 'אחרי הפיידר', 'מה הערוץ שולח הלאה, לפי הפיידר והמיוט.', () => this.setPref({ meterPost: true }))}
+            ${opt(!P.meterPost, 'לפני הפיידר', 'כמה סאונד נכנס לערוץ, גם כשהפיידר למטה או במיוט.', () => this.setPref({ meterPost: false }), mtrPic(false))}
+            ${opt(!!P.meterPost, 'אחרי הפיידר', 'מה הערוץ שולח הלאה, לפי הפיידר והמיוט.', () => this.setPref({ meterPost: true }), mtrPic(true))}
           </div>
         </section>
         <section class="sec" style="gap:12px;padding:16px">
           <span style="font-size:23px;font-weight:800;color:#f3e6cc;text-align:center;align-self:center">האיקיו הרגיל בתוך האיקיו הדינמי</span>
           <span style="font-size:15px;color:#9b927f;text-align:center">במסך האיקיו הדינמי, העקומה והנקודות של האיקיו הרגיל של הערוץ מופיעות בקו מקווקו, רק לצפייה.</span>
           <div style="display:flex;gap:12px">
-            ${opt(P.deqRef !== false, 'להציג', 'רואים איפה האיקיו הרגיל עובד.', () => this.setPref({ deqRef: true }))}
-            ${opt(P.deqRef === false, 'להסתיר', 'רק הפסים הדינמיים.', () => this.setPref({ deqRef: false }))}
+            ${opt(P.deqRef !== false, 'להציג', 'רואים איפה האיקיו הרגיל עובד.', () => this.setPref({ deqRef: true }), deqPic(true))}
+            ${opt(P.deqRef === false, 'להסתיר', 'רק הפסים הדינמיים.', () => this.setPref({ deqRef: false }), deqPic(false))}
           </div>
         </section>
         <section class="sec" style="gap:12px;padding:16px">
@@ -6172,7 +6391,7 @@ class App extends Component {
   }
   renderHome(Hd) {
     const st = this.state, i = st.eqCh, ch = st.chans[i], cf = this.cfgOf(Math.min(i, 47));
-    const bodyH = Math.round(Hd - 72), h1 = Math.round((bodyH - 10) * 0.56), h2 = bodyH - 10 - h1;
+    const bodyH = Math.round(Hd - 72), h1 = Math.round((bodyH - 10) * (i < 48 ? 0.68 : 0.56)), h2 = bodyH - 10 - h1;
     const src = cf.altOn ? cf.alt : cf.main, other = cf.altOn ? cf.main : cf.alt;
     const pre = src && PRE.has(src.grp), sv = src ? this.srcOf(src) : null;
     const opre = other && PRE.has(other.grp), ov = other ? this.srcOf(other) : null;
@@ -6195,7 +6414,7 @@ class App extends Component {
     const chip = (txt, on, color) => html`<span style=${`padding:4px 9px;border-radius:6px;font-family:var(--mono);font-size:13px;${on ? `background:#2a2014;color:${color || 'var(--brass-hi)'};border:1px solid #8a6a3a` : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${txt}</span>`;
     const ph = v => html`<span style=${`padding:4px 10px;border-radius:6px;font-weight:700;font-size:14px;${v ? 'background:#d0392b;color:#fff6ee;box-shadow:0 0 10px rgba(208,57,43,.5)' : 'background:#2a1513;color:#8a5a52'}`}>+48V</span>`;
     const gV = s => s ? (this.srcOf(s).gain > 0 ? '+' : '') + this.srcOf(s).gain.toFixed(1) : '—';
-    const sends = ch.sends.slice(0, 16);
+    const sends = ch.sends.slice(0, Math.max(4, Math.min(16, 2 * Math.floor((h2 - 58) / 17))));   // as many as fit, two columns
     const mH = Math.max(30, h1 - 78 - 84);
     /* a drag bar under a tile: label, value, position 0..1, and what a new position means */
     const bar = (label, txt, n, set, color) => html`<button class="panmini" aria-label=${label + ' ' + txt + ', drag sideways'}
@@ -6217,55 +6436,48 @@ class App extends Component {
     return html`
       ${this.chanHeader('Home', html`<span style="font-family:var(--mono);font-size:12px;color:#cbbd9f">${stripName(i)}</span>`)}
       <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        ${i < 48 && html`<div style=${`width:168px;flex:none;height:${bodyH}px;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:10px;border:1px solid #4a4036;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(0,0,0,.4);background:linear-gradient(180deg,#221f1b,#181614);overflow:hidden`}>
+          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="display:flex;align-items:center;gap:6px;padding:0;border:none;background:none;color:inherit;cursor:pointer">
+            <span style="flex:1;font-size:18px;font-weight:800;letter-spacing:.14em;color:#f3e6cc;text-align:left">INPUT</span><span style="color:#8a7d66;font-size:16px">›</span></button>
+          <div style="display:flex;gap:8px;align-items:stretch">
+            ${this.homeGain(src, pre, sv, Math.round(bodyH * 0.5))}
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding-bottom:6px">
+              <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
+              <span style="font-family:var(--mono);font-size:21px;color:#6fb8ff;text-shadow:0 0 10px rgba(95,168,255,.35)">${pre ? gV(src) : '—'}</span>
+              ${pre && html`<button aria-pressed=${String(sv.ph)} aria-label=${'Phantom power ' + (sv.ph ? 'on' : 'off')} onClick=${() => this.updSrc(src, { ph: !sv.ph })}
+                style=${`height:44px;border-radius:9px;font-weight:900;font-size:15px;cursor:pointer;${sv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #ff6b5a;box-shadow:0 0 14px rgba(208,57,43,.6)' : 'background:#2a1513;color:#8a5a52;border:1px solid #4a2420'}`}>+48V</button>`}
+            </div>
+          </div>
+          <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;padding:0;border:none;background:none;color:inherit;text-align:left;cursor:pointer">
+            <span style="display:flex;align-items:center;gap:6px">
+              <span style=${`padding:2px 7px;border-radius:5px;font-weight:700;font-size:12px;letter-spacing:.1em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
+              <span style="font-family:var(--mono);font-size:13px;color:var(--brass-hi);white-space:nowrap">${this.srcLabel(src)}</span></span>
+            <span style="font-size:15px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcName(src)}</span>
+            <span style="display:flex;flex-wrap:wrap;gap:4px">${chip('TRIM ' + (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1), cf.trim !== 0)}${chip('Ø', cf.inv)}${chip(cf.dlyOn ? 'DLY ' + cf.dly.toFixed(1) : 'DLY OFF', cf.dlyOn)}</span>
+            <span style="margin-top:auto;padding-top:6px;border-top:1px solid #2c2721;display:flex;flex-direction:column;gap:2px;font-size:12px;color:#9b927f">
+              <span style="letter-spacing:.1em">${cf.altOn ? 'MAIN' : 'ALT'} standby</span>
+              <span style="font-family:var(--mono);color:#cbbd9f">${other ? this.srcLabel(other) : 'none'}${opre ? ' · ' + gV(other) + ' dB' : ''}${opre && ov.ph ? ' · 48V' : ''}</span></span>
+          </button>
+        </div>`}
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">
           <div style=${`height:${h1}px;display:flex;gap:10px`}>
-            ${i < 48 && html`            <div style="width:236px;flex:none;display:flex;gap:2px;padding-right:6px;border-radius:10px;border:1px solid #4a4036;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 0 0 1px rgba(0,0,0,.4);background:linear-gradient(180deg,#221f1b,#181614);overflow:hidden">
-            ${tile('INPUT', cf.altOn ? 'Alt' : 'Main', null, () => this.goTab('Config'), html`
-              <span style="display:flex;align-items:center;gap:8px">
-                <span style=${`padding:3px 9px;border-radius:5px;font-weight:700;font-size:13px;letter-spacing:.1em;color:#121110;background:${cf.altOn ? '#e8a33d' : '#62b85c'}`}>${cf.altOn ? 'ALT' : 'MAIN'}</span>
-                <span style="font-family:var(--mono);font-size:14px;color:var(--brass-hi)">${this.srcLabel(src)}</span>
-              </span>
-              <span style="font-size:16px;color:#e9dcc2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.srcName(src)}</span>
-              <span style="display:flex;align-items:flex-end;gap:10px">
-                <span style="display:flex;flex-direction:column;line-height:1">
-                  <span style="font-size:11px;font-weight:700;letter-spacing:.14em;color:#b8a78a">GAIN</span>
-                  <span style="font-family:var(--mono);font-size:24px;color:#6fb8ff;text-shadow:0 0 10px rgba(95,168,255,.35)">${pre ? gV(src) : '—'}</span>
-                </span>
-                ${pre && html`<span role="switch" aria-checked=${String(sv.ph)} aria-label=${'Phantom power ' + (sv.ph ? 'on' : 'off')} tabindex="0"
-                  onPointerDown=${e => e.stopPropagation()} onClick=${e => { e.stopPropagation(); this.updSrc(src, { ph: !sv.ph }); }}
-                  style=${`margin-left:auto;min-width:68px;height:42px;display:inline-flex;align-items:center;justify-content:center;border-radius:9px;font-weight:900;font-size:16px;cursor:pointer;${sv.ph ? 'background:#d0392b;color:#fff6ee;border:1px solid #ff6b5a;box-shadow:0 0 14px rgba(208,57,43,.6)' : 'background:#2a1513;color:#a8665c;border:1px solid #4a2420'}`}>48V</span>`}
-              </span>
-              <span style="display:flex;flex-wrap:wrap;gap:5px">
-                ${chip('TRIM ' + (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1), cf.trim !== 0)}
-                ${chip('Ø', cf.inv)}
-                ${chip(cf.dlyOn ? 'DLY ' + cf.dly.toFixed(1) + 'ms' : 'DLY OFF', cf.dlyOn)}
-              </span>
-              <span style="margin-top:auto;padding-top:6px;border-top:1px solid #2c2721;display:flex;align-items:center;gap:8px;font-size:13px;color:#9b927f">
-                <span style="letter-spacing:.1em">${cf.altOn ? 'MAIN' : 'ALT'} standby</span>
-                <span style="font-family:var(--mono);color:#cbbd9f">${other ? this.srcLabel(other) : 'none'}</span>
-                ${opre && html`<span style="font-family:var(--mono);color:#cbbd9f">${gV(other)} dB</span>`}
-                ${opre && ov.ph && html`<span style="color:#ff8a7a;font-weight:700">48V</span>`}
-              </span>`, 'flex:1;min-width:0;border:none;box-shadow:none;background:transparent;padding-right:4px')}
-              ${this.homeGain(src, pre, sv, h1 - 8)}
-            </div>
-`}
             ${i < 48 && html`            ${tile('GATE', mName('gate', gSlot), onSw(this.slotOn('gate'), () => this.setSlotOn('gate', !this.slotOn('gate')), 'Gate'), () => this.goTab('Gate'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                ${gSlot === 'GATE' ? this.miniGate(180, mH) : isDeq(gSlot) ? this.miniEq('deq', 180, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
+                ${gSlot === 'GATE' ? this.miniGate(204, mH) : isDeq(gSlot) ? this.miniEq('deq', 204, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('gate', gSlot)}</span>`}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', gFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${gSlot === 'GATE' ? `RNG ${st.gate.range.toFixed(0)} · A ${st.gate.att} · R ${Math.round(st.gate.rel)}` : isDeq(gSlot) ? st.deq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:220px;flex:none', gFoot)}
 `}
             ${tile('EQ', q.bypass ? 'Bypassed' : '', onSw(!q.bypass, () => this.setState(s0 => ({ eq: { ...s0.eq, bypass: !s0.eq.bypass } })), 'EQ'), () => this.goTab('EQ'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0c1214;overflow:hidden">${gHas && this.miniEq('eq', i >= 48 ? 760 : 400, Math.max(60, h1 - 56), true)}</span>`, 'flex:1')}
             ${tile('COMP', mName('comp', cSlot), onSw(this.slotOn('comp'), () => this.setSlotOn('comp', !this.slotOn('comp')), 'Comp'), () => this.goTab('Comp'), html`
               <span style="flex:1;min-height:0;display:flex;align-items:center;border-radius:6px;background:#0e0d0b;overflow:hidden">
-                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(150, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}</span>
+                <span style="flex:1;min-width:0;align-self:stretch;display:flex;align-items:center">${cSlot === 'COMP' || cSlot === 'EXP' ? this.miniComp(172, mH) : isDeq(cSlot) ? this.miniEq('cdeq', 150, mH) : html`<span style="padding:10px;font-size:15px;color:#cbbd9f">${mName('comp', cSlot)}</span>`}</span>
                 ${this.grBars()}
               </span>
-              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:196px;flex:none', cFoot)}
+              <span style="font-family:var(--mono);font-size:13px;color:#cbbd9f">${cSlot === 'COMP' || cSlot === 'EXP' ? `K ${st.comp.knee} · A ${st.comp.att} · R ${Math.round(st.comp.rel)}` : isDeq(cSlot) ? st.cdeq.bands.map(b => fmtF(b.f)).join(' · ') : ''}</span>`, 'width:220px;flex:none', cFoot)}
           </div>
           <div style=${`height:${h2}px;display:flex;gap:10px`}>
-            ${i < 48 ? html`            ${tile('SENDS', 'Tap: tab · Hold: quick faders', null, () => { if (this.swLong) { this.swLong = false; return; } this.goTab('Sends'); }, html`
+            ${i < 48 ? html`            ${tile('SENDS', '', null, () => { if (this.swLong) { this.swLong = false; return; } this.goTab('Sends'); }, html`
               <span style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:1fr;column-gap:18px;row-gap:3px">
                 ${sends.map((v, k) => html`<span data-k=${k} style="min-height:0;display:flex;align-items:center;gap:8px">
                   <span style="width:78px;flex:none;font-size:13px;color:${v > 0 ? '#e9dcc2' : '#6f675a'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.busLabel(k)}</span>
@@ -6597,7 +6809,7 @@ class App extends Component {
               <span style="position:absolute;left:8px;top:6px;font-size:12px;font-weight:700;letter-spacing:.14em;color:#cfe0e5">KEY · ${!G.sc.on ? 'FILTER OFF' : KEYT[G.sc.type] + ' · ' + fmtF(G.sc.f)}</span>
               <span style="position:absolute;right:6px;top:6px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(0,0,0,.5);color:#cfe0e5">${IC.full}</span>
             </button>
-            <button class="box" style="cursor:pointer" onClick=${() => this.setState({ chPick: true })} aria-label="Choose key source">
+            <button class="box" style=${'cursor:pointer;' + this.keyTint()} onClick=${() => this.setState({ chPick: true })} aria-label="Choose key source">
               <b>Source</b><em style="display:flex;align-items:center;gap:8px">${this.keySrcName()}<span style="color:#b8a78a">▾</span></em></button>
           </section>
         </div>` : html`
@@ -6613,6 +6825,9 @@ class App extends Component {
   }
 
   /* ---------- gate key (sidechain) ---------- */
+  /* the colour of the channel that opens the gate / drives the comp (soft tint for its row) */
+  keySrcColor() { const s = this.curSc().src, i = s === 'SELF' || s === undefined ? this.state.eqCh : typeof s === 'number' ? s : -1; return i >= 0 && this.state.chans[i] ? this.state.chans[i].color : null; }
+  keyTint() { const c = this.keySrcColor(); return c ? `background:linear-gradient(90deg,${c}38,${c}12);border-color:${c};` : ''; }
   keySrcName() {
     const s = this.curSc().src;
     if (s === 'SELF') return 'SELF · ' + this.state.chans[this.state.eqCh].name;
@@ -6941,8 +7156,8 @@ class App extends Component {
           <div style=${`height:${H1}px;display:flex;gap:10px`}>
             ${card('main')}${card('alt')}
 
-            <section class="sec" style="flex:1;min-width:0;justify-content:space-between;gap:8px;padding:8px 12px 12px">
-              <div style="display:flex;justify-content:center">${this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a')}</div>
+            <section class="sec" style="flex:1;min-width:0;justify-content:space-between;gap:6px;padding:8px 12px 10px;overflow:hidden">
+              <div style="display:flex;justify-content:center">${(() => { const k0 = this.kS; this.kS = clamp(H1 - 300, 72, 120); try { return this.knob('trim', 'Trim', cf.trim, 18, (cf.trim > 0 ? '+' : '') + cf.trim.toFixed(1) + ' dB', '#c9a25a'); } finally { this.kS = k0; } })()}</div>
               <div style="display:flex;flex-direction:column;gap:6px;padding:10px 10px 8px;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,rgba(122,167,224,.16),transparent 70%),#100f0e;border:1px solid #2f4a6a;box-shadow:0 0 18px rgba(122,167,224,.12)">
                 <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:17px;font-weight:900;letter-spacing:.16em;color:#cfe0f5">BALANCE</span><span style="flex:1"></span><span style="font-family:var(--mono);font-size:24px;font-weight:700;color:#8ec0ff;text-shadow:0 0 10px rgba(122,167,224,.6)">${balText}</span></div>
                 ${this.hslide('Balance', (cf.bal + 9) / 18, n => { let v = Math.round((n * 18 - 9) * 10) / 10; if (Math.abs(v) < 0.3) v = 0; this.updCfg(i, { bal: v }); }, 0.5, '#7aa7e0', 62, 0.5)}
