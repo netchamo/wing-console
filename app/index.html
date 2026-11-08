@@ -1324,7 +1324,8 @@ class App extends Component {
     if (!isMain) {
       if (has('$solo')) c.solo = +mx.$solo === 1;
       if (has('name')) c.name = this.nameIn(s, mx.name);
-      if (has('col')) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
+      /* channels and aux take their colour from OSC: the native colour answer comes back as the first colour (blue) and made them flicker */
+      if (has('col') && s >= 48) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
       if (has('icon')) c.icon = +mx.icon;
       const sends = c.sends.slice(); let sc = false;
       for (let k = 0; k < 24; k++) { const key = k < 16 ? `send/${k + 1}/lvl` : `send/MX${k - 15}/lvl`; if (has(key)) { sends[k] = posOf(+mx[key]); sc = true; } }
