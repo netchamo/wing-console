@@ -986,7 +986,7 @@ class App extends Component {
       else if (!this.coreDone) { this.coreDone = true; this.logLine('sys', 'colours: 76/76 read'); }
     }                       // subscription: the WING pushes changes; renewed every 9 s (as Bitfocus Companion does)
     /* names and colours: over the native link they come from the desk itself (below); the OSC copy is only for when that link is down */
-    if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/icon', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
+    if (n % 50 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/$name', chAddr(i) + '/$col', chAddr(i) + '/$icon', chAddr(i) + '/clink', chAddr(i) + '/$solo'); for (let b = 1; b <= 16; b++) q.push('/bus/' + b + '/$name'); for (let b = 1; b <= 8; b++) q.push('/mtx/' + b + '/$name'); }
     if (n % 25 === 1) { for (let i = 0; i < 48; i++) q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); }
     else if (n % 2 === 1 && st.bank < 6 && !(now - (this.natAt || 0) < 3000)) { for (let j = 0; j < 8; j++) { const i = st.bank * 8 + j; q.push(chAddr(i) + '/fdr', chAddr(i) + '/mute'); } q.push('/main/1/fdr', '/main/1/mute'); }
     if (q.length) NATIVE.query(q.join('\n'));
@@ -1053,7 +1053,7 @@ class App extends Component {
         const chans = (out.chans || st.chans).slice(); let main = out.main || st.main, touched = false;
         for (const m of osc) {
           const a = m.args || [];
-          let mm = /^\/(ch|aux)\/(\d+)\/(\$?name|\$?col|\$?icon|fdr|mute|\$solo)$/.exec(m.address);
+          let mm = /^\/(ch|aux)\/(\d+)\/(\$?name|\$?col|\$?icon|clink|fdr|mute|\$solo)$/.exec(m.address);
           if (mm) {
             const i = mm[1] === 'ch' ? +mm[2] - 1 : 39 + +mm[2];
             if (i < 0 || i >= 48) continue;
@@ -1061,7 +1061,8 @@ class App extends Component {
             if (mm[3] === 'fdr' && typeof a[1] === 'number') ch.v = clamp(a[1], 0, 1);
             else if (mm[3] === 'mute') ch.mute = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
             else if (mm[3] === '$solo') ch.solo = (typeof a[2] === 'number' ? a[2] : Math.round(+a[1] || 0)) === 1;
-            else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') ch.name = this.nameIn(i, a[0]);
+            else if ((mm[3] === 'name' || mm[3] === '$name') && typeof a[0] === 'string') { ch.name = this.nameIn(i, a[0]); (this.oscNm || (this.oscNm = {}))[i] = true; }
+            else if (mm[3] === 'clink') (this.clink || (this.clink = {}))[i] = (typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10)) === 1 ? 1 : 0;
             else if (mm[3] === 'icon' || mm[3] === '$icon') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 0 && k <= 999) { ch.icon = k; (this.oscIcon || (this.oscIcon = {}))[i] = true; } }
             else if (mm[3] === 'col' || mm[3] === '$col') { const k = typeof a[2] === 'number' ? a[2] : parseInt(a[0], 10); if (k >= 1 && k <= 12) ch.color = WING_COLORS[k - 1]; }
             chans[i] = ch; touched = true; continue;
@@ -1324,7 +1325,7 @@ class App extends Component {
     if (has('wid')) { c.width = Math.abs(+mx.wid) / 100; c.swap = +mx.wid < 0; }
     if (!isMain) {
       if (has('$solo')) c.solo = +mx.$solo === 1;
-      if (has('name')) c.name = this.nameIn(s, mx.name);
+      if (has('name') && !(this.oscNm || {})[s]) c.name = this.nameIn(s, mx.name);
       /* channels and aux take their colour from OSC: the native colour answer comes back as the first colour (blue) and made them flicker */
       if (has('col') && s >= 48) { const k = +mx.col; if (k >= 1 && k <= 12) c.color = WING_COLORS[k - 1]; }
       if (has('icon') && !(this.oscIcon || {})[s]) c.icon = +mx.icon;
@@ -1508,9 +1509,10 @@ class App extends Component {
     if (c.mlv) c.mlv.forEach((v, k) => { d[`main/${k + 1}/lvl`] = fdrDb(v); });
     if (c.proc) d.proc = c.proc;
     if (c.ins) ['preins', 'postins'].forEach(w => { const I = c.ins[w]; if (I) { d[w + '/ins'] = I.fx ? 'FX' + I.fx : 'NONE'; d[w + '/on'] = I.on ? 1 : 0; } });
-    if (s !== 48 && c.nameEd) d.name = c.name;
-    if (s !== 48 && c.iconEd && c.icon !== undefined) d.icon = c.icon;
-    if (s !== 48 && c.colEd) { const k = WING_COLORS.indexOf(c.color); if (k >= 0) d.col = k + 1; }
+    const viaIn = s < 48 && (this.clink || {})[s] === 1;
+    if (s !== 48 && !viaIn && c.nameEd) d.name = c.name;
+    if (s !== 48 && !viaIn && c.iconEd && c.icon !== undefined) d.icon = c.icon;
+    if (s !== 48 && !viaIn && c.colEd) { const k = WING_COLORS.indexOf(c.color); if (k >= 0) d.col = k + 1; }
     d.fdr = fdrDb(c.v); d.mute = c.mute ? 1 : 0; d.pan = c.pan * 100; d.wid = c.width * 100 * (c.swap ? -1 : 1);
     if (s === 48 && s !== st.eqCh) return d;
     if (s !== 48) d.$solo = c.solo ? 1 : 0;
@@ -5699,6 +5701,12 @@ class App extends Component {
     </div>`;
   }
   touch(s) { (this.touchS || (this.touchS = new Set())).add(s); }
+  /* name / colour / icon by hand: when the desk shows the input's ones (CUST LINK), the input is what changes, over OSC; only with live control */
+  identOut(i, key, v) {
+    if (i >= 48 || (this.clink || {})[i] !== 1 || !this.isLinked() || !this.state.conn.live) return;
+    const cf = { ...this.cfgOf(i), ...(this.state.cfg[i] || {}) }, src = cf.altOn ? cf.alt : cf.main; if (!src) return;
+    NATIVE.set(`/io/in/${wgrp(src.grp)}/${src.n}/${key}`, key === 'name' ? 's' : 'i', String(v));
+  }
   renderRouteChannels(Hd) {
     const st = this.state, page = st.routeChPage || 0;
     const pages = ['1–8', '9–16', '17–24', '25–32', '33–40', 'Aux 1–8'], idx = Array.from({ length: 8 }, (_, k) => page * 8 + k);
@@ -6313,9 +6321,9 @@ class App extends Component {
     const st = this.state, i = st.nameEdit.i, c = st.chans[i], close = () => this.setState({ nameEdit: null });
     const txt = st.nameEdit.txt ?? c.name, heb = /[֐-׿]/.test(txt), ascii = txt.replace(/[^\x20-\x7E]/g, '');
     const go = d => { const n = (i + d + 48) % 48; this.setState({ nameEdit: { i: n } }); };
-    const setName = v => { this.touch(i); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], name: v, nameEd: true }; return { chans }; }); };
-    const setCol = col => { this.touch(i); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], color: col, colEd: true }; return { chans }; }); };
-    const ic = this.iconOf(i), setIcon = v => { this.touch(i); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], icon: clamp(v, 0, 999), iconEd: true }; return { chans }; }); };
+    const setName = v => { this.touch(i); this.identOut(i, 'name', v); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], name: v, nameEd: true }; return { chans }; }); };
+    const setCol = col => { this.touch(i); this.identOut(i, 'col', WING_COLORS.indexOf(col) + 1); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], color: col, colEd: true }; return { chans }; }); };
+    const ic = this.iconOf(i), setIcon = v => { this.touch(i); this.identOut(i, 'icon', clamp(v, 0, 999)); this.setState(s0 => { const chans = s0.chans.slice(); chans[i] = { ...chans[i], icon: clamp(v, 0, 999), iconEd: true }; return { chans }; }); };
     return html`<button class="scrim" style="z-index:20" aria-label="Close" onClick=${close}></button>
       <div class="pop" style=${`z-index:21;left:90px;top:12px;width:1000px;height:${Hd - 24}px;padding:16px 20px;gap:14px;border-color:${c.color}`}>
         <div style="display:flex;align-items:center;gap:12px">
