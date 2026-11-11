@@ -766,6 +766,8 @@ class App extends Component {
     this.ptrs = {}; this.taps = {};
   }
   componentDidMount() {
+    /* the send guard keeps its picture of the screen fresh even when nothing redraws */
+    this.syncIv = setInterval(() => { try { this.syncCheck(); } catch (e) {} }, 250);
     const ro = new ResizeObserver(() => { const r = this.stage.getBoundingClientRect(); this.setState({ cw: r.width, ch: r.height }); });
     ro.observe(this.stage);
     const fsc = () => this.setState({ isFs: !!(document.fullscreenElement || document.webkitFullscreenElement) });
@@ -773,7 +775,7 @@ class App extends Component {
     ['gesturestart','gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
     document.addEventListener('contextmenu', e => e.preventDefault());
     const ua = () => { this.uAct = Date.now(); };
-    ['pointerdown', 'pointermove', 'click', 'wheel', 'keydown'].forEach(t => document.addEventListener(t, ua, true));
+    ['pointerdown', 'pointermove', 'click', 'wheel', 'keydown', 'input', 'beforeinput'].forEach(t => document.addEventListener(t, ua, true));
     // a finger lifted anywhere is gone for pinch tracking too
     const gone = e => { if (this.ptrs && this.ptrs[e.pointerId]) { delete this.ptrs[e.pointerId]; if (Object.keys(this.ptrs).length < 2) this.pinch = null; } };
     ['pointerup', 'pointercancel'].forEach(t => window.addEventListener(t, gone, true));
@@ -1375,8 +1377,9 @@ class App extends Component {
       const q = st.eq, bands = this.eqBands(s, q.bands).map(b => ({ ...b })), P = { L: 'l', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', H: 'h' };
       bands.forEach(b => { const p = 'eq/STD/' + P[b.id];
         if (has(p + 'g')) b.g = +mx[p + 'g']; if (has(p + 'f')) b.f = +mx[p + 'f']; if (has(p + 'q')) b.q = +mx[p + 'q'];
-        if (b.id === 'L' && has('eq/STD/leq')) b.type = mx['eq/STD/leq'] === 'SHV' ? 'losh' : 'bell';
-        if (b.id === 'H' && has('eq/STD/heq')) b.type = mx['eq/STD/heq'] === 'SHV' ? 'hish' : 'bell';
+        const lhT = (raw, sh) => { raw = String(raw); return raw === 'SHV' ? { type: sh, cut: null } : raw === 'PEQ' ? { type: 'bell', cut: null } : { type: 'cut', cut: raw }; };
+        if (b.id === 'L' && has('eq/STD/leq')) Object.assign(b, lhT(mx['eq/STD/leq'], 'losh'));
+        if (b.id === 'H' && has('eq/STD/heq')) Object.assign(b, lhT(mx['eq/STD/heq'], 'hish'));
         if (b.type === 'notch') b.type = 'bell'; b.on = true; });
       const e = { ...q, bands };
       if (has('eq/on')) e.bypass = +mx['eq/on'] === 0;
@@ -1540,8 +1543,8 @@ class App extends Component {
       const q = st.eq, P = { L: 'l', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', H: 'h' };
       q.bands.forEach(b => { const p = 'eq/STD/' + P[b.id]; d[p + 'g'] = b.g; d[p + 'f'] = b.f; d[p + 'q'] = b.q; });
       const bl = q.bands.find(b => b.id === 'L'), bh = q.bands.find(b => b.id === 'H');
-      if (bl) d['eq/STD/leq'] = bl.type === 'losh' ? 'SHV' : 'PEQ';
-      if (bh) d['eq/STD/heq'] = bh.type === 'hish' ? 'SHV' : 'PEQ';
+      if (bl) d['eq/STD/leq'] = bl.type === 'cut' && bl.cut ? bl.cut : bl.type === 'losh' ? 'SHV' : 'PEQ';
+      if (bh) d['eq/STD/heq'] = bh.type === 'cut' && bh.cut ? bh.cut : bh.type === 'hish' ? 'SHV' : 'PEQ';
       d['eq/on'] = q.bypass ? 0 : 1;
       d['flt/lc'] = q.lc.on ? 1 : 0; d['flt/lcf'] = q.lc.f; d['flt/hc'] = q.hc.on ? 1 : 0; d['flt/hcf'] = q.hc.f;
       if (q.lc.s) d['flt/lcs'] = q.lc.s; if (q.hc.s) d['flt/hcs'] = q.hc.s; if (q.tool) { d['flt/tf'] = q.tool.on ? 1 : 0; d['flt/mdl'] = q.tool.mdl; }
@@ -1588,22 +1591,33 @@ class App extends Component {
   /* compares screen and desk after a user action */
   syncCheck() {
     if (!this.isLinked() || !this.mx) return;
-    if (Date.now() - (this.uAct || 0) > 1500) return;
     const st = this.state, strips = new Set([st.eqCh, 48, st.prefs.mainStrip ?? 48]);
+    const idle = Date.now() - (this.uAct || 0) > 1500;
     if (st.nameEdit) strips.add(st.nameEdit.i);
     for (let j = 0; j < 8; j++) { const s0 = bankIdx(st.bank, j); if (s0 >= 0) strips.add(s0); }
     if (st.sendPop) strips.add(st.sendPop.i);
     if (st.sofOn && st.screen === 'main') strips.add(sofIdx(st.sof));
     if (st.plPop || st.screen === 'rec') strips.add(this.playerCh());
     if (st.screen === 'osc') [1, 2].forEach(n => { const k = this.oscCh(n); if (k != null) strips.add(k); });
+    /* no hand action: remember how the app shows these strips now (the base); nothing is sent.
+       In an action only what the app itself changed against that base is sent: a value the app merely shows
+       differently from the desk (a type it does not know, rounding) is never "corrected" on the desk */
+    const B = this.base || (this.base = {});
+    if (idle) { const now = Date.now();
+      if (now - (this.baseT || 0) > 200) { this.baseT = now; const all = now - (this.baseA || 0) > 1500; if (all) this.baseA = now;
+        for (let s = 0; s < 76; s++) if (this.mx[s] && (all || strips.has(s))) B[s] = this.deriveStrip(st, s); this.baseG = this.deriveG(st); }
+      return; }
     if (this.touchS) { this.touchS.forEach(x => strips.add(x)); this.touchS.clear(); }
+    const same = (k, a, b) => k === 'tags' ? tagsKey(a) === tagsKey(b) : near(a, b);
     const diff = [];
     for (const s of strips) {
-      const mx = this.mx[s], d = this.deriveStrip(st, s);
-      for (const k in d) if (k in mx && !(k === 'tags' ? tagsKey(d[k]) === tagsKey(mx[k]) : near(d[k], mx[k]))) diff.push([s, k, d[k]]);
+      const mx = this.mx[s]; if (!mx) continue;
+      const d = this.deriveStrip(st, s), b = B[s];
+      if (!b) { B[s] = d; continue; }          /* a strip just opened: its first look is the base */
+      for (const k in d) if (k in mx && !same(k, d[k], mx[k]) && !(k in b && same(k, d[k], b[k]))) { diff.push([s, k, d[k]]); delete b[k]; }
     }
-    const dg = this.deriveG(st);
-    for (const p in dg) if (p in this.gx && !near(dg[p], this.gx[p])) diff.push([-1, p, dg[p]]);
+    const dg = this.deriveG(st), bg = this.baseG || (this.baseG = {});
+    for (const p in dg) if (p in this.gx && !near(dg[p], this.gx[p]) && !(p in bg && near(dg[p], bg[p]))) { diff.push([-1, p, dg[p]]); delete bg[p]; }
     /* a value the desk has not reported yet, changed by hand: send it too (only with live control on) */
     if (this.touchG && this.touchG.size) { for (const p of this.touchG) if (!(p in this.gx) && GID[p] !== undefined && st.monv[p] !== undefined) { diff.push([-1, p, st.monv[p]]); if (!(this.unrep || (this.unrep = {}))[p]) { this.unrep[p] = 1; this.logLine('sys', 'desk has not reported ' + p + ' yet; sending the change anyway'); } } this.touchG.clear(); }
     if (!diff.length) return;
@@ -2306,10 +2320,15 @@ class App extends Component {
     if (b.type === 'bell') return g / (1 + Math.pow(b.q * (r - 1 / r), 2));
     if (b.type === 'losh') return g / (1 + r * r);
     if (b.type === 'hish') return g / (1 + 1 / (r * r));
+    if (b.type === 'cut') { /* the desk's cut filter on L or H: slope from its name (BW24 = 24 dB/oct, LR = two halves) */
+      const t = String(b.cut || 'CUT'), n = (+t.replace(/\D/g, '') || 12) / 6, x = b.id === 'H' ? r : 1 / r;
+      return /^LR/.test(t) ? -20 * Math.log10(1 + Math.pow(x, n)) : -10 * Math.log10(1 + Math.pow(x, 2 * n)); }
     return -30 / (1 + Math.pow(b.q * 2 * (r - 1 / r), 2));
   }
   filt(f) {
     const q = this.state[this.ek]; let d = 0;
+    /* buses, mains and matrices have no low/high cut or tool filter on the desk: only their EQ tilt */
+    if (this.ek === 'eq' && this.state.eqCh >= 48) return q.tilt * Math.log10(f / 1000) / Math.log10(20);
     /* the slope in dB/oct: 6 per order */
     if (q.lc.on) d += -10 * Math.log10(1 + Math.pow(q.lc.f / f, 2 * (+q.lc.s || 12) / 6));
     if (q.hc.on) d += -10 * Math.log10(1 + Math.pow(f / q.hc.f, 2 * (+q.hc.s || 12) / 6));
@@ -2577,7 +2596,7 @@ class App extends Component {
             </div>
             <div style="display:flex;gap:4px;height:44px">
               ${D ? [['BP', 'Band'], ['LP6', 'Low 6'], ['LP12', 'Low 12'], ['HP6', 'High 6'], ['HP12', 'High 12'], ['OFF', 'Wide']].map(t => html`<button class=${'pill' + (sb.filt === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:14px;font-weight:600;padding:0" onClick=${() => this.updBand(si, { filt: t[0], type: /^LP/.test(t[0]) ? 'losh' : /^HP/.test(t[0]) ? 'hish' : 'bell' })}>${t[1]}</button>`)
-                : (this.isLinked() && sb.id !== 'L' && sb.id !== 'H' ? [['bell', 'Bell']] : this.isLinked() ? [['bell', 'Bell'], [sb.id === 'L' ? 'losh' : 'hish', sb.id === 'L' ? 'Low shelf' : 'High shelf']] : [['bell','Bell'],['losh','Low shelf'],['hish','High shelf'],['notch','Notch']]).map(t => html`<button class=${'pill' + (sb.type === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:15px;font-weight:600" onClick=${() => this.updBand(si, { type: t[0] })}>${t[1]}</button>`)}
+                : (this.isLinked() && sb.id !== 'L' && sb.id !== 'H' ? [['bell', 'Bell']] : this.isLinked() ? [['bell', 'Bell'], [sb.id === 'L' ? 'losh' : 'hish', sb.id === 'L' ? 'Low shelf' : 'High shelf'], ...(sb.cut ? [['cut', (sb.id === 'L' ? 'Low cut ' : 'High cut ') + sb.cut]] : [])] : [['bell','Bell'],['losh','Low shelf'],['hish','High shelf'],['notch','Notch']]).map(t => html`<button class=${'pill' + (sb.type === t[0] ? ' on' : '')} style="flex:1;min-width:0;border-radius:6px;font-size:15px;font-weight:600" onClick=${() => this.updBand(si, { type: t[0] })}>${t[1]}</button>`)}
             </div>
             <div style="display:flex;gap:6px">
               ${this.box('f', 'Freq', fmtF(sb.f), sb.color, 1, 'flex:1;min-width:0')}
