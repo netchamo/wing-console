@@ -2410,13 +2410,14 @@ class App extends Component {
     this.drag = { kind: 'thr', top: r.top, h: r.height, sx: e.clientX, sy: e.clientY, scale: 1 };
     this.gMove(e);
   }
-  NS = { f: [20, 20000, 1], g: [-15, 15], q: [0.442, 10, 1], thr: [-60, 0], range: [-15, 15], att: [0, 200], rel: [20, 4000, 1], lc: [20, 2000, 1], hc: [50, 20000, 1], tilt: [-6, 6] };
+  NS = { f: [20, 20000, 1], g: [-15, 15], q: [0.442, 10, 1], thr: [-60, 0], range: [-15, 15], att: [0, 200], rel: [20, 4000, 1], lc: [20, 2000, 1], hc: [50, 20000, 1], blc: [20, 20000, 1], bhc: [20, 20000, 1], tilt: [-6, 6] };
   norm(k, v) { const [a, b, lg] = this.NS[k]; return lg ? Math.log(v / a) / Math.log(b / a) : (v - a) / (b - a); }
   denorm(k, n) { const [a, b, lg] = this.NS[k]; n = clamp(n, 0, 1); return lg ? a * Math.pow(b / a, n) : a + n * (b - a); }
-  getVal(k) { const q = this.state[this.ek]; if (k === 'lc' || k === 'hc') return q[k].f; if (k === 'tilt') return q.tilt; return q.bands[q.sel][k]; }
+  getVal(k) { const q = this.state[this.ek]; if (k === 'lc' || k === 'hc') return q[k].f; if (k === 'blc') return q.bands[0].f; if (k === 'bhc') return q.bands[q.bands.length - 1].f; if (k === 'tilt') return q.tilt; return q.bands[q.sel][k]; }
   setVal(k, v) {
     const q = this.state[this.ek];
     if (k === 'lc' || k === 'hc') return this.updEq({ [k]: { ...q[k], f: Math.round(v) } });
+    if (k === 'blc' || k === 'bhc') return this.updBand(k === 'blc' ? 0 : q.bands.length - 1, { f: Math.round(v) });
     if (k === 'tilt') return this.updEq({ tilt: Math.round(v * 10) / 10 });
     this.updBand(q.sel, { [k]: k === 'f' || k === 'rel' ? Math.round(v) : k === 'q' ? Math.round(v * 100) / 100 : Math.round(v * 10) / 10 });
   }
@@ -2498,6 +2499,22 @@ class App extends Component {
       return html`<div style="display:flex;gap:5px">
         ${hasT && html`<button aria-pressed=${String(on)} onClick=${() => this.updEq({ [k]: { ...q[k], on: !on } })} class="pill" style=${`width:56px;height:44px;font-size:15px;border-radius:6px;${pillOn(on)}`}>${short}</button>`}
         ${this.box(k, label, value, '#8fa3aa', on ? 1 : 0.4, 'flex:1;min-width:0')}${hasT && slopes(k)}
+      </div>`;
+    };
+    /* buses, mains, matrices: low and high cut are the L and H bands set to a cut filter (as on the desk) */
+    const CUTS = { 6: ['BW'], 12: ['BW', 'BS', 'LR'], 18: ['BW'], 24: ['BW', 'BS', 'LR'], 48: ['BW', 'LR'] };
+    const busCut = id => {
+      const bi = id === 'L' ? 0 : q.bands.length - 1, b = q.bands[bi], on = b.type === 'cut', cur = String(b.cut || ''), sl = cur.replace(/\D/g, ''), fam = cur.replace(/\d/g, '');
+      const setCut = (sl2, fam2) => this.updBand(bi, { type: 'cut', cut: (CUTS[sl2].includes(fam2) ? fam2 : CUTS[sl2][0]) + sl2, ...(on ? {} : { prevType: b.type }) });
+      return html`<div style="display:flex;gap:4px">
+        <button aria-pressed=${String(on)} onClick=${() => on ? this.updBand(bi, { type: b.prevType && b.prevType !== 'cut' ? b.prevType : 'bell', prevCut: cur }) : setCut(b.prevCut ? b.prevCut.replace(/\D/g, '') || '24' : '24', b.prevCut ? b.prevCut.replace(/\d/g, '') : 'LR')}
+          class="pill" style=${`width:52px;height:44px;font-size:15px;border-radius:6px;${pillOn(on)}`}>${id === 'L' ? 'LC' : 'HC'}</button>
+        ${this.box(id === 'L' ? 'blc' : 'bhc', id === 'L' ? 'Low cut' : 'High cut', fmtF(b.f), '#8fa3aa', on ? 1 : 0.4, 'flex:1;min-width:0')}
+        ${['6', '12', '18', '24', '48'].map(x => html`<button aria-pressed=${String(on && sl === x)} aria-label=${x + ' dB per octave'} onClick=${() => setCut(x, fam || 'BW')} class="pill"
+          style=${`width:32px;height:44px;padding:0;font-size:13px;border-radius:6px;${pillOn(on && sl === x)}`}>${x}</button>`)}
+        <button aria-label=${'Filter type ' + (fam || 'BW') + ', tap for the next'} disabled=${!on || !sl || CUTS[sl].length < 2} class="pill"
+          onClick=${() => { const L = CUTS[sl]; setCut(sl, L[(L.indexOf(fam) + 1) % L.length]); }}
+          style=${`width:40px;height:44px;padding:0;font-size:12px;border-radius:6px;${pillOn(on)};opacity:${on && sl && CUTS[sl].length > 1 ? 1 : 0.45}`}>${on ? (sl ? fam : 'CUT') : '—'}</button>
       </div>`;
     };
     const tl = q.tool || { on: true, mdl: 'TILT' };
@@ -2621,8 +2638,8 @@ class App extends Component {
 
           </section>` : html`
           <section class="sec" style="flex:360 1 0">
-            ${st.eqCh < 48 && frow('lc', 'LC', 'Low cut', fmtF(q.lc.f), true)}
-            ${st.eqCh < 48 && frow('hc', 'HC', 'High cut', fmtF(q.hc.f), true)}
+            ${st.eqCh < 48 ? frow('lc', 'LC', 'Low cut', fmtF(q.lc.f), true) : busCut('L')}
+            ${st.eqCh < 48 ? frow('hc', 'HC', 'High cut', fmtF(q.hc.f), true) : busCut('H')}
             ${st.eqCh < 48 ? toolRow : frow('tilt', '', 'Tilt', fmtDb(q.tilt), false)}
           </section>`}
         </div>` : html`
@@ -6054,7 +6071,7 @@ class App extends Component {
   hideDragPop() { if (this.state.dragPop) this.setState({ dragPop: false }); }
   fmtEq(k) {
     const v = this.getVal(k);
-    if (k === 'f' || k === 'lc' || k === 'hc') return fmtF(v);
+    if (k === 'f' || k === 'lc' || k === 'hc' || k === 'blc' || k === 'bhc') return fmtF(v);
     if (k === 'g' || k === 'range' || k === 'tilt') return fmtDb(v);
     if (k === 'q') return v.toFixed(2);
     if (k === 'thr') return v.toFixed(1) + ' dB';
