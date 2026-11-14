@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- three fader slots with ivory caps, on the 108dp adaptive-icon grid -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FF070606" android:pathData="M37,30h4v48h-4z M52,30h4v48h-4z M67,30h4v48h-4z" />
+    <path android:fillColor="#FFE8DFC8" android:strokeColor="#FF6F6656" android:strokeWidth="1"
+        android:pathData="M32,56h14v10h-14z M47,38h14v10h-14z M62,48h14v10h-14z" />
+    <path android:fillColor="#FF1B1915" android:pathData="M33,60.5h12v1h-12z M48,42.5h12v1h-12z M63,52.5h12v1h-12z" />
+</vector>

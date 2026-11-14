@@ -164,3 +164,25 @@ Read this once at the start of a new session. It replaces the long history of th
 6. Later: monitor app for musicians (one bus per musician), Wi‑Fi client guide.
 
 Open question still unanswered: **does he have an XR16 available for testing?** Ask early.
+
+## 8. Air Console (X-Air) – state after the first build (15 Nov 2026)
+
+- Separate app in the same repo, the WING app is untouched: source `src/xair-console.html`
+  (one file, ~800 lines) → `python3 build_xair.py` → `xair/index.html` (Pages:
+  `https://netchamo.github.io/wing-console/xair/`). Android project `android-xair/`
+  (package `app.xairconsole`, label "Air Console"), built by `.github/workflows/android-xair.yml`
+  only when `android-xair/**` changes; APK at release tag `xair-latest` (`air-console.apk`).
+- Protocol and open `VERIFY` items: `docs/XAIR-PROTOCOL.md`. Running list: `dev/notes/xair-list.md`.
+- **Architecture (simpler than WING, keep it):** two stores – `demo` and `desk` (only what the mixer
+  reported, raw floats). One write path, `set()` / `act()`: needs LIVE, a value the mixer already
+  reported, and a hand gesture in the last 1.5 s. Nothing is derived and written back, so the WING
+  "base" send guard is not needed. The native side (`XAirLink.kt`) is a dumb UDP pipe (the page
+  encodes/decodes OSC → protocol fixes are web updates) and drops value packets while live is off.
+- Done: strips, faders (1024 steps), mute, solo, pan, names/colours, layers, sends on faders,
+  strip window with sends, auto-detect of the model + last mixer remembered, link loss handling,
+  "mixer report" (Settings → דוח מיקסר: reads ~2750 addresses, copy to clipboard – ask the user
+  to paste it; it settles the `VERIFY` items and gives real values for the next screens).
+- Recorder/player exists only on XR16/XR12 (user confirmed: not on X18) → `MODELS[..].rec`.
+- Tests: `cd dev/xair-tests && python3 regen.py && node run.mjs` (51 checks, fake mixer in
+  `fake-mixer.js`; `node shot.mjs` writes screenshots to `/tmp/shots`). Run before every release.
+- Next: channel screens (EQ + RTA via `/meters/4`, gate, comp, config), USB player/recorder, FX.

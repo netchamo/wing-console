@@ -1,0 +1,65 @@
+/* A fake X-Air behind a fake Android bridge (window.XAirNative), for the tests.
+   URL: ?model=XR16|XR18|XR12  &delay=ms (the mixer starts answering only after this long)
+   window.fake.sets = every packet that carried a value (what a real mixer would have been told to change). */
+(function () {
+  const Q = new URLSearchParams(location.search), MODEL = Q.get('model') || 'XR16', DELAY = +(Q.get('delay') || 0), IP = '192.168.1.1';
+  const NBUS = MODEL === 'XR18' ? 6 : MODEL === 'XR16' ? 4 : 2, NCH = MODEL === 'XR12' ? 12 : 16;
+  const TE = new TextEncoder(), TD = new TextDecoder(), pad2 = n => String(n).padStart(2, '0');
+  const oscStr = s => { const b = TE.encode(s), o = new Uint8Array((b.length + 4) & ~3); o.set(b); return o; };
+  function enc(addr, args) {
+    const parts = [oscStr(addr), oscStr(',' + args.map(a => a[0]).join(''))];
+    for (const [t, v] of args) {
+      if (t === 's') parts.push(oscStr(String(v)));
+      else if (t === 'b') { const h = new Uint8Array(4); new DataView(h.buffer).setInt32(0, v.length); const p = new Uint8Array((v.length + 3) & ~3); p.set(v); parts.push(h, p); }
+      else { const b = new Uint8Array(4), d = new DataView(b.buffer); if (t === 'f') d.setFloat32(0, v); else d.setInt32(0, v | 0); parts.push(b); }
+    }
+    let n = 0; parts.forEach(p => { n += p.length; }); const o = new Uint8Array(n); let k = 0; parts.forEach(p => { o.set(p, k); k += p.length; }); return o;
+  }
+  function dec(u) {
+    const d = new DataView(u.buffer, u.byteOffset, u.byteLength); let p = 0;
+    const str = () => { let e = p; while (e < u.length && u[e]) e++; const s = TD.decode(u.subarray(p, e)); p = (e + 4) & ~3; return s; };
+    const addr = str(), args = []; let types = '';
+    if (p < u.length && u[p] === 44) { types = str().slice(1); for (const t of types) { if (t === 'i') { args.push(d.getInt32(p)); p += 4; } else if (t === 'f') { args.push(d.getFloat32(p)); p += 4; } else if (t === 's') args.push(str()); } }
+    return { addr, types, args };
+  }
+  const b64 = u => { let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+  const unb64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+  const g = (v, n) => Math.fround(Math.round(v * (n - 1)) / (n - 1));
+
+  const store = {};
+  const core = (b, name, col, i, pan) => { store[b + '/config/name'] = ['s', name]; store[b + '/config/color'] = ['i', col]; store[b + '/mix/fader'] = ['f', g(0.3 + (i * 0.037) % 0.6, 1024)]; store[b + '/mix/on'] = ['i', i % 5 === 3 ? 0 : 1]; if (pan) store[b + '/mix/pan'] = ['f', g((i * 0.13) % 1, 101)]; };
+  const sends = b => { for (let k = 1; k <= 10; k++) { store[`${b}/mix/${pad2(k)}/level`] = ['f', g((k * 0.071 + b.length * 0.03) % 1, 161)]; store[`${b}/mix/${pad2(k)}/pan`] = ['f', 0.5]; store[`${b}/mix/${pad2(k)}/tap`] = ['i', 3]; } };
+  for (let n = 1; n <= NCH; n++) { const b = '/ch/' + pad2(n); core(b, n === 7 ? '' : 'D' + pad2(n), n % 16, n, true); sends(b); store[b + '/preamp/hpf'] = ['f', 0.25]; store[b + '/eq/1/f'] = ['f', 0.2]; store[b + '/eq/1/type'] = ['i', 1]; }
+  core('/rtn/aux', 'USBRTN', 15, 20, true); sends('/rtn/aux');
+  for (let n = 1; n <= 4; n++) { core('/rtn/' + n, 'RTN' + n, 13, 21 + n, true); sends('/rtn/' + n); core('/fxsend/' + n, 'FXS' + n, 6, 30 + n, false);
+    store[`/dca/${n}/config/name`] = ['s', 'DCA' + n]; store[`/dca/${n}/config/color`] = ['i', 7]; store[`/dca/${n}/fader`] = ['f', g(0.75, 1024)]; store[`/dca/${n}/on`] = ['i', 1]; store[`/fx/${n}/type`] = ['i', n]; }
+  for (let n = 1; n <= NBUS; n++) core('/bus/' + n, 'BUS' + n, 3, 40 + n, true);
+  core('/lr', 'MAIN', 7, 50, true);
+  for (let k = 1; k <= 54; k++) store['/-stat/solosw/' + pad2(k)] = ['i', 0];
+  store['/-stat/solo'] = ['i', 0]; store['/-stat/usbmounted'] = ['i', MODEL === 'XR18' ? 0 : 1]; store['/-stat/tape/state'] = ['i', 0]; store['/-prefs/name'] = ['s', 'FAKE-' + MODEL];
+
+  const out = []; let fl = 0;
+  const push = (addr, args) => { out.push({ type: 'rx', ip: IP, d: b64(enc(addr, args)) }); if (!fl) fl = setTimeout(() => { fl = 0; const l = out.splice(0); if (window.__xairNative) window.__xairNative(l); }, 4); };
+  const t0 = Date.now();
+  const fake = (window.fake = { store, sets: [], blocked: [], gets: 0, live: false, silent: false, remote: 0, meters: false, copied: '',
+    /* a change made on the mixer by someone else */
+    emit(addr, type, val) { store[addr] = [type, val]; push(addr, [[type, val]]); } });
+  window.calls = [];
+  function handle(u) {
+    if (fake.silent || Date.now() - t0 < DELAY) return;
+    const m = dec(u);
+    if (m.addr === '/xinfo') { push('/xinfo', [['s', IP], ['s', 'FAKE-' + MODEL], ['s', MODEL], ['s', '1.18']]); return; }
+    if (m.addr === '/xremote') { fake.remote = Date.now(); return; }
+    if (m.addr === '/meters') { fake.meters = true; return; }
+    if (!m.args.length) { fake.gets++; const v = store[m.addr]; if (v) push(m.addr, [v]); return; }
+    fake.sets.push([m.addr, m.types, m.args[0]]); window.calls.push(['set', m.addr, m.args[0]]);
+    if (!fake.live) { fake.blocked.push(m.addr); return; }   /* the native side drops values while live is off */
+    if (store[m.addr]) store[m.addr] = [m.types[0], m.args[0]];
+  }
+  setInterval(() => { if (!fake.meters || fake.silent) return; const b = new Uint8Array(4 + 80), d = new DataView(b.buffer); d.setInt32(0, 40, true); for (let i = 0; i < 40; i++) d.setInt16(4 + 2 * i, Math.round((-40 + 30 * Math.random()) * 256), true); push('/meters/1', [['b', b]]); }, 100);
+  window.XAirNative = { ready() {}, version() { return 'test'; }, wifi() { return true; }, wifiAddress() { return '192.168.1.50/24'; }, netInfo() { return '[]'; },
+    setLive(on) { fake.live = !!on; window.calls.push(['setLive', !!on]); },
+    discover(b) { window.calls.push(['discover']); handle(unb64(b)); },
+    send(ip, b) { if (ip === IP) handle(unb64(b)); },
+    openWifi() {}, copy(t) { fake.copied = t; }, reload() {}, build() { return 1; }, checkUpdate() {}, downloadUpdate() { return 'ok'; }, updateProgress() { return -1; }, updateReason() { return ''; }, openUpdateLink() {} };
+})();

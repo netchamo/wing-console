@@ -3,3 +3,8 @@
 /android/build/
 /android/app/src/main/assets/
 /android/local.properties
+/android-xair/app/build/
+/android-xair/.gradle/
+/android-xair/build/
+/android-xair/app/src/main/assets/
+/android-xair/local.properties

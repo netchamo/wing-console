@@ -1,0 +1,18 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+import http from 'http'; import fs from 'fs'; import path from 'path'; import { fileURLToPath } from 'url';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const srv = http.createServer((q, r) => { const f = path.join(here, q.url.split('?')[0].replace(/^\/+/, '')); fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'content-type': f.endsWith('.js') ? 'text/javascript' : 'text/html; charset=utf-8' }); r.end(d); }); }).listen(8767);
+const B = await chromium.launch(); const out = process.argv[2] || '/tmp/shots'; fs.mkdirSync(out, { recursive: true });
+const tap = async (p, text) => { const h = await p.evaluateHandle(t => [...document.querySelectorAll('button')].find(e => e.offsetParent && !e.disabled && e.textContent.trim() === t), text); const e = h.asElement(); if (e) { await e.click(); await p.waitForTimeout(250); } return !!e; };
+let p = await B.newPage({ viewport: { width: 1180, height: 640 } }); await p.goto('http://127.0.0.1:8767/index.html?model=XR16'); await p.waitForTimeout(3000);
+await p.screenshot({ path: out + '/1-main.png' });
+await tap(p, 'SENDS'); await p.waitForTimeout(700); await p.screenshot({ path: out + '/2-sof.png' }); await tap(p, 'SENDS');
+await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(500); await p.screenshot({ path: out + '/3-sheet.png' }); await tap(p, 'CLOSE');
+await tap(p, 'LIVE OFF'); await p.screenshot({ path: out + '/4-live.png' }); await tap(p, 'Cancel');
+await p.evaluate(() => __app.setState({ connPop: true })); await p.waitForTimeout(300); await p.screenshot({ path: out + '/5-conn.png' }); await tap(p, 'סגור');
+await tap(p, 'הגדרות'); await p.waitForTimeout(300); await p.screenshot({ path: out + '/6-settings.png' });
+await p.close();
+p = await B.newPage({ viewport: { width: 1200, height: 540 } }); await p.goto('http://127.0.0.1:8767/index.html?model=XR18'); await p.waitForTimeout(3000);
+console.log('buses tap', await tap(p, 'Buses'), await p.evaluate(() => [...document.querySelectorAll('.strip .cname')].map(e => e.textContent.trim()).join(',')), await p.evaluate(() => document.body.textContent.includes('נגן ומקליט USB')));
+await p.screenshot({ path: out + '/7-xr18-540.png' });
+await p.close(); await B.close(); srv.close();

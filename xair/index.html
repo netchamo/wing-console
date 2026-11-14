@@ -1,0 +1,815 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0a09">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Air Console">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Air Console</title>
+<style>
+/* Layout: fixed 1180-wide console, scaled to fill the device in landscape; height stretches to the screen so faders and the EQ graph grow on taller devices. */
+:root{
+  --ground:#121110; --panel:#1a1815; --ink:#f1e7d2; --ink-dim:#b8a78a;
+  --brass:#c9a25a; --brass-hi:#f3c27a; --line:#2c2721;
+  --display:'Barlow Condensed','Arial Narrow',sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%;margin:0;background:#0b0a09;color:var(--ink);overflow:hidden;overscroll-behavior:none}
+*{box-sizing:border-box}
+button{font-family:var(--display);-webkit-tap-highlight-color:transparent;color:inherit}
+button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
+#stage{position:fixed;top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;background:#0b0a09}
+.console{position:absolute;top:0;width:1180px;transform-origin:0 0;display:flex;flex-direction:column;overflow:hidden;background:var(--ground);font-family:var(--display);color:var(--ink)}
+.wood{background:repeating-linear-gradient(180deg,rgba(0,0,0,.14) 0 2px,transparent 2px 7px),linear-gradient(90deg,#3a2213,#6e4527 45%,#55331b 70%,#2e1b0f)}
+.topbar{flex:none;display:flex;align-items:center;gap:12px;padding-right:14px;background:linear-gradient(180deg,#2b2723,#1a1815);border-bottom:1px solid #8a6a3a}
+.navbtn{width:60px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:transparent;border:1px solid transparent;border-radius:8px;color:#e9dcc2;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.navbtn.hot{background:#2a2014;border-color:#8a6a3a;color:var(--brass-hi);width:66px}
+.strip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px;padding:6px;background:linear-gradient(180deg,#27241f,#1a1815 60%,#161412);border:1px solid #302b25;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.cname{height:34px;flex:none;border:none;border-radius:4px;padding:0 6px;color:#121110;font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.panmini{position:relative;height:30px;flex:none;padding:0;border:1px solid #34302a;border-radius:15px;background:#100f0d;cursor:ew-resize;touch-action:none}
+.knob{position:absolute;top:50%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e3b4,#c9a25a 55%,#7a5a26);box-shadow:0 2px 3px rgba(0,0,0,.6)}
+.ms{display:flex;gap:4px;height:32px;flex:none}
+.ms button{flex:1;min-width:0;padding:0;border-radius:4px;font-weight:700;font-size:13px;letter-spacing:.08em;cursor:pointer}
+.dbr{height:14px;flex:none;text-align:center;font-family:var(--mono);font-size:11px;line-height:14px;color:#d9cdb3}
+.fader{position:relative;width:100%;flex:none;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none}
+.mk{position:absolute;left:0;width:22px;text-align:right;font-family:var(--mono);font-size:9px;line-height:14px;color:#9b927f}
+.tk{position:absolute;left:30px;width:28px;height:1px;background:#3a342c}
+.slot{position:absolute;left:41px;width:6px;top:20px;bottom:20px;border-radius:3px;background:#070606;box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 0 0 1px #2c2721}
+.meter{position:absolute;left:66px;width:15px;top:22px;display:flex;gap:2px;padding:0;z-index:0;isolation:isolate}
+.mcol{flex:1;position:relative;height:100%;border-radius:1px;overflow:hidden;background:linear-gradient(0deg,#14231a 0,#14231a 80%,#2a2212 80%,#2a2212 95%,#2e1613 95%)}
+.mfill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#3f9e4c 0,#7fd36b 72%,#e6c23e 80%,#f0a24a 92%,#ff4a3a 95%,#ff4a3a 100%);background-position:bottom;background-repeat:no-repeat}
+.mcol::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,#0b0a09 2px 3px);pointer-events:none;z-index:2}
+.mpk{position:absolute;left:0;right:0;height:2px;z-index:3}
+.box em{white-space:nowrap}
+.tab{white-space:nowrap}
+.topbar .tag{white-space:nowrap;flex:none}
+.sofrow::-webkit-scrollbar{display:none}
+.cap{position:absolute;left:24px;width:40px;height:44px;border-radius:5px;background:linear-gradient(180deg,#f4ecda 0%,#ddd3bc 40%,#b9ad93 50%,#d6ccb4 60%,#ece4d0 100%);border:1px solid #6f6656;box-shadow:0 6px 8px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.7)}
+.cap::after{content:"";position:absolute;left:3px;right:3px;top:20px;height:2px;background:#1b1915}
+.layer{height:46px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:6px;border:1px solid #302b25;background:#1a1815;color:#e9dcc2;font-weight:600;font-size:19px;letter-spacing:.03em;cursor:pointer}
+.layer i{width:4px;height:26px;border-radius:2px;background:#4a4339}
+.layer.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.layer.on i{background:#e8a33d}
+.scrim{position:absolute;inset:0;border:none;padding:0;background:rgba(8,7,6,.72);cursor:default}
+.pop{position:absolute;display:flex;flex-direction:column;background:linear-gradient(180deg,#2a2622,#1a1815);border:1px solid #5a4630;border-radius:12px;box-shadow:0 30px 60px rgba(0,0,0,.7)}
+.tag{height:26px;padding:0 12px;display:flex;align-items:center;border-radius:3px;color:#121110;font-weight:700;font-size:16px;letter-spacing:.05em;text-transform:uppercase}
+.pill{height:44px;border-radius:8px;border:1px solid #3a342c;background:#1a1815;color:#e9dcc2;font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.pill.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.fxk{width:104px;height:100px;flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0 0;border:none;border-radius:8px;background:transparent;cursor:ns-resize;touch-action:none;color:inherit}.fxk:active{background:rgba(255,255,255,.03)}.fxkl{max-width:100px;font-size:10.5px;font-weight:700;letter-spacing:.1em;color:#b8a78a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fxkv{font-family:var(--mono);font-size:12.5px;color:#f3e6cc;white-space:nowrap}.fxch{flex:none;height:100px;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:0 6px;border:none;background:transparent;color:inherit}.fxsec{display:flex;flex-direction:column;gap:2px;padding:6px 8px 4px;border-radius:10px;border:1px solid;background:linear-gradient(180deg,#1a1714,#121110)}.fxsect{font-size:11px;font-weight:800;letter-spacing:.2em;padding-left:4px}
+.fxwet svg.fxpic{opacity:var(--wet,1);transition:opacity .12s}
+.box{position:relative;padding:0 10px;display:flex;align-items:center;justify-content:space-between;border-radius:6px;border:1px solid var(--line);background:#141210;cursor:ew-resize;touch-action:none;overflow:hidden;height:44px}
+.box b{font-size:13px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9b927f}
+.box em{font-style:normal;font-family:var(--mono);font-size:15px;color:var(--ink)}
+.box.big b{font-size:15px}.box.big em{font-size:21px}
+.box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
+.sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
+.tab{height:44px;display:flex;align-items:center;gap:3px;padding:0 9px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.topbar.backR>.backbtn{order:98}.topbar.backR>.wood:last-child{order:99}
+.tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
+.small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
+.gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
+.overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 30%,#2a2420,#0b0a09 75%);z-index:20;padding:24px}
+.card{max-width:520px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;font-family:'Heebo',var(--display)}
+.card h1{margin:0;font-family:var(--display);font-size:44px;letter-spacing:.12em;color:var(--brass-hi);font-weight:700}
+.card p{margin:0;color:#d9cdb3;font-size:17px;line-height:1.5}
+.cta{min-height:56px;padding:0 34px;border-radius:12px;border:1px solid var(--brass);background:#2a2014;color:var(--brass-hi);font-family:'Heebo',var(--display);font-size:20px;font-weight:700;cursor:pointer}
+.ghost{min-height:44px;padding:0 20px;border-radius:10px;border:1px solid #3a342c;background:transparent;color:#cbbd9f;font-family:'Heebo',var(--display);font-size:16px;cursor:pointer}
+.toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);padding:12px 20px;border-radius:10px;background:#2a2014;border:1px solid #8a6a3a;color:var(--brass-hi);font-family:'Heebo',var(--display);font-size:16px;z-index:30;direction:rtl;max-width:90%;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&family=Heebo:wght@400;700&display=swap">
+<script>if ('serviceWorker' in navigator && !window.XAirNative) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+</head>
+<body>
+<div id="stage"></div>
+<script type="module">
+import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/preact/standalone.module.js';
+
+/* AIR CONSOLE – X-Air (XR12 / XR16 / XR18). See docs/XAIR-PROTOCOL.md and docs/HANDOFF.md.
+   Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
+   mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
+   and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
+const DW = 1180, APP_VER = '0.1.0';
+const NATIVE = window.XAirNative || null;
+const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const pad2 = n => String(n).padStart(2, '0');
+const capture = e => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} };
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+/* ---------- OSC ---------- */
+const TE = new TextEncoder(), TD = new TextDecoder();
+const oscStr = s => { const b = TE.encode(s), o = new Uint8Array((b.length + 4) & ~3); o.set(b); return o; };
+function oscMsg(addr, args = []) {
+  const parts = [oscStr(addr), oscStr(',' + args.map(a => a[0]).join(''))];
+  for (const [t, v] of args) {
+    if (t === 's') parts.push(oscStr(String(v)));
+    else { const b = new Uint8Array(4), d = new DataView(b.buffer); if (t === 'f') d.setFloat32(0, v); else d.setInt32(0, v | 0); parts.push(b); }
+  }
+  let n = 0; parts.forEach(p => { n += p.length; });
+  const o = new Uint8Array(n); let k = 0; parts.forEach(p => { o.set(p, k); k += p.length; });
+  return o;
+}
+function oscParse(u) {
+  const d = new DataView(u.buffer, u.byteOffset, u.byteLength); let p = 0;
+  const str = () => { let e = p; while (e < u.length && u[e]) e++; const s = TD.decode(u.subarray(p, e)); p = (e + 4) & ~3; return s; };
+  const addr = str(); if (addr[0] !== '/') return null;
+  const args = []; let types = '';
+  if (p < u.length && u[p] === 44) {
+    types = str().slice(1);
+    for (const t of types) {
+      if (t === 'i') { args.push(d.getInt32(p)); p += 4; }
+      else if (t === 'f') { args.push(d.getFloat32(p)); p += 4; }
+      else if (t === 's') args.push(str());
+      else if (t === 'b') { const n = d.getInt32(p); p += 4; args.push(u.subarray(p, p + n)); p += (n + 3) & ~3; }
+      else break;
+    }
+  }
+  return { addr, types, args };
+}
+const b64 = u => { let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+const unb64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+
+/* ---------- value laws (float 0..1 as the mixer keeps it) ---------- */
+const STEPS = { fader: 1024, level: 161, pan: 101 };
+/* a hand value snapped to the mixer's own grid, as the float32 the mixer will hold */
+const q = (v, n) => Math.fround(Math.round(clamp(v, 0, 1) * (n - 1)) / (n - 1));
+function dbOf(v) {
+  if (!(v > 0)) return -Infinity;
+  if (v >= 0.5) return v * 40 - 30;
+  if (v >= 0.25) return v * 80 - 50;
+  if (v >= 0.0625) return v * 160 - 70;
+  return v * 480 - 90;
+}
+function posOf(d) {
+  if (!(d > -90)) return 0;
+  if (d >= -10) return clamp((d + 30) / 40, 0, 1);
+  if (d >= -30) return (d + 50) / 80;
+  if (d >= -60) return (d + 70) / 160;
+  return (d + 90) / 480;
+}
+const dbText = v => { if (v === undefined) return '···'; const d = dbOf(v); return d === -Infinity ? '-∞' : (d > 0.04 ? '+' : '') + (Math.abs(d) < 0.05 ? '0.0' : d.toFixed(1)); };
+const panText = v => { if (v === undefined) return '···'; const p = Math.round(v * 100) * 2 - 100; return p === 0 ? 'C' : (p < 0 ? 'L' : 'R') + Math.abs(p); };
+const same = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) < 1e-6);
+
+/* ---------- models ---------- */
+const MODELS = {
+  XR18: { key: 'XR18', ch: 16, bus: 6, rec: false, aux: 'AUX IN' },
+  XR16: { key: 'XR16', ch: 16, bus: 4, rec: true, aux: 'USB' },
+  XR12: { key: 'XR12', ch: 12, bus: 2, rec: true, aux: 'USB' }
+};
+const modelKey = m => /18/.test(m || '') ? 'XR18' : /16/.test(m || '') ? 'XR16' : /12/.test(m || '') ? 'XR12' : 'XR18';
+const isXAir = m => /^(XR|MR|X)-?(12|16|18)/i.test(m || '');
+
+/* mixer colour 0–15: OFF RD GN YE BL MG CY WH, +8 = inverted */
+const COLORS = ['#7d7466', '#e0513f', '#62b85c', '#e6c23e', '#4a8ee8', '#d868d8', '#45c9cc', '#e9e2d0'];
+const nameLook = c => {
+  if (c === undefined) return 'background:#2c2721;color:#8c8272';
+  const col = COLORS[c & 7];
+  return c & 8 ? `background:#141210;color:${col};box-shadow:inset 0 0 0 1.5px ${col}` : `background:${col};color:#121110`;
+};
+const solPath = k => '/-stat/solosw/' + pad2(k);
+function mkStrip(kind, n, M) {
+  const S = (b, o) => ({ kind, n, base: b, id: kind + (n || ''), fader: b + '/mix/fader', on: b + '/mix/on', name: b + '/config/name', color: b + '/config/color', ...o });
+  if (kind === 'ch') return S('/ch/' + pad2(n), { def: 'CH ' + pad2(n), pan: '/ch/' + pad2(n) + '/mix/pan', solo: solPath(n), mt: [n - 1], sends: true });
+  if (kind === 'aux') return S('/rtn/aux', { def: M.aux, pan: '/rtn/aux/mix/pan', solo: solPath(17), mt: [16, 17], sends: true });
+  if (kind === 'rtn') return S('/rtn/' + n, { def: 'FX ' + n + ' RTN', pan: '/rtn/' + n + '/mix/pan', solo: solPath(17 + n), mt: [16 + 2 * n, 17 + 2 * n], sends: true });
+  if (kind === 'bus') return S('/bus/' + n, { def: 'BUS ' + n, pan: '/bus/' + n + '/mix/pan', solo: solPath(39 + n), mt: [25 + n] });
+  if (kind === 'fxs') return S('/fxsend/' + n, { def: 'FX ' + n + ' SEND', solo: solPath(45 + n), mt: [31 + n] });
+  if (kind === 'dca') return S('/dca/' + n, { def: 'DCA ' + n, fader: '/dca/' + n + '/fader', on: '/dca/' + n + '/on', solo: solPath(50 + n), mt: [] });
+  return S('/lr', { def: 'MAIN LR', pan: '/lr/mix/pan', solo: solPath(50), mt: [36, 37] });
+}
+const LAYOUT = {};
+function layoutOf(key) {
+  if (LAYOUT[key]) return LAYOUT[key];
+  const M = MODELS[key], r = n => Array.from({ length: n }, (_, i) => i + 1);
+  const ch = r(M.ch).map(n => mkStrip('ch', n, M)), aux = mkStrip('aux', 0, M), rtn = r(4).map(n => mkStrip('rtn', n, M)),
+    bus = r(M.bus).map(n => mkStrip('bus', n, M)), fxs = r(4).map(n => mkStrip('fxs', n, M)), dca = r(4).map(n => mkStrip('dca', n, M)), lr = mkStrip('lr', 0, M);
+  const all = [...ch, aux, ...rtn, ...bus, ...fxs, ...dca, lr], byId = {}; all.forEach(s => { byId[s.id] = s; });
+  const banks = [{ label: 'In 1–8', col: '#7aa7e0', strips: ch.slice(0, 8), ins: true }, { label: 'In 9–' + M.ch, col: '#7aa7e0', strips: ch.slice(8), ins: true },
+    { label: 'Returns', col: '#a993d9', strips: [aux, ...rtn], ins: true }, { label: 'Buses', col: '#c9a25a', strips: bus }, { label: 'FX · DCA', col: '#4fc9b7', strips: [...fxs, ...dca] }];
+  /* send destinations: mix 01–06 are the buses, 07–10 the four FX sends */
+  const dests = [...bus.map(s => ({ k: s.n, label: 'BUS ' + s.n, col: '#c9a25a', strip: s })), ...fxs.map(s => ({ k: 6 + s.n, label: 'FX ' + s.n, col: '#4fc9b7', strip: s }))];
+  return (LAYOUT[key] = { M, ch, aux, rtn, bus, fxs, dca, lr, all, byId, banks, dests });
+}
+const sendPath = (s, d) => s.base + '/mix/' + pad2(d.k) + '/level';
+const corePaths = s => [s.name, s.color, s.fader, s.on, s.solo, ...(s.pan ? [s.pan] : [])];
+
+/* every address the mixer report asks for (reads only). Network keys and passwords are left out on purpose. */
+function dumpPaths() {
+  const P = [], r = n => Array.from({ length: n }, (_, i) => i + 1), add = (b, xs) => xs.forEach(x => P.push(b + '/' + x));
+  const eq = (b, n) => { r(n).forEach(k => add(`${b}/eq/${k}`, ['type', 'f', 'g', 'q'])); P.push(b + '/eq/on'); };
+  const dyn = b => add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
+  const sends = b => r(10).forEach(k => add(`${b}/mix/${pad2(k)}`, ['level', 'pan', 'tap', 'grpon']));
+  const core = b => add(b, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'mix/pan', 'mix/lr', 'grp/dca', 'grp/mute']);
+  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'automix/group', 'automix/weight']);
+    add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); dyn(b); eq(b, 4); sends(b); });
+  r(18).forEach(n => add('/headamp/' + pad2(n), ['gain', 'phantom']));
+  ['/rtn/aux', ...r(4).map(n => '/rtn/' + n)].forEach(b => { core(b); add(b, ['config/rtnsrc', 'preamp/rtnsw', 'preamp/rtntrim']); eq(b, 4); sends(b); });
+  r(6).forEach(n => { const b = '/bus/' + n; core(b); dyn(b); eq(b, 6); add(b, ['eq/mode', 'insert/on', 'insert/fxslot']); });
+  core('/lr'); dyn('/lr'); eq('/lr', 6); add('/lr', ['eq/mode', 'insert/on', 'insert/fxslot']);
+  r(4).forEach(n => { add('/fxsend/' + n, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'grp/dca', 'grp/mute']); add('/dca/' + n, ['config/name', 'config/color', 'fader', 'on']);
+    add('/fx/' + n, ['type', 'insert', ...r(32).map(k => 'par/' + pad2(k))]); add('/config/mute', [String(n)]); });
+  add('/config', ['chlink/1-2', 'chlink/3-4', 'chlink/5-6', 'chlink/7-8', 'chlink/9-10', 'chlink/11-12', 'chlink/13-14', 'chlink/15-16', 'buslink/1-2', 'buslink/3-4', 'buslink/5-6', 'linkcfg/preamp', 'linkcfg/eq', 'linkcfg/dyn', 'linkcfg/fdrmute',
+    'solo/level', 'solo/source', 'solo/sourcetrim', 'solo/chmode', 'solo/busmode', 'solo/dim', 'solo/dimatt', 'solo/dimpfl', 'solo/mono', 'solo/mute', 'amixenable/X', 'amixenable/Y']);
+  r(6).forEach(n => add('/routing/aux/' + pad2(n), ['src', 'pos'])); add('/routing/main', ['01', '02']); r(18).forEach(n => add('/routing/usb/' + pad2(n), ['src', 'pos']));
+  add('/-stat', ['solo', 'usbmounted', 'tape/state', 'tape/file', 'tape/etime', 'tape/rtime', 'usb/path', 'usb/count', 'usb/001/name', 'usb/001/type', 'usb/002/name', 'usb/002/type', 'rta/source', 'rta/pos', 'autosave', 'keysolo', ...r(54).map(k => 'solosw/' + pad2(k))]);
+  add('/-prefs', ['name', 'clockrate', 'playnext', 'usbifcmode', 'hardmute', 'dcamute', 'ponmute', 'rta/decay', 'rta/det', 'lan/mode']); add('/-snap', ['index', 'name', '01/name']);
+  return P;
+}
+
+const IC = {
+  back: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
+  gear: html`<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M10.3 2h3.4l.5 2.6a7.8 7.8 0 0 1 1.9.8l2.2-1.5 2.4 2.4-1.5 2.2c.3.6.6 1.2.8 1.9l2.6.5v3.4l-2.6.5a7.8 7.8 0 0 1-.8 1.9l1.5 2.2-2.4 2.4-2.2-1.5a7.8 7.8 0 0 1-1.9.8l-.5 2.6h-3.4l-.5-2.6a7.8 7.8 0 0 1-1.9-.8l-2.2 1.5-2.4-2.4 1.5-2.2a7.8 7.8 0 0 1-.8-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.8-1.9L3.9 5.7l2.4-2.4 2.2 1.5c.6-.3 1.2-.6 1.9-.8zM12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4z"/></svg>`,
+  full: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+  sends: html`<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h7M4 17h11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M16 9l4 3-4 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+};
+const HEB = "font-family:'Heebo',sans-serif";
+
+class App extends Component {
+  constructor() {
+    super();
+    const last = load('xair.last', null);
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone === true, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, connPop: false, liveAsk: false, rev: 0,
+      conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
+      prefs: { demoModel: 'XR16', ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
+    this.desk = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
+    this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
+    this.sim = new Float32Array(40).fill(-60);
+    this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
+    this.demoInit(this.state.prefs.demoModel);
+    window.__app = this; window.__xm = { q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
+  }
+
+  /* ---------- stores ---------- */
+  linked() { const s = this.state.conn.status; return !!NATIVE && (s === 'connected' || s === 'lost'); }
+  val(p) { return (this.linked() ? this.desk : this.demo)[p]; }
+  mkey() { return this.linked() ? modelKey(this.state.conn.model) : this.state.prefs.demoModel; }
+  L() { return layoutOf(this.mkey()); }
+  bump() { if (this.bq) return; this.bq = true; requestAnimationFrame(() => { this.bq = false; this.setState(s => ({ rev: s.rev + 1 })); }); }
+  log(dir, text) { const t = new Date(); this.logs.push(`${pad2(t.getHours())}:${pad2(t.getMinutes())}:${pad2(t.getSeconds())} ${dir} ${text}`); if (this.logs.length > 500) this.logs.splice(0, 100); }
+  toast(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2600); }
+  toastRO(msg) { if (Date.now() - (this.roT || 0) > 2500) { this.roT = Date.now(); this.toast(msg); } }
+
+  demoInit(key) {
+    const L = layoutOf(key), D = (this.demo = {});
+    const NM = ['KICK', 'SNARE', 'HI HAT', 'TOM 1', 'TOM 2', 'OH L', 'OH R', 'BASS', 'GTR 1', 'GTR 2', 'KEYS L', 'KEYS R', 'VOX 1', 'VOX 2', 'VOX 3', 'TALK'];
+    const CL = [1, 1, 1, 1, 1, 6, 6, 4, 2, 2, 5, 5, 3, 3, 3, 7];
+    const core = (s, name, col, v, pan) => { D[s.name] = name; D[s.color] = col; D[s.fader] = q(v, 1024); D[s.on] = 1; D[s.solo] = 0; if (s.pan) D[s.pan] = q(pan === undefined ? 0.5 : pan, 101); };
+    L.ch.forEach((s, i) => { core(s, NM[i], CL[i], 0.55 + ((i * 37) % 23) / 100, i === 5 || i === 10 ? 0.2 : i === 6 || i === 11 ? 0.8 : 0.5); });
+    core(L.aux, L.M.rec ? 'PLAYER' : 'AUX', 15, 0.6);
+    L.rtn.forEach((s, i) => core(s, ['HALL', 'PLATE', 'DELAY', 'CHORUS'][i], 13, 0.6));
+    L.bus.forEach((s, i) => core(s, 'MON ' + (i + 1), 3, 0.7));
+    L.fxs.forEach((s, i) => core(s, ['HALL', 'PLATE', 'DELAY', 'CHORUS'][i], 6, 0.75));
+    L.dca.forEach((s, i) => core(s, ['DRUMS', 'BAND', 'VOCALS', 'FX'][i], 7, 0.75));
+    core(L.lr, '', 7, 0.75); D['/-stat/solo'] = 0;
+    [...L.ch, L.aux, ...L.rtn].forEach((s, i) => L.dests.forEach((d, j) => { D[sendPath(s, d)] = q(d.k > 6 ? (i >= 12 && i < 15 ? 0.5 : 0) : ((i * 7 + j * 13) % 10) / 14, 161); }));
+  }
+
+  /* ---------- the only write path ---------- */
+  set(path, type, value) {
+    if (!this.linked()) { this.demo[path] = value; this.bump(); return true; }
+    const c = this.state.conn;
+    if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
+    if (!(path in this.desk)) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return false; }
+    if (!c.live) { this.toastRO('קריאה בלבד: הדלק LIVE כדי לשנות את המיקסר'); return false; }
+    if (Date.now() - (this.uAct || 0) > 1500) { this.log('sys', 'blocked, no hand action: ' + path); return false; }
+    if (same(this.desk[path], value)) return true;
+    this.desk[path] = value; this.hold[path] = Date.now();
+    this.outq.set(path, [type, value]);
+    if (type === 'f') { if (!this.outT) this.outT = setTimeout(() => this.flushOut(), 30); } else this.flushOut();
+    this.bump(); return true;
+  }
+  flushOut() {
+    clearTimeout(this.outT); this.outT = 0;
+    for (const [p, a] of this.outq) { this.tx(p, [a]); this.sent++; this.log('out', p + ' ' + a[1]); }
+    this.outq.clear();
+  }
+  /* a one-shot command (clear solo…): same locks as set() */
+  act(path, args) {
+    const c = this.state.conn;
+    if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
+    if (!c.live) { this.toastRO('קריאה בלבד: הדלק LIVE כדי לשנות את המיקסר'); return false; }
+    if (Date.now() - (this.uAct || 0) > 1500) return false;
+    this.tx(path, args); this.sent++; this.log('out', path); return true;
+  }
+  tx(addr, args, ip) { const to = ip || this.state.conn.ip; if (!NATIVE || !to) return; try { NATIVE.send(to, b64(oscMsg(addr, args || []))); } catch (e) { this.log('err', 'send ' + e.message); } }
+
+  /* ---------- reads ---------- */
+  need(paths, force) { for (const p of paths) { if (this.pend.has(p) || (!force && p in this.desk)) continue; this.pend.set(p, { t: 0, n: 0 }); this.queue.push(p); } }
+  pump() {
+    if (!this.queue.length || !this.linked()) return;
+    const now = Date.now();
+    for (let k = 0; k < 6 && this.queue.length; k++) { const p = this.queue.shift(), o = this.pend.get(p); if (!o) { k--; continue; } o.t = now; o.n++; this.tx(p); }
+  }
+  readCore(force) {
+    const L = this.L(), P = ['/-stat/solo'];
+    L.all.forEach(s => P.push(...corePaths(s)));
+    if (L.M.rec) P.push('/-stat/usbmounted', '/-stat/tape/state');
+    this.need(P, force); this.readView(force);
+  }
+  /* what the open view shows beyond the core values */
+  readView(force) {
+    if (!this.linked()) return;
+    const st = this.state, L = this.L(), P = [];
+    if (st.sofOn) { const d = L.dests[st.sof]; if (d) [...L.ch, L.aux, ...L.rtn].forEach(s => P.push(sendPath(s, d))); }
+    const sh = st.sheet && L.byId[st.sheet]; if (sh && sh.sends) L.dests.forEach(d => P.push(sendPath(sh, d)));
+    this.need(P, force);
+  }
+  visible() { const st = this.state, L = this.L(), b = L.banks[st.bank] || L.banks[0]; return [...b.strips, st.sofOn && L.dests[st.sof] ? L.dests[st.sof].strip : L.lr]; }
+
+  /* ---------- link ---------- */
+  onNative(list) {
+    for (const ev of list) {
+      try {
+        if (ev.type === 'rx') this.onRx(ev.ip, unb64(ev.d));
+        else if (ev.type === 'log') this.log(ev.dir || 'sys', ev.text || '');
+        else if (ev.type === 'net') { this.setState(s => ({ conn: { ...s.conn, wifi: !!ev.wifi } })); if (ev.wifi && !this.linked()) this.probe(); }
+        else if (ev.type === 'update') this.setState(s => ({ conn: { ...s.conn, update: true } }));
+        else if (ev.type === 'apkUpdate') this.setState(s => ({ conn: { ...s.conn, apk: ev.build } }));
+      } catch (e) { this.log('err', 'event: ' + (e && e.message)); }
+    }
+  }
+  onRx(ip, u) {
+    const m = oscParse(u); if (!m) return;
+    if (m.addr === '/xinfo') { this.onInfo(ip, m.args); return; }
+    const c = this.state.conn;
+    if (!this.linked() || ip !== c.ip) return;
+    this.lastRx = Date.now();
+    if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); return; }
+    if (!m.args.length) return;
+    const v = m.args[0];
+    this.pend.delete(m.addr); this.missing.delete(m.addr);
+    if (Date.now() - (this.hold[m.addr] || 0) < 600) return;   /* a late answer must not pull back a control the hand is moving */
+    if (this.desk[m.addr] !== v) { this.desk[m.addr] = v; this.bump(); }
+  }
+  onInfo(ip, args) {
+    const strs = args.filter(a => typeof a === 'string'), model = strs.find(isXAir) || '';
+    const info = { ip, name: strs[1] && strs[1] !== model ? strs[1] : (strs.find(x => x !== model && !/^\d+\.\d+\.\d+\.\d+$/.test(x)) || ''), model, fw: strs[strs.length - 1] !== model ? strs[strs.length - 1] || '' : '' };
+    const c = this.state.conn;
+    if (this.linked() && ip === c.ip) { this.lastRx = Date.now(); if (model && model !== c.model) { this.log('sys', 'model ' + model); this.setState(s => ({ conn: { ...s.conn, ...info } }), () => this.readCore()); } return; }
+    if (!model) return;
+    if (!c.found.some(f => f.ip === ip)) { this.log('in', `found ${model} "${info.name}" at ${ip} fw ${info.fw}`); this.setState(s => ({ conn: { ...s.conn, found: [...s.conn.found.filter(f => f.ip !== ip), info] } })); }
+    if (this.linked()) return;
+    const last = this.state.last;
+    if (this.noAuto && this.wantIp !== ip) return;   /* the user disconnected: wait for a choice */
+    if (this.wantIp === ip || !last || last.ip === ip || (last.name && last.name === info.name)) this.connect(info);
+  }
+  connect(info) {
+    this.desk = {}; this.hold = {}; this.pend.clear(); this.queue = []; this.outq.clear(); this.missing.clear(); this.mt.fill(-128); this.pk.fill(-128); this.wantIp = '';
+    try { NATIVE.setLive(false); } catch (e) {}
+    const last = { ip: info.ip, name: info.name, model: info.model }; save('xair.last', last);
+    this.firstRead = true; this.lastRx = Date.now(); this.log('sys', `connected to ${info.model} "${info.name}" at ${info.ip} (read only)`);
+    this.setState(s => ({ last, ipText: info.ip, bank: 0, sofOn: false, sheet: null, connPop: false, liveAsk: false, conn: { ...s.conn, status: 'connected', ip: info.ip, name: info.name, model: info.model, fw: info.fw, live: false } }),
+      () => { this.pulse(); this.readCore(); });
+  }
+  disconnect() {
+    try { NATIVE.setLive(false); } catch (e) {}
+    this.noAuto = true; this.log('sys', 'disconnected'); this.searchT0 = Date.now() + 3600e3;   /* stay in demo until asked to search again */
+    this.setState(s => ({ conn: { ...s.conn, status: 'search', ip: '', live: false, found: [] }, sofOn: false, sheet: null }));
+  }
+  manual(ip) {
+    ip = String(ip || '').trim(); if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) { this.toast('כתובת לא תקינה'); return; }
+    this.wantIp = ip; this.log('sys', 'asking ' + ip); this.tx('/xinfo', [], ip); setTimeout(() => this.tx('/xinfo', [], ip), 400);
+    setTimeout(() => { if (this.wantIp === ip) { this.wantIp = ''; this.toast('אין תשובה מהכתובת ' + ip); } }, 2500);
+  }
+  probe() {
+    if (!NATIVE || this.linked()) return;
+    const x = b64(oscMsg('/xinfo')), last = this.state.last;
+    try { NATIVE.discover(x, last ? last.ip : ''); } catch (e) { this.log('err', 'discover ' + e.message); }
+  }
+  search() { this.noAuto = false; this.searchT0 = Date.now(); this.setState(s => ({ conn: { ...s.conn, found: [] } })); this.probe(); }
+  pulse() {
+    if (!this.linked()) return;
+    this.tx('/xremote'); this.tx('/meters', [['s', '/meters/1'], ['i', 0]]); this.tx('/xinfo');
+  }
+  /* once a second: link health, retries, searching */
+  watch() {
+    const now = Date.now(), c = this.state.conn; this.wn = (this.wn || 0) + 1;
+    if (!NATIVE) return;
+    if (!this.linked()) {
+      if (this.wn % 2 === 0 && now >= this.searchT0) this.probe();
+      const el = now - this.searchT0;
+      if (el > 3500 && el < 3600e3 && c.found.length && !this.autoT) {
+        if (c.found.length === 1) this.connect(c.found[0]); else if (!this.state.connPop) { this.autoT = 1; this.setState({ connPop: true }); }
+      }
+      return;
+    }
+    this.autoT = 0;
+    if (this.wn % 3 === 0) this.pulse();
+    const quiet = now - this.lastRx;
+    if (c.status === 'connected' && quiet > 7000) { this.log('err', 'no answer from the mixer for 7 s'); this.setState(s => ({ conn: { ...s.conn, status: 'lost' } })); }
+    else if (c.status === 'lost' && quiet < 2500) { this.log('sys', 'the mixer answers again: reading everything'); this.setState(s => ({ conn: { ...s.conn, status: 'connected' } }), () => this.readCore(true)); }
+    for (const [p, o] of this.pend) if (o.t && now - o.t > 700) { if (o.n >= 4) { this.pend.delete(p); if (!(p in this.desk)) this.missing.add(p); } else { o.t = 0; this.queue.push(p); } }
+    /* a lost packet must not leave a stale picture: re-read what is on screen */
+    if (c.status === 'connected' && this.wn % 5 === 0 && !this.dumpRun && !this.fd && !this.pd) { const P = []; this.visible().forEach(s => P.push(...corePaths(s))); this.need(P, true); this.readView(true); }
+    if (this.dumpRun) this.dumpStep();
+    const pn = this.pend.size; if (this.firstRead && pn <= 12) this.firstRead = false;
+    if (pn !== this.pnShown) { this.pnShown = pn; this.bump(); }
+  }
+  askLive(on) {
+    if (!on) { try { NATIVE.setLive(false); } catch (e) {} this.log('sys', 'live off'); this.setState(s => ({ conn: { ...s.conn, live: false } })); return; }
+    this.setState({ liveAsk: true });
+  }
+  goLive() { try { NATIVE.setLive(true); } catch (e) {} this.log('sys', 'LIVE ON'); this.setState(s => ({ liveAsk: false, conn: { ...s.conn, live: true } })); }
+
+  /* ---------- meters ---------- */
+  onMeters(b) {
+    if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(40, d.getInt32(0, true), (b.length - 4) >> 1);
+    for (let i = 0; i < n; i++) this.mt[i] = d.getInt16(4 + 2 * i, true) / 256;
+    this.paintSoon();
+  }
+  paintSoon() { if (this.pq) return; this.pq = true; requestAnimationFrame(() => { this.pq = false; this.paint(); }); }
+  paint() {
+    const now = Date.now(), els = this.stage ? this.stage.querySelectorAll('.mcol[data-m]') : [];
+    for (const el of els) {
+      const i = +el.dataset.m, v = this.mt[i], lv = clamp((v + 60) / 60, 0, 1);
+      if (v >= this.pk[i]) { this.pk[i] = v; this.pkT[i] = now; } else if (now - this.pkT[i] > 1200) this.pk[i] = Math.max(v, this.pk[i] - 1.5);
+      const p = clamp((this.pk[i] + 60) / 60, 0, 1), f = el.firstChild, k = f.nextSibling;
+      f.style.height = (lv * 100).toFixed(1) + '%';
+      k.style.bottom = (p * 100).toFixed(1) + '%'; k.style.opacity = p > 0.02 ? 1 : 0; k.style.background = p > 0.95 ? '#ff5a45' : p > 0.8 ? '#f0b04a' : '#9be08f';
+    }
+  }
+  demoTick() {
+    if (this.linked()) return;
+    const L = this.L(), D = this.demo;
+    for (const s of L.all) for (const i of s.mt) {
+      const act = s.kind === 'dca' ? -90 : -34 + 22 * Math.sin(Date.now() / (900 + i * 137) + i) + 10 * Math.random();
+      const tgt = D[s.on] === 0 ? -90 : act + dbOf(D[s.fader] === undefined ? 0.75 : D[s.fader]);
+      this.sim[i] += (clamp(tgt, -90, 0) - this.sim[i]) * 0.45; this.mt[i] = this.sim[i];
+    }
+    this.paint();
+  }
+
+  /* ---------- mixer report (reads only) ---------- */
+  dumpStart() {
+    if (this.state.conn.status !== 'connected') { this.toast('הדוח נקרא מהמיקסר: צריך להיות מחובר'); return; }
+    const P = dumpPaths(); this.dumpRun = { P, t0: Date.now() }; this.dumpText = '';
+    this.need(P, true); this.setState({ dump: { n: 0, total: P.length, done: false } }); this.log('sys', 'mixer report: asking ' + P.length + ' values');
+  }
+  dumpStep() {
+    const R = this.dumpRun, left = R.P.filter(p => this.pend.has(p)).length;
+    if (left && Date.now() - R.t0 < 60000) { this.setState({ dump: { n: R.P.length - left, total: R.P.length, done: false } }); return; }
+    const c = this.state.conn, miss = R.P.filter(p => !(p in this.desk));
+    const lines = [`AIR CONSOLE ${APP_VER} report`, `model ${c.model} | name ${c.name} | fw ${c.fw} | ip ${c.ip}`, `asked ${R.P.length}, answered ${R.P.length - miss.length}`, '--- values'];
+    R.P.forEach(p => { if (p in this.desk) { const v = this.desk[p]; lines.push(p + '\t' + (typeof v === 'string' ? JSON.stringify(v) : Number.isInteger(v) ? 'i ' + v : 'f ' + (+v.toFixed(5)))); } });
+    lines.push('--- no answer'); miss.forEach(p => lines.push(p)); lines.push('--- log'); lines.push(...this.logs.slice(-120));
+    this.dumpText = lines.join('\n'); this.dumpRun = null; this.log('sys', `mixer report ready: ${R.P.length - miss.length} of ${R.P.length}`);
+    this.setState({ dump: { n: R.P.length - miss.length, total: R.P.length, done: true } });
+  }
+  copyText(t, okMsg) {
+    try { if (NATIVE) NATIVE.copy(t); else navigator.clipboard.writeText(t); this.toast(okMsg); } catch (e) { this.toast('ההעתקה נכשלה'); }
+  }
+
+  /* ---------- lifecycle ---------- */
+  componentDidMount() {
+    const ro = new ResizeObserver(() => { const r = this.stage.getBoundingClientRect(); this.setState({ cw: r.width, ch: r.height }); });
+    ro.observe(this.stage);
+    const fsc = () => this.setState({ isFs: !!(document.fullscreenElement || document.webkitFullscreenElement) });
+    document.addEventListener('fullscreenchange', fsc); document.addEventListener('webkitfullscreenchange', fsc);
+    ['gesturestart', 'gesturechange'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    const ua = e => { if (e.isTrusted !== false) this.uAct = Date.now(); };
+    ['pointerdown', 'pointermove', 'click', 'keydown', 'input'].forEach(t => document.addEventListener(t, ua, true));
+    this.dv = setInterval(() => this.demoTick(), 90);
+    if (NATIVE) {
+      window.__xairNative = list => this.onNative(list);
+      try { NATIVE.ready(); } catch (e) {}
+      this.pv = setInterval(() => this.pump(), 25);
+      this.wv = setInterval(() => { try { this.watch(); } catch (e) { this.log('err', 'watch: ' + e.message); } }, 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.linked()) { this.pulse(); this.readCore(true); } else this.probe(); } });
+      const last = this.state.last;
+      setTimeout(() => { if (last) { this.tx('/xinfo', [], last.ip); } this.tx('/xinfo', [], '192.168.1.1'); this.probe(); }, 300);
+    }
+  }
+  componentDidUpdate(pp, ps) {
+    const st = this.state;
+    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank) { this.readView(); this.paintSoon(); }
+    if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
+  }
+  dims() { const { cw, ch } = this.state, s = Math.min(cw / DW, ch / 500); return { s, Hd: ch / s, offX: (cw - DW * s) / 2 }; }
+  goFullscreen() {
+    this.setState({ started: true });
+    try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch (_) {}
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (!req) return;
+    try { const p = req.call(el, { navigationUI: 'hide' }); const lock = () => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch (_) {} }; if (p && p.then) p.then(lock).catch(() => {}); else lock(); } catch (_) {}
+  }
+  toggleFullscreen() { if (this.state.isFs) { const x = document.exitFullscreen || document.webkitExitFullscreen; x && x.call(document); } else this.goFullscreen(); }
+  setPref(p) { this.setState(s => { const prefs = { ...s.prefs, ...p }; save('xair.prefs', prefs); return { prefs }; }); }
+
+  /* ---------- gestures ---------- */
+  dbl(key) { const now = Date.now(), hit = this.taps[key] && now - this.taps[key] < 320; this.taps[key] = hit ? 0 : now; return hit; }
+  /* a tap that changes the screen on pointer-up: swallow the click the browser sends after it */
+  eatClicks(ms = 450) {
+    const until = Date.now() + ms, T = ['click', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchend'];
+    const eat = e => { if (Date.now() > until) { off(); return; } e.stopPropagation(); e.preventDefault(); };
+    const off = () => T.forEach(t => window.removeEventListener(t, eat, true));
+    T.forEach(t => window.addEventListener(t, eat, true)); setTimeout(off, ms + 20);
+  }
+  /* spec: { path, steps, tap } – on the knob: drag (a long press makes it slow), double tap = 0 dB; beside the knob: tap */
+  faderDown(spec, e, T, FH) {
+    capture(e); clearTimeout(this.ft);
+    const v0 = this.val(spec.path);
+    if (v0 === undefined) { this.fd = { spec, dead: true, moved: false, tapOpen: !!spec.tap, y: e.clientY }; return; }
+    const r = e.currentTarget.getBoundingClientRect(), yy = (e.clientY - r.top) * FH / r.height, capTop = (1 - v0) * T, onCap = yy >= capTop - 30 && yy <= capTop + 74;
+    if ((onCap || !spec.tap) && this.dbl('f' + spec.path)) { this.set(spec.path, 'f', q(0.75, spec.steps)); this.fd = null; return; }
+    this.fd = { spec, y: e.clientY, ly: e.clientY, start: v0, px: r.height * T / FH, moved: false, tapOpen: !!spec.tap && !onCap, slow: 1 };
+    if (onCap || !spec.tap) this.ft = setTimeout(() => { const f = this.fd; if (f && !f.moved) { f.slow = 4; try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} } }, 450);
+  }
+  faderMove(e) {
+    const f = this.fd; if (!f) return; const dy = e.clientY - f.y;
+    if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
+    if (f.moved && !f.dead && !f.tapOpen) this.set(f.spec.path, 'f', q(f.start - dy / (f.px * f.slow), f.spec.steps));
+  }
+  faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) { this.eatClicks(); f.spec.tap(); } }
+  panDown(path, e) {
+    capture(e); const v0 = this.val(path); if (v0 === undefined) return;
+    if (this.dbl('p' + path)) { this.set(path, 'f', q(0.5, STEPS.pan)); this.pd = null; return; }
+    this.pd = { path, x: e.clientX, start: v0, w: e.currentTarget.getBoundingClientRect().width, moved: false };
+  }
+  panMove(e) {
+    const p = this.pd; if (!p) return; const dx = e.clientX - p.x;
+    if (!p.moved && Math.abs(dx) > 4) p.moved = true;
+    if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6), 0, 1); if (Math.abs(v - 0.5) < 0.015) v = 0.5; this.set(p.path, 'f', q(v, STEPS.pan)); }
+  }
+  panUp() { this.pd = null; }
+  tog(path) { const v = this.val(path); if (v === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', v ? 0 : 1); }
+  anySolo() { const v = this.val('/-stat/solo'); if (this.linked()) return v === 1 || this.L().all.some(s => this.desk[s.solo] === 1); return this.L().all.some(s => this.demo[s.solo] === 1); }
+  clearSolo() {
+    const L = this.L();
+    if (!this.linked()) { L.all.forEach(s => { this.demo[s.solo] = 0; }); this.bump(); return; }
+    if (this.act('/-action/clearsolo', [['i', 1]])) setTimeout(() => this.need(['/-stat/solo', ...L.all.map(s => s.solo)], true), 200);
+  }
+
+  /* ---------- drawing ---------- */
+  meter(mt, T) {
+    if (!mt.length) return null;
+    const col = i => html`<span class="mcol" data-m=${i}><span class="mfill" style=${`height:0%;background-size:100% ${T}px`}></span><span class="mpk" style="bottom:0;opacity:0"></span></span>`;
+    return html`<span class="meter" style=${`height:${T}px`}>${col(mt[0])}${col(mt.length > 1 ? mt[1] : mt[0])}</span>`;
+  }
+  connLook() {
+    const c = this.state.conn;
+    if (!NATIVE) return { dot: '#e8a33d', fg: '#ffd9a0', border: '#8a6a3a', text: 'DEMO' };
+    if (c.status === 'connected') return this.firstRead && this.pend.size > 12 ? { dot: '#e6c23e', fg: '#f3e2a8', border: '#8a7a3a', text: 'READING ' + this.pend.size } : { dot: '#62b85c', fg: '#bfe8b8', border: '#3f6a3a', text: (c.model || 'MIXER') + (c.name ? ' · ' + c.name : '') };
+    if (c.status === 'lost') return { dot: '#e0513f', fg: '#ffb0a8', border: '#7a2a22', text: 'NO ANSWER' };
+    return { dot: '#e8a33d', fg: '#ffd9a0', border: '#8a6a3a', text: c.wifi ? 'DEMO · SEARCHING' : 'DEMO · NO WI-FI' };
+  }
+  connPill() {
+    const L = this.connLook(), c = this.state.conn, B = 'height:40px;padding:0 12px;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;white-space:nowrap;flex:none;';
+    return html`
+      ${NATIVE && c.apk && html`<button onClick=${() => this.apkUpdate()} style=${B + 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c'}>${c.dl >= 0 && c.dl < 100 ? 'DOWNLOADING ' + c.dl + '%' : 'UPDATE APP'}</button>`}
+      ${NATIVE && c.update && !c.apk && html`<button onClick=${() => NATIVE.reload()} style=${B + 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c'}>NEW VERSION</button>`}
+      ${this.linked() && html`<button onClick=${() => this.askLive(!c.live)} aria-pressed=${String(c.live)}
+        style=${B + (c.live ? 'background:#62b85c;color:#08140a;border:1px solid #62b85c;box-shadow:0 0 12px rgba(98,184,92,.5)' : 'background:#2a1d10;color:#ffc98f;border:1px solid #8a5a2a')}>LIVE ${c.live ? 'ON' : 'OFF'}</button>`}
+      <button onClick=${() => this.setState({ connPop: true })} aria-label="Mixer connection"
+        style=${`height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid ${L.border};background:#1d1611;color:${L.fg};font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;max-width:330px;white-space:nowrap;overflow:hidden;min-width:0`}>
+        <span style=${`width:10px;height:10px;flex:none;border-radius:50%;background:${L.dot};box-shadow:0 0 8px ${L.dot}`}></span><span style="overflow:hidden;text-overflow:ellipsis">${L.text}</span></button>`;
+  }
+  apkUpdate() {
+    const r = NATIVE.downloadUpdate();
+    if (r === 'perm') { this.toast('אשר התקנה מהאפליקציה הזו ולחץ שוב'); return; }
+    if (r !== 'ok') { this.toast('ההורדה לא התחילה, נפתח הקישור בדפדפן'); try { NATIVE.openUpdateLink(); } catch (e) {} return; }
+    clearInterval(this.dlT); this.dlT = setInterval(() => { const p = NATIVE.updateProgress(); this.setState(s => ({ conn: { ...s.conn, dl: p } })); if (p < 0 || p >= 100) clearInterval(this.dlT); }, 700);
+  }
+
+  renderMain(Hd) {
+    const st = this.state, L = this.L(), bank = L.banks[st.bank] || L.banks[0];
+    const FH = Math.round(Hd - 236), T = FH - 44;
+    const marks = [[1, '+10'], [0.875, '+5'], [0.75, '0'], [0.625, '-5'], [0.5, '-10'], [0.375, '-20'], [0.25, '-30'], [0.125, '-50'], [0, '-∞']]
+      .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
+    const SO = st.sofOn, D = SO ? L.dests[st.sof] : null, tcol = D ? D.col : '';
+    const strip = (s, tgt) => {
+      const snd = SO && !tgt, fp = snd ? sendPath(s, D) : s.fader, v = this.val(fp), on = this.val(s.on), solo = this.val(s.solo), pan = s.pan ? this.val(s.pan) : undefined, nm = this.val(s.name), col = this.val(s.color);
+      const isMain = s.kind === 'lr' || tgt;
+      return html`
+      <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
+        <button class="cname" style=${nameLook(col) + (isMain ? ';font-size:15px;letter-spacing:.02em' : '')} aria-label=${'Open ' + (nm || s.def)} onClick=${() => this.setState({ sheet: s.id })}>${nm || s.def}</button>
+        ${snd ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${D.label}</div>`
+          : s.pan ? html`<button class="panmini" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
+          <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
+          <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">${pan !== undefined && html`<span class="knob" style=${`left:${pan * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>`}</span>
+        </button>` : html`<div class="panmini" style="border-color:transparent;background:transparent"></div>`}
+        <div class="ms">
+          <button onClick=${() => this.tog(s.on)} aria-pressed=${String(on === 0)} aria-label=${'Mute ' + (nm || s.def)}
+            style=${on === 0 ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : `background:#2a1513;color:#d48a80;border:1px solid #4a2420${on === undefined ? ';opacity:.45' : ''}`}>MUTE</button>
+          ${!isMain && html`<button onClick=${() => this.tog(s.solo)} aria-pressed=${String(solo === 1)} aria-label=${'Solo ' + (nm || s.def)}
+            style=${solo === 1 ? 'background:#e8b93a;color:#1a1405;border:1px solid #4a3d1a;box-shadow:0 0 12px rgba(232,185,58,.5)' : `background:#2a2410;color:#d9bd6a;border:1px solid #4a3d1a${solo === undefined ? ';opacity:.45' : ''}`}>SOLO</button>`}
+        </div>
+        <div class="dbr">${dbText(v)}</div>
+        <button class="fader" data-f=${fp} style=${'height:' + FH + 'px'} aria-label=${'Fader ' + dbText(v) + ' dB'}
+          onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.setState({ sheet: s.id }) }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          ${marks.map(m => html`<span class="mk" style=${'top:' + m.top + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.tick + 'px'}></span>`)}
+          <span class="slot"></span>
+          ${this.meter(s.mt, T)}
+          ${v !== undefined && html`<span class="cap" style=${'top:' + Math.round((1 - v) * T) + 'px'}></span>`}
+        </button>
+      </div>`; };
+    const cells = [];
+    for (let j = 0; j < 8; j++) { const s = bank.strips[j]; cells.push(s && !(SO && !s.sends) ? strip(s) : html`<div style="flex:1 1 0;min-width:0"></div>`); }
+    cells.push(SO ? strip(D.strip, true) : strip(L.lr));
+    const c = st.conn, anyS = this.anySolo();
+    return html`
+      <header class="topbar" style="height:56px;position:relative;overflow:hidden;isolation:isolate;z-index:0">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <div style=${`flex:1;min-width:0;align-self:stretch;display:flex;align-items:center;gap:12px;transition:opacity .35s,transform .45s cubic-bezier(.2,.8,.2,1);padding-right:${140 + 14}px;${SO ? 'opacity:0;transform:translateX(-40px);pointer-events:none' : ''}`}>
+          <div style="display:flex;flex-direction:column;line-height:1;gap:2px;flex:none">
+            <span style="font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase">Air Console · ${this.linked() ? c.model : this.mkey() + ' demo'}</span>
+            <span style="font-size:25px;font-weight:700;letter-spacing:.05em">LR MIX</span>
+          </div>
+          ${this.connPill()}
+          <div style="flex:1;min-width:0"></div>
+          <nav style="display:flex;gap:6px;flex:none">
+            ${anyS && html`<button class="navbtn hot" style="width:84px;background:#3a2f10;border-color:#e8b93a;color:#ffe08a" onClick=${() => this.clearSolo()} aria-label="Clear all solos"><span style="font-size:15px;letter-spacing:.06em">CLEAR</span><span>Solo</span></button>`}
+            <button class="navbtn" onClick=${() => this.setState({ screen: 'settings' })}>${IC.gear}<span>הגדרות</span></button>
+            ${!NATIVE && html`<button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>`}
+          </nav>
+        </div>
+        <div class="sofrow" style=${`position:absolute;left:30px;right:${14 + 140 + 12}px;top:0;bottom:0;display:flex;align-items:center;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;touch-action:pan-x;background:linear-gradient(180deg,#2b2723,#1a1815);transition:clip-path .55s cubic-bezier(.2,.8,.2,1),opacity .3s;${SO ? 'clip-path:inset(0 0 0 0);opacity:1' : 'clip-path:inset(0 0 0 100%);opacity:.4;pointer-events:none'}`}>
+          ${L.dests.map((d, k) => { const sel = k === st.sof, nm = this.val(d.strip.name), cc = this.val(d.strip.color);
+            return html`<button onClick=${() => this.setState({ sof: k })} aria-pressed=${String(sel)}
+              style=${`flex:none;width:98px;height:44px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;padding:0 9px;text-align:left;position:relative;overflow:hidden;${sel ? `background:${d.col}33;border:1.5px solid ${d.col};box-shadow:0 0 12px ${d.col}88,inset 0 0 10px ${d.col}55` : 'background:#161412;border:1px solid #302b25'}`}>
+              <i style=${`position:absolute;left:0;top:0;bottom:0;width:4px;background:${cc === undefined ? d.col : COLORS[cc & 7]}`}></i>
+              <span style=${`font-size:10px;font-weight:700;letter-spacing:.14em;color:${d.col}`}>${d.label}</span>
+              <span style="font-size:15px;font-weight:700;color:#f1e7d2;max-width:80px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm || d.strip.def}</span></button>`; })}
+        </div>
+        <button onClick=${() => this.setState(s => ({ sofOn: !s.sofOn, bank: !s.sofOn && !(L.banks[s.bank] || {}).ins ? 0 : s.bank }))} aria-pressed=${String(SO)} aria-label=${SO ? 'Leave sends on faders' : 'Sends on faders'}
+          style=${`position:absolute;top:5px;left:${DW - 14 - 140}px;width:140px;height:46px;z-index:2;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;font-weight:800;font-size:17px;letter-spacing:.14em;transition:box-shadow .35s,background .35s,color .35s,border-color .35s;
+            ${SO ? 'background:radial-gradient(ellipse at 50% 40%,#5a4320,#2a1f10 75%);color:#ffe3ad;border:1.5px solid #f3c27a;box-shadow:0 0 16px rgba(243,194,122,.6),inset 0 0 14px rgba(243,194,122,.45)' : 'background:linear-gradient(180deg,#2e2924,#1a1714);color:var(--brass-hi);border:1.5px solid #8a6a3a;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)'}`}>${IC.sends}SENDS</button>
+      </header>
+      <div style="flex:1;min-height:0;display:flex;gap:8px;padding:16px 0 14px">
+        <div class="wood" style="width:18px;flex:none;box-shadow:inset -2px 0 4px rgba(0,0,0,.5)"></div>
+        <div style="flex:1;min-width:0;display:flex;gap:6px">${cells}</div>
+        <div style=${`width:140px;flex:none;display:flex;flex-direction:column;gap:6px;border-radius:10px;transition:box-shadow .45s,background .45s,outline-color .45s;outline:1.5px solid ${SO ? tcol : 'transparent'};outline-offset:3px;${SO ? `box-shadow:0 0 22px ${tcol}66,inset 0 0 26px ${tcol}22;background:${tcol}10` : ''}`}>
+          <span style=${`font-size:11px;letter-spacing:.16em;color:${SO ? tcol : '#b8a78a'};text-transform:uppercase;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${SO ? 700 : 400}`}>${SO ? 'Sends → ' + D.label : 'Layers'}</span>
+          ${L.banks.map((b, n) => !b.strips.length ? null : SO && !b.ins ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${b.col}`}></i>${b.label}</button>`
+            : html`<button class=${'layer' + (n === st.bank ? ' on' : '')} onClick=${() => this.setState({ bank: n })}><i style=${`background:${b.col};opacity:${n === st.bank ? 1 : 0.7};box-shadow:${n === st.bank ? '0 0 8px ' + b.col : 'none'}`}></i>${b.label}</button>`)}
+          <div style="flex:1"></div>
+          ${L.M.rec && html`<div dir="rtl" style=${`${HEB};font-size:12px;line-height:1.35;color:#8c8272;padding:4px`}>נגן ומקליט USB: בשלב הבא</div>`}
+        </div>
+        <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
+      </div>
+      ${st.sheet && this.renderSheet(Hd)}
+      ${st.connPop && this.renderConn(Hd)}
+      ${st.liveAsk && html`
+        <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ liveAsk: false })}></button>
+        <div class="pop" role="alertdialog" style=${`z-index:9;left:340px;top:${Math.round((Hd - 250) / 2)}px;width:500px;padding:22px;gap:14px;border-color:#ff7a3d`}>
+          <span style="font-size:24px;font-weight:700;letter-spacing:.04em;color:#ffb08a">Turn on live control?</span>
+          <span dir="rtl" style=${`${HEB};font-size:16px;line-height:1.55;color:#d9cdb3`}>מרגע זה כל שינוי שתעשה ביד באפליקציה ישנה את המיקסר עצמו: פיידרים, מיוט, סולו, פאן ושליחות. שום דבר לא נשלח בלי פעולה שלך, וערך שהמיקסר עוד לא דיווח עליו לא יישלח.</span>
+          <div style="display:flex;gap:10px">
+            <button class="pill" style="flex:1;height:50px" onClick=${() => this.setState({ liveAsk: false })}>Cancel</button>
+            <button class="pill" style="flex:1;height:50px;background:#ff7a3d;color:#1a0d05;border-color:#ff7a3d" onClick=${() => this.goLive()}>Turn on</button>
+          </div>
+        </div>`}`;
+  }
+
+  /* a strip's window: pan and its sends. The full channel screens (EQ, gate, compressor) come in the next stage. */
+  renderSheet(Hd) {
+    const st = this.state, L = this.L(), s = L.byId[st.sheet]; if (!s) return null;
+    const nm = this.val(s.name), col = this.val(s.color), pan = s.pan ? this.val(s.pan) : undefined, H = Math.min(Hd - 40, 500), FH = H - 150, T = FH - 44, W = s.sends ? 110 + L.dests.length * 84 + 66 : 420;
+    const close = () => this.setState({ sheet: null });
+    return html`
+      <button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
+      <div class="pop" style=${`z-index:7;left:${Math.round((DW - W) / 2)}px;top:${Math.round((Hd - H) / 2)}px;width:${W}px;height:${H}px;padding:14px 16px;gap:12px`}>
+        <div style="display:flex;align-items:center;gap:12px;flex:none">
+          <span class="tag" style=${nameLook(col) + ';height:34px;font-size:19px;min-width:120px'}>${nm || s.def}</span>
+          <span style="font-size:13px;letter-spacing:.14em;color:#b8a78a;text-transform:uppercase">${s.def}</span>
+          <div style="flex:1"></div>
+          <button class="small" onClick=${close}>CLOSE</button>
+        </div>
+        <div style="flex:1;min-height:0;display:flex;gap:14px">
+          <div style="width:${s.sends ? 110 : 380}px;flex:none;display:flex;flex-direction:column;gap:8px">
+            ${s.pan && html`<span style="font-size:11px;letter-spacing:.16em;color:#b8a78a">PAN</span>
+            <button class="panmini" style="height:44px;border-radius:22px" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
+              <span style="position:absolute;left:50%;top:9px;bottom:9px;width:1px;background:#4a4339"></span>
+              <span style="position:absolute;left:18px;right:18px;top:0;bottom:0">${pan !== undefined && html`<span class="knob" style=${`left:${pan * 100}%;width:26px;height:26px;margin:-13px 0 0 -13px`}></span>`}</span>
+            </button>
+            <span style="font-family:var(--mono);font-size:14px;text-align:center;color:#f1e7d2">${panText(pan)}</span>`}
+            <div style="flex:1"></div>
+            <span dir="rtl" style=${`${HEB};font-size:12.5px;line-height:1.4;color:#8c8272`}>איקיו, גייט וקומפרסור: בשלב הבא</span>
+          </div>
+          ${s.sends && html`<div style="flex:1;min-width:0;display:flex;gap:4px;padding:8px;border-radius:8px;background:#141210;border:1px solid var(--line)">
+            ${L.dests.map(d => { const p = sendPath(s, d), v = this.val(p), dn = this.val(d.strip.name);
+              return html`<div style="width:80px;flex:none;display:flex;flex-direction:column;align-items:center;gap:3px">
+                <span style=${`font-size:10px;font-weight:700;letter-spacing:.14em;color:${d.col}`}>${d.label}</span>
+                <span style="font-size:13px;font-weight:700;color:#f1e7d2;max-width:78px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:16px">${dn || ''}</span>
+                <span class="dbr">${dbText(v)}</span>
+                <button class="fader" data-f=${p} style=${`height:${FH}px;width:80px`} aria-label=${d.label + ' send ' + dbText(v)}
+                  onPointerDown=${e => this.faderDown({ path: p, steps: STEPS.level }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+                  <span class="slot" style="left:37px"></span>
+                  ${v !== undefined && html`<span class="cap" style=${`left:20px;top:${Math.round((1 - v) * T)}px`}></span>`}
+                </button></div>`; })}
+          </div>`}
+        </div>
+      </div>`;
+  }
+
+  renderConn(Hd) {
+    const st = this.state, c = st.conn, H = Math.min(Hd - 30, 440), close = () => this.setState({ connPop: false });
+    const T = { demo: 'מצב הדגמה. חיבור למיקסר אפשרי רק מתוך אפליקציית האנדרואיד.', search: c.wifi ? 'מחפש מיקסר ברשת… בינתיים מצב הדגמה.' : 'אין רשת Wi‑Fi. התחבר לרשת של המיקסר.', connected: 'מחובר למיקסר.', lost: 'המיקסר לא עונה. ממשיך לנסות.' }[c.status];
+    const row = 'display:flex;align-items:center;gap:10px';
+    return html`
+      <button class="scrim" style="z-index:8" aria-label="Close" onClick=${close}></button>
+      <div class="pop" dir="rtl" style=${`z-index:9;left:${(DW - 620) / 2}px;top:${Math.round((Hd - H) / 2)}px;width:620px;max-height:${H}px;padding:18px 20px;gap:12px;${HEB};overflow:auto`}>
+        <div style=${row}><span style="font-size:22px;font-weight:700;color:var(--brass-hi);flex:1">חיבור למיקסר</span><button class="small" onClick=${close}>סגור</button></div>
+        <span style="font-size:16px;line-height:1.5;color:#d9cdb3">${T}</span>
+        ${this.linked() && html`<div style="font-size:15px;line-height:1.6;color:#f1e7d2;padding:10px 12px;border-radius:8px;background:#141210;border:1px solid var(--line)">
+          <div>דגם: <b dir="ltr">${c.model}</b></div><div>שם: <b dir="ltr">${c.name || '—'}</b></div><div>כתובת: <b dir="ltr">${c.ip}</b> · גרסה: <b dir="ltr">${c.fw || '—'}</b></div>
+          <div>מצב: <b>${c.live ? 'שליטה חיה פעילה' : 'קריאה בלבד'}</b> · נשלחו <b dir="ltr">${this.sent}</b> שינויים</div></div>`}
+        ${NATIVE && !this.linked() && c.found.length > 0 && html`<div style="display:flex;flex-direction:column;gap:6px">
+          <span style="font-size:14px;color:#b8a78a">מיקסרים שנמצאו:</span>
+          ${c.found.map(f => html`<button class="pill" style="height:48px;text-transform:none;display:flex;align-items:center;gap:10px;padding:0 14px" onClick=${() => this.connect(f)}><b dir="ltr">${f.model}</b><span dir="ltr" style="flex:1;text-align:left">${f.name}</span><span dir="ltr" style="font-family:var(--mono);font-size:13px">${f.ip}</span></button>`)}</div>`}
+        ${NATIVE && html`<div style=${row}>
+          <input dir="ltr" value=${st.ipText} onInput=${e => this.setState({ ipText: e.target.value })} placeholder="192.168.1.1" inputmode="decimal"
+            style="flex:1;height:44px;padding:0 12px;border-radius:8px;border:1px solid #3a342c;background:#100f0d;color:#f1e7d2;font-family:var(--mono);font-size:16px" />
+          <button class="pill" style="padding:0 16px" onClick=${() => this.manual(st.ipText)}>חבר לכתובת</button></div>
+        <div style=${row + ';flex-wrap:wrap'}>
+          ${!this.linked() && html`<button class="pill" style="padding:0 16px;flex:1" onClick=${() => this.search()}>חפש שוב</button>`}
+          ${this.linked() && html`<button class="pill" style="padding:0 16px;flex:1" onClick=${() => this.disconnect()}>נתק</button>`}
+          <button class="pill" style="padding:0 16px;flex:1" onClick=${() => { try { NATIVE.openWifi(); } catch (e) {} }}>הגדרות Wi‑Fi</button>
+        </div>
+        <span dir="ltr" style="font-family:var(--mono);font-size:12px;color:#8c8272;text-align:left">${(() => { try { return 'this device: ' + (NATIVE.wifiAddress() || 'no local network'); } catch (e) { return ''; } })()}</span>`}
+      </div>`;
+  }
+
+  renderSettings(Hd) {
+    const st = this.state, c = st.conn, d = st.dump, sec = 'flex:1;min-width:0;gap:10px;' + HEB, h = 'font-size:18px;font-weight:700;color:var(--brass-hi)', p = 'font-size:14.5px;line-height:1.55;color:#d9cdb3';
+    return html`
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button class="navbtn hot backbtn" onClick=${() => this.setState({ screen: 'main' })} aria-label="Back to the mixer">${IC.back}<span>Mixer</span></button>
+        <span style="font-size:22px;font-weight:700;letter-spacing:.06em;flex:1">SETTINGS</span>
+        ${this.connPill()}
+      </header>
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:12px 26px" dir="rtl">
+        <div class="sec" style=${sec}>
+          <span style=${h}>המיקסר</span>
+          <span style=${p}>${this.linked() ? html`מחובר: <b dir="ltr">${c.model}</b> · <b dir="ltr">${c.name || '—'}</b> · <span dir="ltr">${c.ip}</span>` : 'לא מחובר. הדגם מזוהה לבד בחיבור, והמיקסר האחרון נזכר לפעם הבאה.'}</span>
+          <button class="pill" onClick=${() => this.setState({ connPop: true, screen: 'main' })}>חיבור למיקסר</button>
+          <span style=${h + ';margin-top:8px'}>מצב הדגמה</span>
+          <span style=${p}>הדגם שמוצג כשאין חיבור. מה שמשחקים בהדגמה נשאר באפליקציה ולא נשלח לעולם.</span>
+          <div style="display:flex;gap:6px" dir="ltr">${Object.keys(MODELS).reverse().map(k => html`<button class=${'pill' + (st.prefs.demoModel === k ? ' on' : '')} style="flex:1" onClick=${() => { this.demoInit(k); this.setPref({ demoModel: k }); this.setState({ bank: 0, sofOn: false, sof: 0 }); }}>${k}</button>`)}</div>
+        </div>
+        <div class="sec" style=${sec}>
+          <span style=${h}>דוח מיקסר</span>
+          <span style=${p}>קורא מהמיקסר את כל הערכים (קריאה בלבד, לא משנה דבר) ומכין טקסט להעתקה. הדוח הזה מאפשר לוודא שהאפליקציה קוראת נכון את המיקסר שלך לפני שבונים את המסכים הבאים.</span>
+          <button class="pill" disabled=${!!(d && !d.done)} onClick=${() => this.dumpStart()}>${d && !d.done ? `קורא ${d.n} מתוך ${d.total}` : 'הכן דוח'}</button>
+          ${d && d.done && html`<span style=${p}>הדוח מוכן: ענו <b dir="ltr">${d.n}</b> מתוך <b dir="ltr">${d.total}</b>.</span>
+            <button class="pill on" onClick=${() => this.copyText(this.dumpText, 'הדוח הועתק. אפשר להדביק אותו בשיחה')}>העתק דוח</button>`}
+          <button class="pill" style="margin-top:auto" onClick=${() => this.copyText(this.logs.join('\n'), 'היומן הועתק')}>העתק יומן חיבור</button>
+        </div>
+        <div class="sec" style=${sec}>
+          <span style=${h}>האפליקציה</span>
+          <span style=${p}>גרסת ממשק <b dir="ltr">${APP_VER}</b>${NATIVE ? html` · גרסת אפליקציה <b dir="ltr">${(() => { try { return NATIVE.version(); } catch (e) { return ''; } })()}</b>` : ''}</span>
+          <span style=${p}>האפליקציה קוראת בלבד עד שמדליקים LIVE. גם אז נשלח רק מה שמשנים ביד.</span>
+          ${NATIVE && html`<button class="pill" onClick=${() => { try { NATIVE.checkUpdate(); } catch (e) {} this.toast('בודק עדכונים'); }}>בדוק עדכון</button>
+          <button class="pill" onClick=${() => NATIVE.reload()}>טען מחדש את הממשק</button>`}
+          <span style=${p + ';margin-top:auto;color:#8c8272'}>בשלבים הבאים: מסכי ערוץ, נגן ומקליט USB, אפקטים.</span>
+        </div>
+      </div>
+      ${st.connPop && this.renderConn(Hd)}`;
+  }
+
+  render() {
+    try { const v = this.renderApp(); this.rErr = 0; return v; }
+    catch (e) {
+      this.rErr = (this.rErr || 0) + 1;
+      try { this.log('err', 'screen error on ' + this.state.screen + ': ' + String(e && e.message || e)); } catch (_) {}
+      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
+      return html`<div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0;background:#0b0a09"></div>`;
+    }
+  }
+  renderApp() {
+    const st = this.state, { s, Hd, offX } = this.dims(), portrait = st.ch > st.cw * 1.05;
+    return html`
+      <div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0">
+        <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
+          ${st.screen === 'settings' ? this.renderSettings(Hd) : this.renderMain(Hd)}
+        </div>
+        ${!st.started && html`
+          <div class="overlay" dir="rtl">
+            <div class="card">
+              <h1>AIR CONSOLE</h1>
+              <p>מצב הדגמה: הנתונים מדומים. חיבור למיקסר נעשה מתוך אפליקציית האנדרואיד.</p>
+              <button class="cta" onClick=${() => this.goFullscreen()}>פתח במסך מלא</button>
+              <button class="ghost" onClick=${() => this.setState({ started: true })}>המשך בלי מסך מלא</button>
+            </div>
+          </div>`}
+        ${st.started && portrait && html`<div class="overlay" dir="rtl" style="z-index:25"><div class="card"><h1 style="font-size:30px">⟲</h1><p>סובב את המכשיר לרוחב</p></div></div>`}
+        ${st.toast && html`<div class="toast" role="status">${st.toast}</div>`}
+      </div>`;
+  }
+}
+
+render(html`<${App} />`, document.getElementById('stage'));
+</script>
+
+</body>
+</html>
