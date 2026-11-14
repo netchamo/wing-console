@@ -1,0 +1,11 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1180, height: 640 } }); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('http://127.0.0.1:8765/index.html'); await p.waitForTimeout(900);
+const ids = await p.evaluate(() => [0, 1, 2].map(s => __wm.wid(s, 'name'))), cid = await p.evaluate(() => __wm.wid(0, 'col'));
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/fdr', args: [0, 0.7, -5] }, { type: 'nativeOpen' }])); await p.waitForTimeout(300);
+const show = async t => console.log(t, await p.evaluate(() => __app.state.chans.slice(0, 3).map(c => c.name + ' ' + c.color).join(' | ')));
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/$name', args: ['VOX'] }, { type: 'osc', address: '/ch/1/$col', args: ['3', 0, 3] }, { type: 'osc', address: '/ch/2/$name', args: ['GTR'] }, { type: 'osc', address: '/ch/2/$col', args: ['7', 0, 7] }])); await p.waitForTimeout(400); await show('osc   ');
+await p.evaluate(ids => __wingNative([{ type: 'nat', id: ids[0], s: '' }, { type: 'nat', id: ids[1], s: '' }]), ids); await p.waitForTimeout(400); await show('native empty');
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/$name', args: [''] }])); await p.waitForTimeout(400); await show('osc empty');
+await p.evaluate(c => __wingNative([{ type: 'nat', id: c, v: 1 }]), cid); await p.waitForTimeout(400); await show('native col 1');
+console.log(errs); await b.close();

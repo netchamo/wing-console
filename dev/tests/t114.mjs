@@ -1,0 +1,11 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1180, height: 640 } }); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('http://127.0.0.1:8765/index.html'); await p.waitForTimeout(900);
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/fdr', args: [0, 0.7, -5] }, { type: 'nativeOpen' }])); await p.waitForTimeout(300);
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/$icon', args: ['55', 55, 55] }, { type: 'osc', address: '/ch/1/clink', args: ['1', 1, 1] }, { type: 'osc', address: '/ch/2/clink', args: ['0', 0, 0] }])); await p.waitForTimeout(300);
+console.log('icon', await p.evaluate(() => __app.state.chans[0].icon));
+await p.evaluate(() => { __app.setLive(true); }); await p.waitForTimeout(1500);
+await p.evaluate(() => { calls.length = 0; __app.setState({ nameEdit: { i: 0 } }); }); await p.waitForTimeout(300);
+await p.evaluate(() => { calls.length = 0; __app.identOut(0, 'icon', 12); __app.identOut(1, 'icon', 12); }); await p.waitForTimeout(300);
+console.log(JSON.stringify(await p.evaluate(() => calls.filter(c => c[0] === 'set'))));
+console.log(errs); await b.close();

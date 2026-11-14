@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><script>
+window.calls=[];
+window.WingNative={ready(){},version(){return 'test'},wifi(){return true},wifiAddress(){return '192.168.20.4/24'},netInfo(){return JSON.stringify([{kind:'wifi',addr:'192.168.20.4',prefix:24,gw:'192.168.0.1',internet:false}])},
+ discover(h){calls.push(['discover',h])},connect(ip){calls.push(['connect',ip])},disconnect(){calls.push(['disconnect'])},
+ query(a){calls.push(['query',a.split('\n').length])},setLive(on){calls.push(['setLive',on])},request(ids){calls.push(['request',ids.split(',').length])},requestDef(ids){calls.push(['requestDef',ids])},
+ set(a,t,v){calls.push(['set',a,t,v])},setNative(id,t,v){calls.push(['setNative',id,t,v])},nativeOpen(){return true},
+ openWifi(){},copy(){},reload(){},build(){return 1},checkUpdate(){},downloadUpdate(){return 'ok'},updateProgress(){return -1}};
+try{localStorage.setItem('wing.ip','192.168.0.100')}catch(e){}
+</script>

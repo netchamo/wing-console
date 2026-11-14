@@ -1,0 +1,10 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1180, height: 640 } });
+await p.goto('http://127.0.0.1:8765/index.html'); await p.waitForTimeout(900);
+await p.evaluate(() => __wingNative([{ type: 'osc', address: '/ch/1/fdr', args: [0, 0.7, -5] }, { type: 'nativeOpen' }])); await p.waitForTimeout(300);
+await p.evaluate(() => { __app.setState(s => ({ monv: { ...s.monv, '/fx/3/mdl': 'DEQ3' } })); __app.setLive(true); }); await p.waitForTimeout(800);
+await p.evaluate(() => { calls.length = 0; __app.setState({ screen: 'fxed', fxEd: { n: 3, from: 'fx' } }); }); await p.waitForTimeout(1500);
+console.log('open sends', await p.evaluate(() => calls.filter(c => c[0] === 'setNative').length));
+await p.evaluate(() => { calls.length = 0; __app.uAct = Date.now(); __app.setState(s => ({ fdeq: { ...s.fdeq, bands: s.fdeq.bands.map((x, i) => i ? x : { ...x, f: x.f * 1.5 }) } })); }); await p.waitForTimeout(1500);
+console.log('hand sends', JSON.stringify(await p.evaluate(() => calls.filter(c => c[0] === 'setNative'))));
+await b.close();

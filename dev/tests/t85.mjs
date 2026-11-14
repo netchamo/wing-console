@@ -1,0 +1,10 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1180, height: 640 } }); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('http://127.0.0.1:8765/demo.html'); await p.waitForTimeout(800); const g = await p.$('button.ghost'); if (g) await g.click();
+await p.evaluate(() => __app.setState({ screen: 'fxed', fxEd: { n: 5, from: 'fx' } })); await p.waitForTimeout(600); await p.screenshot({ path: 'r-fdeq.png' });
+const bt = await p.$('button[aria-label^="Band 2,"]'); const bb = await bt.boundingBox();
+await p.mouse.move(bb.x + 27, bb.y + 27); await p.mouse.down(); await p.mouse.move(bb.x + 120, bb.y + 60, { steps: 6 }); await p.mouse.up(); await p.waitForTimeout(400);
+console.log(await p.evaluate(() => { const P = __app.fxParams('DEQ3'); return ['2-f', '2-g'].map(n => __app.state.monv['/fx/5/p' + P.find(x => x[1] === n)[0]]); }));
+await p.screenshot({ path: 'r-fdeq2.png' });
+await p.evaluate(() => __app.setState({ screen: 'ins', insSlot: 'preins', eqCh: 0 })); await p.waitForTimeout(600); await p.screenshot({ path: 'r-fdeq-ins.png' });
+console.log(errs); await b.close();

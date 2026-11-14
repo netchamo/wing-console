@@ -1,0 +1,12 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1180, height: 640 } }); const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('http://127.0.0.1:8765/demo.html'); await p.waitForTimeout(800); const g = await p.$('button.ghost'); if (g) await g.click();
+const show = async (m, f) => { await p.evaluate(m => __app.setState(s => { const o = { ...s.monv, '/fx/1/mdl': m }; for (const k in o) if (k.startsWith('/fx/1/p')) delete o[k]; return { monv: o, screen: 'fxed', fxEd: { n: 1, from: 'fx' }, fxAssign: null }; }), m); await p.waitForTimeout(350); await p.screenshot({ path: f }); };
+for (const m of ['ST-DL', 'SHIMMER', 'V-PLATE', 'TAP-DL', 'BBD-DL']) await show(m, 'z-' + m.replace(/\W/g, '') + '.png');
+console.log('where', JSON.stringify(await p.evaluate(() => __app.fxWhere(1))));
+await p.click('button[aria-label^="Effect"]'); await p.waitForTimeout(200); console.log('after toggle', JSON.stringify(await p.evaluate(() => __app.fxWhere(1))));
+await p.evaluate(() => __app.setState({ fxAssign: 1 })); await p.waitForTimeout(300); await p.screenshot({ path: 'z-assign.png' });
+await p.click('button[aria-label^="Gtr INS 2"], button[aria-label*=" INS 2"]'); await p.waitForTimeout(300); console.log('assigned', JSON.stringify(await p.evaluate(() => __app.fxWhere(1))));
+await p.evaluate(() => __app.setState({ screen: 'fx' })); await p.waitForTimeout(300);
+await p.click('div[aria-label^="FX 2 inserted"]'); await p.waitForTimeout(300); console.log('rack assign pop', await p.evaluate(() => __app.state.fxAssign), await p.evaluate(() => __app.state.screen));
+console.log(errs); await b.close();
