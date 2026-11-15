@@ -36,7 +36,7 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   const d0 = await p.evaluate(() => __app.demo['/ch/01/mix/fader']); await drag(p, '/ch/01/mix/fader', -50);
   const d1 = await p.evaluate(() => __app.demo['/ch/01/mix/fader']); ok('demo: fader moves', d1 > d0, d0 + '→' + d1);
   await p.evaluate(() => document.querySelectorAll('.strip .ms button')[0].click()); ok('demo: mute toggles', await p.evaluate(() => __app.demo['/ch/01/mix/on'] === 0));
-  await tap(p, 'Buses'); ok('demo XR16: 4 buses', (await names(p)).filter(x => /^MON/.test(x)).length === 4);
+  await tap(p, 'Buses'); ok('demo XR16: 6 buses', (await names(p)).filter(x => /^MON/.test(x)).length === 6);
   await tap(p, 'הגדרות'); await tap(p, 'XR18'); await p.evaluate(() => document.querySelector('.backbtn').click()); await p.waitForTimeout(200); await tap(p, 'Buses');
   ok('demo XR18: 6 buses', (await names(p)).filter(x => /^MON/.test(x)).length === 6);
   await tap(p, 'הגדרות'); await tap(p, 'XR12'); await p.evaluate(() => document.querySelector('.backbtn').click()); await p.waitForTimeout(200);
@@ -49,7 +49,7 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   await drag(p, '/ch/01/mix/fader', -80); await p.evaluate(() => { document.querySelectorAll('.strip .ms button')[0].click(); document.querySelectorAll('.strip .ms button')[1].click(); });
   await tap(p, 'SENDS'); await drag(p, '/ch/02/mix/01/level', -60); await tap(p, 'SENDS');
   await p.waitForTimeout(4500);
-  ok('auto-detect: connected, model from the mixer, read only', (await status(p)) === 'connected/XR16/false', await status(p));
+  ok('auto-detect: connected, model from the mixer, read only', (await status(p)) === 'connected/XR16W/false', await status(p));
   const r = await p.evaluate(() => ({ sets: fake.sets.length, f: __app.desk['/ch/01/mix/fader'], ff: fake.store['/ch/01/mix/fader'][1], on: __app.desk['/ch/01/mix/on'], nm: [...document.querySelectorAll('.strip .cname')].map(e => e.textContent.trim()) }));
   ok('demo play sent nothing', r.sets === 0, r.sets);
   ok('the screen shows the mixer, not the demo', r.f === r.ff && r.on === 1 && r.nm[0] === 'D01' && r.nm[6] === 'CH 07' && r.nm[8] === 'MAIN', JSON.stringify(r));
@@ -57,10 +57,10 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
 
 /* ---------- read only, then live ---------- */
 { const p = await open('index.html?model=XR16'); await p.waitForTimeout(2500);
-  ok('connected without any question', (await status(p)) === 'connected/XR16/false', await status(p));
+  ok('connected without any question', (await status(p)) === 'connected/XR16W/false', await status(p));
   const wrong = await p.evaluate(() => { const bad = []; for (const k in __app.desk) if (fake.store[k] && fake.store[k][1] !== __app.desk[k]) bad.push(k); return { bad, n: Object.keys(__app.desk).length, miss: [...__app.missing] }; });
   ok('every value read equals the mixer', wrong.bad.length === 0 && wrong.n > 180, JSON.stringify(wrong).slice(0, 300));
-  await tap(p, 'Buses'); ok('XR16: 4 buses shown', (await names(p)).filter(x => /^BUS/.test(x)).length === 4, (await names(p)).join(',')); await tap(p, 'In 1–8');
+  await tap(p, 'Buses'); ok('XR16: 6 buses shown', (await names(p)).filter(x => /^BUS/.test(x)).length === 6, (await names(p)).join(',')); await tap(p, 'In 1–8');
   const f0 = await p.evaluate(() => __app.desk['/ch/01/mix/fader']); await drag(p, '/ch/01/mix/fader', -60);
   const ro = await p.evaluate(() => ({ sets: fake.sets.length, f: __app.desk['/ch/01/mix/fader'], toast: __app.state.toast }));
   ok('read only: a drag sends nothing, value stays, toast shown', ro.sets === 0 && ro.f === f0 && /קריאה בלבד/.test(ro.toast), JSON.stringify(ro));
@@ -68,7 +68,7 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('read only: mute tap sends nothing', (await sets(p)).length === 0 && await p.evaluate(() => __app.desk['/ch/01/mix/on'] === 1));
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
-  ok('live on', (await status(p)) === 'connected/XR16/true' && await p.evaluate(() => fake.live));
+  ok('live on', (await status(p)) === 'connected/XR16W/true' && await p.evaluate(() => fake.live));
   await p.waitForTimeout(6500); ok('live, hands off for 6.5 s (refresh included): nothing sent', (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   const w2 = await walk(p); await p.waitForTimeout(600); ok(`live: walking every view (${w2} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await drag(p, '/ch/01/mix/fader', -60); let S = await sets(p);
@@ -80,7 +80,7 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('live: solo sends one value', S.length === c0 + 1 && S[c0][0] === '/-stat/solosw/02' && S[c0][2] === 1, JSON.stringify(S.slice(c0)));
   c0 = S.length; await tap(p, 'SENDS'); await p.evaluate(() => document.querySelectorAll('.sofrow button')[1].click()); await p.waitForTimeout(500); await drag(p, '/ch/03/mix/02/level', -50); S = await sets(p);
   ok('live: sends on faders moves only that send, on the 161 grid', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/03/mix/02/level' && Math.abs(s[2] * 160 - Math.round(s[2] * 160)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
-  await p.evaluate(() => document.querySelectorAll('.sofrow button')[5].click()); await p.waitForTimeout(500);
+  await p.evaluate(() => document.querySelectorAll('.sofrow button')[7].click()); await p.waitForTimeout(500);
   ok('FX 2 send is mix 08', !!(await p.$('[data-f="/ch/01/mix/08/level"] .cap')));
   await tap(p, 'SENDS'); c0 = (await sets(p)).length;
   await p.evaluate(() => fake.emit('/ch/05/mix/fader', 'f', 0.25)); await p.waitForTimeout(250);
@@ -113,13 +113,14 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
 
 /* ---------- models and the mixer report ---------- */
 { const p = await open('index.html?model=XR18', { width: 1200, height: 540 }); await p.waitForTimeout(2500); await tap(p, 'Buses');
-  ok('XR18: model detected, 6 buses, no recorder note', (await status(p)) === 'connected/XR18/false' && (await names(p)).filter(x => /^BUS/.test(x)).length === 6 && !(await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB'))));
+  ok('XR18: model detected, 6 buses, no recorder note', (await status(p)) === 'connected/XR18W/false' && (await names(p)).filter(x => /^BUS/.test(x)).length === 6 && !(await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB'))));
   await tap(p, 'הגדרות'); await tap(p, 'הכן דוח'); await p.waitForTimeout(45000);
-  const d = await p.evaluate(() => ({ d: __app.state.dump, t: __app.dumpText.slice(0, 200), sets: fake.sets.length, gets: fake.gets }));
-  ok('mixer report: reads only, finishes', d.d && d.d.done && d.sets === 0 && /model XR18/.test(d.t), JSON.stringify(d));
+  const d = await p.evaluate(() => ({ d: __app.state.dump, t: __app.dumpText.slice(0, 400), sizes: __app.dumpParts.map(x => x.length), f: /\/ch\/01: config\/name="D01" config\/color=i1 mix\/fader=f0\.\d+/.test(__app.dumpText), sets: fake.sets.length }));
+  ok('mixer report: reads only, finishes, in parts a chat can take, values typed', d.d && d.d.done && d.sets === 0 && /XR18W/.test(d.t) && d.sizes.length > 1 && d.sizes.every(x => x < 19000) && d.f, JSON.stringify(d));
   ok('no page errors (1200×540)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
 { const p = await open('index.html?model=XR12'); await p.waitForTimeout(2500);
-  ok('XR12: 12 channels, recorder note', (await status(p)) === 'connected/XR12/false' && await tap(p, 'In 9–12') && (await names(p)).length === 5 && await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB')));
+  await p.waitForTimeout(3500); await tap(p, 'Buses'); ok('XR12 that answers for 2 buses only: 2 shown', (await names(p)).filter(x => /^BUS/.test(x)).length === 2, (await names(p)).join(','));
+  ok('XR12: 12 channels, recorder note', (await status(p)) === 'connected/XR12W/false' && await tap(p, 'In 9–12') && (await names(p)).length === 5 && await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB')));
   await p.close(); }
 
 console.log(`\n${n - fails} of ${n} passed`); await B.close(); srv.close(); process.exit(fails ? 1 : 0);

@@ -44,7 +44,7 @@ The app uses `/meters/1` for the mixer screen.
 | model | inputs | buses | stick recorder/player | `/rtn/aux` is |
 |-------|--------|-------|-----------------------|---------------|
 | XR18 / X18 / MR18 | 16 (+ aux in 17/18) | 6 | **no** (18×18 USB audio instead) | Aux in 17/18 |
-| XR16 | 16 (8 mic + 8 line) | 4 `VERIFY` | **yes** | USB player return |
+| XR16 | 16 (8 mic + 8 line) | 6 for sends (user's XR16 answers `mix/05`, `mix/06` and uses them); `/bus/5..6` strips still `VERIFY` | **yes** | USB player return |
 | XR12 / MR12 | 12 (4 mic + 8 line) | 2 `VERIFY` | **yes** | USB player return |
 
 `VERIFY` the bus count: some documents say every model has six internal buses. The app shows the
@@ -115,3 +115,14 @@ rate, name).
 - Search: `/xinfo` to the last known address, to `192.168.1.1` (the mixer's own access point) and
   to every local broadcast address; the first known mixer that answers is connected, the model is
   taken from the answer and remembered.
+
+## Confirmed on the user's XR16 (report of 15 Nov 2026, firmware 1.19 – first 20 000 characters only, channels 1–8)
+
+- `/xinfo` answers `ip, "XR16W-B2-3E-C9" (name), "XR16W" (model), "1.19"`.
+- Sends `mix/01..06` all answer on the XR16; `pan` exists only on the odd ones (pair pan); FX sends are `07..10`.
+- `/ch/NN/config/insrc` exists (0–15, the analog input feeding the channel). `/ch/NN/insert/fxslot` does not answer.
+- Step grids seen in real values: fader 1/1023, send level 1/160, `preamp/hpf` 1/100, EQ `f` 1/200, `g` 1/120, `q` 1/71,
+  gate `thr` 1/160, `range` 1/57, `attack` 1/120, `hold`/`release` 1/100, dyn `thr` 1/120, `knee` 1/5, `mgain` 1/48,
+  `attack` 1/120, `hold`/`release` 1/100.
+- A chat paste is cut at 20 000 characters → the report is now split into parts under 18 000.
+- The app shows six buses when connected and hides the last ones the mixer never answers for.

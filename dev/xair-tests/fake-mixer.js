@@ -3,7 +3,7 @@
    window.fake.sets = every packet that carried a value (what a real mixer would have been told to change). */
 (function () {
   const Q = new URLSearchParams(location.search), MODEL = Q.get('model') || 'XR16', DELAY = +(Q.get('delay') || 0), IP = '192.168.1.1';
-  const NBUS = MODEL === 'XR18' ? 6 : MODEL === 'XR16' ? 4 : 2, NCH = MODEL === 'XR12' ? 12 : 16;
+  const NBUS = +(Q.get('bus') || (MODEL === 'XR12' ? 2 : 6)), NCH = MODEL === 'XR12' ? 12 : 16;
   const TE = new TextEncoder(), TD = new TextDecoder(), pad2 = n => String(n).padStart(2, '0');
   const oscStr = s => { const b = TE.encode(s), o = new Uint8Array((b.length + 4) & ~3); o.set(b); return o; };
   function enc(addr, args) {
@@ -48,7 +48,7 @@
   function handle(u) {
     if (fake.silent || Date.now() - t0 < DELAY) return;
     const m = dec(u);
-    if (m.addr === '/xinfo') { push('/xinfo', [['s', IP], ['s', 'FAKE-' + MODEL], ['s', MODEL], ['s', '1.18']]); return; }
+    if (m.addr === '/xinfo') { push('/xinfo', [['s', IP], ['s', MODEL + 'W-B2-3E-C9'], ['s', MODEL + 'W'], ['s', '1.19']]); return; }
     if (m.addr === '/xremote') { fake.remote = Date.now(); return; }
     if (m.addr === '/meters') { fake.meters = true; return; }
     if (!m.args.length) { fake.gets++; const v = store[m.addr]; if (v) push(m.addr, [v]); return; }

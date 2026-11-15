@@ -79,7 +79,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.1.0';
+const DW = 1180, APP_VER = '0.1.1';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -146,7 +146,7 @@ const same = (a, b) => a === b || (typeof a === 'number' && typeof b === 'number
 /* ---------- models ---------- */
 const MODELS = {
   XR18: { key: 'XR18', ch: 16, bus: 6, rec: false, aux: 'AUX IN' },
-  XR16: { key: 'XR16', ch: 16, bus: 4, rec: true, aux: 'USB' },
+  XR16: { key: 'XR16', ch: 16, bus: 6, rec: true, aux: 'USB' },
   XR12: { key: 'XR12', ch: 12, bus: 2, rec: true, aux: 'USB' }
 };
 const modelKey = m => /18/.test(m || '') ? 'XR18' : /16/.test(m || '') ? 'XR16' : /12/.test(m || '') ? 'XR12' : 'XR18';
@@ -171,17 +171,17 @@ function mkStrip(kind, n, M) {
   return S('/lr', { def: 'MAIN LR', pan: '/lr/mix/pan', solo: solPath(50), mt: [36, 37] });
 }
 const LAYOUT = {};
-function layoutOf(key) {
-  if (LAYOUT[key]) return LAYOUT[key];
+function layoutOf(key, nbus) {
+  const lk = key + ':' + (nbus || 0); if (LAYOUT[lk]) return LAYOUT[lk];
   const M = MODELS[key], r = n => Array.from({ length: n }, (_, i) => i + 1);
   const ch = r(M.ch).map(n => mkStrip('ch', n, M)), aux = mkStrip('aux', 0, M), rtn = r(4).map(n => mkStrip('rtn', n, M)),
-    bus = r(M.bus).map(n => mkStrip('bus', n, M)), fxs = r(4).map(n => mkStrip('fxs', n, M)), dca = r(4).map(n => mkStrip('dca', n, M)), lr = mkStrip('lr', 0, M);
+    bus = r(nbus || M.bus).map(n => mkStrip('bus', n, M)), fxs = r(4).map(n => mkStrip('fxs', n, M)), dca = r(4).map(n => mkStrip('dca', n, M)), lr = mkStrip('lr', 0, M);
   const all = [...ch, aux, ...rtn, ...bus, ...fxs, ...dca, lr], byId = {}; all.forEach(s => { byId[s.id] = s; });
   const banks = [{ label: 'In 1–8', col: '#7aa7e0', strips: ch.slice(0, 8), ins: true }, { label: 'In 9–' + M.ch, col: '#7aa7e0', strips: ch.slice(8), ins: true },
     { label: 'Returns', col: '#a993d9', strips: [aux, ...rtn], ins: true }, { label: 'Buses', col: '#c9a25a', strips: bus }, { label: 'FX · DCA', col: '#4fc9b7', strips: [...fxs, ...dca] }];
   /* send destinations: mix 01–06 are the buses, 07–10 the four FX sends */
   const dests = [...bus.map(s => ({ k: s.n, label: 'BUS ' + s.n, col: '#c9a25a', strip: s })), ...fxs.map(s => ({ k: 6 + s.n, label: 'FX ' + s.n, col: '#4fc9b7', strip: s }))];
-  return (LAYOUT[key] = { M, ch, aux, rtn, bus, fxs, dca, lr, all, byId, banks, dests });
+  return (LAYOUT[lk] = { M, ch, aux, rtn, bus, fxs, dca, lr, all, byId, banks, dests });
 }
 const sendPath = (s, d) => s.base + '/mix/' + pad2(d.k) + '/level';
 const corePaths = s => [s.name, s.color, s.fader, s.on, s.solo, ...(s.pan ? [s.pan] : [])];
@@ -224,7 +224,7 @@ class App extends Component {
     this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, connPop: false, liveAsk: false, rev: 0,
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
       prefs: { demoModel: 'XR16', ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
-    this.desk = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
+    this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
     this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
     this.sim = new Float32Array(40).fill(-60);
     this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
@@ -236,7 +236,9 @@ class App extends Component {
   linked() { const s = this.state.conn.status; return !!NATIVE && (s === 'connected' || s === 'lost'); }
   val(p) { return (this.linked() ? this.desk : this.demo)[p]; }
   mkey() { return this.linked() ? modelKey(this.state.conn.model) : this.state.prefs.demoModel; }
-  L() { return layoutOf(this.mkey()); }
+  /* connected: all six buses, minus the last ones the mixer never answered for */
+  busCount() { let n = 6; while (n > 1 && this.missing.has('/bus/' + n + '/mix/fader')) n--; return n; }
+  L() { return layoutOf(this.mkey(), this.linked() ? this.busCount() : 0); }
   bump() { if (this.bq) return; this.bq = true; requestAnimationFrame(() => { this.bq = false; this.setState(s => ({ rev: s.rev + 1 })); }); }
   log(dir, text) { const t = new Date(); this.logs.push(`${pad2(t.getHours())}:${pad2(t.getMinutes())}:${pad2(t.getSeconds())} ${dir} ${text}`); if (this.logs.length > 500) this.logs.splice(0, 100); }
   toast(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2600); }
@@ -330,13 +332,14 @@ class App extends Component {
     if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); return; }
     if (!m.args.length) return;
     const v = m.args[0];
-    this.pend.delete(m.addr); this.missing.delete(m.addr);
+    this.pend.delete(m.addr); this.missing.delete(m.addr); this.dtype[m.addr] = m.types[0];
     if (Date.now() - (this.hold[m.addr] || 0) < 600) return;   /* a late answer must not pull back a control the hand is moving */
     if (this.desk[m.addr] !== v) { this.desk[m.addr] = v; this.bump(); }
   }
   onInfo(ip, args) {
-    const strs = args.filter(a => typeof a === 'string'), model = strs.find(isXAir) || '';
-    const info = { ip, name: strs[1] && strs[1] !== model ? strs[1] : (strs.find(x => x !== model && !/^\d+\.\d+\.\d+\.\d+$/.test(x)) || ''), model, fw: strs[strs.length - 1] !== model ? strs[strs.length - 1] || '' : '' };
+    /* the mixer answers: ip, name ("XR16W-B2-3E-C9"), model ("XR16W"), firmware */
+    const strs = args.filter(a => typeof a === 'string'), model = isXAir(strs[2]) ? strs[2] : strs.find(isXAir) || '';
+    const info = { ip, name: strs[1] || '', model, fw: strs.length > 3 ? strs[3] : '', raw: strs };
     const c = this.state.conn;
     if (this.linked() && ip === c.ip) { this.lastRx = Date.now(); if (model && model !== c.model) { this.log('sys', 'model ' + model); this.setState(s => ({ conn: { ...s.conn, ...info } }), () => this.readCore()); } return; }
     if (!model) return;
@@ -347,11 +350,11 @@ class App extends Component {
     if (this.wantIp === ip || !last || last.ip === ip || (last.name && last.name === info.name)) this.connect(info);
   }
   connect(info) {
-    this.desk = {}; this.hold = {}; this.pend.clear(); this.queue = []; this.outq.clear(); this.missing.clear(); this.mt.fill(-128); this.pk.fill(-128); this.wantIp = '';
+    this.desk = {}; this.dtype = {}; this.hold = {}; this.pend.clear(); this.queue = []; this.outq.clear(); this.missing.clear(); this.mt.fill(-128); this.pk.fill(-128); this.wantIp = '';
     try { NATIVE.setLive(false); } catch (e) {}
     const last = { ip: info.ip, name: info.name, model: info.model }; save('xair.last', last);
     this.firstRead = true; this.lastRx = Date.now(); this.log('sys', `connected to ${info.model} "${info.name}" at ${info.ip} (read only)`);
-    this.setState(s => ({ last, ipText: info.ip, bank: 0, sofOn: false, sheet: null, connPop: false, liveAsk: false, conn: { ...s.conn, status: 'connected', ip: info.ip, name: info.name, model: info.model, fw: info.fw, live: false } }),
+    this.setState(s => ({ last, ipText: info.ip, bank: 0, sofOn: false, sheet: null, connPop: false, liveAsk: false, conn: { ...s.conn, status: 'connected', ip: info.ip, name: info.name, model: info.model, fw: info.fw, raw: info.raw || [], live: false } }),
       () => { this.pulse(); this.readCore(); });
   }
   disconnect() {
@@ -441,12 +444,22 @@ class App extends Component {
   dumpStep() {
     const R = this.dumpRun, left = R.P.filter(p => this.pend.has(p)).length;
     if (left && Date.now() - R.t0 < 60000) { this.setState({ dump: { n: R.P.length - left, total: R.P.length, done: false } }); return; }
-    const c = this.state.conn, miss = R.P.filter(p => !(p in this.desk));
-    const lines = [`AIR CONSOLE ${APP_VER} report`, `model ${c.model} | name ${c.name} | fw ${c.fw} | ip ${c.ip}`, `asked ${R.P.length}, answered ${R.P.length - miss.length}`, '--- values'];
-    R.P.forEach(p => { if (p in this.desk) { const v = this.desk[p]; lines.push(p + '\t' + (typeof v === 'string' ? JSON.stringify(v) : Number.isInteger(v) ? 'i ' + v : 'f ' + (+v.toFixed(5)))); } });
-    lines.push('--- no answer'); miss.forEach(p => lines.push(p)); lines.push('--- log'); lines.push(...this.logs.slice(-120));
-    this.dumpText = lines.join('\n'); this.dumpRun = null; this.log('sys', `mixer report ready: ${R.P.length - miss.length} of ${R.P.length}`);
-    this.setState({ dump: { n: R.P.length - miss.length, total: R.P.length, done: true } });
+    const c = this.state.conn, D = this.desk, miss = R.P.filter(p => !(p in D));
+    const fv = p => { const v = D[p]; return typeof v === 'string' ? JSON.stringify(v) : (this.dtype[p] || '?') + (typeof v === 'number' && !Number.isInteger(v) ? +v.toFixed(5) : v); };
+    const base = p => (/^\/(ch|headamp|bus|rtn|fxsend|dca|fx)\/[^/]+/.exec(p) || /^\/[^/]+/.exec(p))[0];
+    const G = new Map(); R.P.forEach(p => { if (!(p in D)) return; const b = base(p); if (!G.has(b)) G.set(b, []); G.get(b).push(p.slice(b.length + 1) + '=' + fv(p)); });
+    const line = b => b + ': ' + G.get(b).join(' '), keys = [...G.keys()];
+    const fold = {}; miss.forEach(p => { const k = p.replace(/\d+/g, 'N'); fold[k] = (fold[k] || 0) + 1; });
+    /* the short answers first, the sixteen channels after them; cut into parts a chat can take */
+    const body = ['xinfo ' + JSON.stringify(c.raw || []), `asked ${R.P.length}, answered ${R.P.length - miss.length}`,
+      'strips with no fader answer: ' + (miss.filter(p => /\/fader$/.test(p)).join(' ') || 'none'),
+      'no answer (N = a number): ' + (Object.keys(fold).map(k => k + ' x' + fold[k]).join(' ') || 'none'),
+      ...keys.filter(b => !b.startsWith('/ch/')).map(line), ...keys.filter(b => b.startsWith('/ch/')).map(line), '--- log', ...this.logs.slice(-40)];
+    const parts = [[]]; let size = 0;
+    for (const l of body) { if (size + l.length > 17500 && parts[parts.length - 1].length) { parts.push([]); size = 0; } parts[parts.length - 1].push(l); size += l.length + 1; }
+    this.dumpParts = parts.map((ls, k) => [`AIR CONSOLE ${APP_VER} report, part ${k + 1} of ${parts.length} | ${c.model} | ${c.name} | fw ${c.fw}`, ...ls].join('\n'));
+    this.dumpText = this.dumpParts.join('\n'); this.dumpRun = null; this.log('sys', `mixer report ready: ${R.P.length - miss.length} of ${R.P.length}`);
+    this.setState({ dump: { n: R.P.length - miss.length, total: R.P.length, done: true, parts: parts.length } });
   }
   copyText(t, okMsg) {
     try { if (NATIVE) NATIVE.copy(t); else navigator.clipboard.writeText(t); this.toast(okMsg); } catch (e) { this.toast('ההעתקה נכשלה'); }
@@ -745,8 +758,8 @@ class App extends Component {
           <span style=${h}>דוח מיקסר</span>
           <span style=${p}>קורא מהמיקסר את כל הערכים (קריאה בלבד, לא משנה דבר) ומכין טקסט להעתקה. הדוח הזה מאפשר לוודא שהאפליקציה קוראת נכון את המיקסר שלך לפני שבונים את המסכים הבאים.</span>
           <button class="pill" disabled=${!!(d && !d.done)} onClick=${() => this.dumpStart()}>${d && !d.done ? `קורא ${d.n} מתוך ${d.total}` : 'הכן דוח'}</button>
-          ${d && d.done && html`<span style=${p}>הדוח מוכן: ענו <b dir="ltr">${d.n}</b> מתוך <b dir="ltr">${d.total}</b>.</span>
-            <button class="pill on" onClick=${() => this.copyText(this.dumpText, 'הדוח הועתק. אפשר להדביק אותו בשיחה')}>העתק דוח</button>`}
+          ${d && d.done && html`<span style=${p}>הדוח מוכן: ענו <b dir="ltr">${d.n}</b> מתוך <b dir="ltr">${d.total}</b>. הוא מחולק לחלקים קצרים, כי הדבקה ארוכה נחתכת. העתק והדבק כל חלק בנפרד.</span>
+            ${(this.dumpParts || []).map((t, k) => html`<button class="pill on" onClick=${() => this.copyText(t, `חלק ${k + 1} הועתק. הדבק אותו בשיחה`)}>העתק חלק ${k + 1} מתוך ${d.parts}</button>`)}`}
           <button class="pill" style="margin-top:auto" onClick=${() => this.copyText(this.logs.join('\n'), 'היומן הועתק')}>העתק יומן חיבור</button>
         </div>
         <div class="sec" style=${sec}>
