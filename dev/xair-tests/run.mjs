@@ -11,13 +11,19 @@ const tap = async (p, text) => { const h = await p.evaluateHandle(t => [...docum
 // drag a fader's knob by dy screen pixels (negative = up)
 async function drag(p, path, dy) { const cap = await p.$(`[data-f="${path}"] .cap`); if (!cap) return false; const b = await cap.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
   await p.mouse.move(x, y); await p.mouse.down(); for (let k = 1; k <= 8; k++) { await p.mouse.move(x, y + dy * k / 8); await p.waitForTimeout(25); } await p.mouse.up(); await p.waitForTimeout(160); return true; }
+async function hdrag(p, sel, dx, dy = 0) { const el = await p.$(sel); if (!el) return false; const b = await el.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
+  await p.mouse.move(x, y); await p.mouse.down(); for (let k = 1; k <= 6; k++) { await p.mouse.move(x + dx * k / 6, y + dy * k / 6); await p.waitForTimeout(25); } await p.mouse.up(); await p.waitForTimeout(180); return true; }
+const click = async (p, sel) => { await p.mouse.move(3 + Math.random() * 4, 3);   /* a real pointer event: the app only writes shortly after a hand action */
+  const ok = await p.evaluate(sel => { const e = document.querySelector(sel); if (e) e.click(); return !!e; }, sel); await p.waitForTimeout(160); return ok; };
+const back = p => click(p, '.backbtn');
 const sets = p => p.evaluate(() => fake.sets.slice());
 const names = p => p.evaluate(() => [...document.querySelectorAll('.strip .cname')].map(e => e.textContent.trim()));
 const status = p => p.evaluate(() => __app.state.conn.status + '/' + __app.state.conn.model + '/' + __app.state.conn.live);
 const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'Buses', 'FX · DCA', 'In 1–8', 'SENDS']) if (await tap(p, x)) t++;
   const nd = await p.evaluate(() => __app.L().dests.length); for (let k = 0; k < nd; k++) { await p.evaluate(k => document.querySelectorAll('.sofrow button')[k].click(), k); await p.waitForTimeout(90); t++; }
   for (const x of ['Returns', 'In 1–8', 'SENDS']) if (await tap(p, x)) t++;
-  for (const k of [0, 3, 8]) { await p.evaluate(k => document.querySelectorAll('.strip .cname')[k].click(), k); await p.waitForTimeout(160); if (await tap(p, 'CLOSE')) t++; }
+  for (const k of [0, 3, 8]) { await p.evaluate(k => document.querySelectorAll('.strip .cname')[k].click(), k); await p.waitForTimeout(200); for (const tb of ['CONFIG', 'EQ', 'GATE', 'COMP', 'SENDS']) if (await click(p, `[data-tab="${tb}"]`)) t++; await click(p, '[data-bs="3"]'); await click(p, '[aria-label="Next strip"]'); await back(p); }
+  if (await tap(p, 'נגן ומקליט USB')) { t++; await p.waitForTimeout(300); await back(p); }
   await tap(p, 'הגדרות'); await p.waitForTimeout(150); await p.evaluate(() => document.querySelector('.backbtn').click()); await p.waitForTimeout(150); return t; };
 
 /* ---------- units ---------- */
@@ -66,6 +72,14 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('read only: a drag sends nothing, value stays, toast shown', ro.sets === 0 && ro.f === f0 && /קריאה בלבד/.test(ro.toast), JSON.stringify(ro));
   await p.evaluate(() => document.querySelectorAll('.strip .ms button')[0].click()); await p.waitForTimeout(100);
   ok('read only: mute tap sends nothing', (await sets(p)).length === 0 && await p.evaluate(() => __app.desk['/ch/01/mix/on'] === 1));
+  await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(700);
+  await click(p, '[data-tab="EQ"]');
+  await hdrag(p, '[data-p="/ch/01/eq/1/f"]', 60); await hdrag(p, '[data-band="2"]', 50, -30); await click(p, '[data-tab="CONFIG"]'); await click(p, '[data-c="5"]'); await click(p, '[data-t="/ch/01/preamp/invert"]');
+  const shown = await p.evaluate(() => { const t = sel => { const e = document.querySelector(sel); return e ? e.parentElement.querySelector('.hv').textContent.trim() : null; }; return [t('[data-p="/ch/01/preamp/hpf"]'), t('[data-p="/headamp/01/gain"]')]; });
+  ok('real XR16 values read as on the mixer: low cut 100 Hz, gain +0.5 dB', shown[0] === '100 Hz' && shown[1] === '+0.5 dB', JSON.stringify(shown));
+  await click(p, '[data-tab="GATE"]'); const gt = await p.evaluate(() => ['hold', 'release', 'thr'].map(k => document.querySelector(`[data-p="/ch/01/gate/${k}"]`).parentElement.querySelector('.hv').textContent.trim()));
+  ok('gate times read as on the mixer: hold 502 ms, release 983 ms, threshold -62.0 dB', gt[0] === '502 ms' && gt[1] === '983 ms' && gt[2] === '-62.0 dB', JSON.stringify(gt));
+  await back(p); ok('read only: the channel screen sends nothing', (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
   ok('live on', (await status(p)) === 'connected/XR16W/true' && await p.evaluate(() => fake.live));
@@ -83,6 +97,24 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   await p.evaluate(() => document.querySelectorAll('.sofrow button')[7].click()); await p.waitForTimeout(500);
   ok('FX 2 send is mix 08', !!(await p.$('[data-f="/ch/01/mix/08/level"] .cap')));
   await tap(p, 'SENDS'); c0 = (await sets(p)).length;
+  await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(700);
+  await click(p, '[data-tab="EQ"]'); c0 = (await sets(p)).length;
+  await hdrag(p, '[data-p="/ch/01/eq/1/f"]', 60); S = await sets(p);
+  ok('live: an EQ slider sends only that value, on the 201 grid', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/eq/1/f' && s[1] === 'f' && Math.abs(s[2] * 200 - Math.round(s[2] * 200)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; await hdrag(p, '[data-band="2"]', 50, -30); S = await sets(p);
+  ok('live: dragging an EQ point sends its freq and gain only', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/eq/2/f' || s[0] === '/ch/01/eq/2/g') && S.slice(c0).some(s => s[0] === '/ch/01/eq/2/g'), JSON.stringify(S.slice(c0, c0 + 4)));
+  c0 = S.length; await click(p, '[data-e="/ch/01/eq/2/type=4"]'); await click(p, '[data-tab="CONFIG"]'); await click(p, '[data-c="5"]'); S = await sets(p);
+  ok('live: band type and colour send one value each', S.length === c0 + 2 && S[c0][0] === '/ch/01/eq/2/type' && S[c0][2] === 4 && S[c0 + 1][0] === '/ch/01/config/color' && S[c0 + 1][1] === 'i' && S[c0 + 1][2] === 5, JSON.stringify(S.slice(c0)));
+  c0 = S.length; await click(p, '[data-t="/headamp/01/phantom"]'); const asked = await p.evaluate(() => !!__app.state.ask); const before = (await sets(p)).length; await click(p, '[data-yes]'); S = await sets(p);
+  ok('live: 48V asks first, then sends one value', asked && before === c0 && S.length === c0 + 1 && S[c0][0] === '/headamp/01/phantom' && S[c0][2] === 1, JSON.stringify(S.slice(c0)));
+  c0 = S.length; await p.fill('input[aria-label="Name"]', 'Guitar'); await tap(p, 'SAVE'); S = await sets(p);
+  ok('live: a name is sent as text', S.length === c0 + 1 && S[c0][0] === '/ch/01/config/name' && S[c0][1] === 's' && S[c0][2] === 'Guitar', JSON.stringify(S.slice(c0)));
+  await back(p); c0 = S.length; await drag(p, '/ch/07/mix/fader', -40); await p.waitForTimeout(700); S = await sets(p);
+  const pair = await p.evaluate(() => [__app.desk['/ch/07/mix/fader'], __app.desk['/ch/08/mix/fader'], fake.store['/ch/08/mix/fader'][1]]);
+  ok('live: a linked pair – only the touched fader is sent, the partner is read back', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/07/mix/fader') && pair[0] === pair[1] && pair[1] === pair[2], JSON.stringify(pair));
+  c0 = S.length; await tap(p, 'נגן ומקליט USB'); await p.waitForTimeout(500); await click(p, '[data-tp="2"]'); await click(p, '[data-tp="4"]'); const recAsk = await p.evaluate(() => !!__app.state.ask) && (await sets(p)).length === c0 + 1; await click(p, '[data-yes]'); S = await sets(p);
+  ok('live: PLAY sends state 2; REC asks first, then state 4', recAsk && S.length === c0 + 2 && S[c0][0] === '/-stat/tape/state' && S[c0][1] === 'i' && S[c0][2] === 2 && S[c0 + 1][2] === 4, JSON.stringify(S.slice(c0)));
+  await click(p, '[data-tp="0"]'); await back(p); c0 = (await sets(p)).length;
   await p.evaluate(() => fake.emit('/ch/05/mix/fader', 'f', 0.25)); await p.waitForTimeout(250);
   ok('a change made on the mixer shows up, nothing sent back', await p.evaluate(() => document.querySelectorAll('.strip .dbr')[4].textContent.trim() === '-30.0') && (await sets(p)).length === c0);
   await p.waitForTimeout(1800); const blocked = await p.evaluate(() => __app.set('/ch/01/mix/fader', 'f', 0.5));

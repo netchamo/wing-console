@@ -79,7 +79,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.1.1';
+const DW = 1180, APP_VER = '0.2.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -217,11 +217,51 @@ const IC = {
 };
 const HEB = "font-family:'Heebo',sans-serif";
 
+/* ---------- parameter laws: the mixer's float 0..1 → the shown value. Step counts are the grids seen in a real XR16 report. ---------- */
+const LIN = (a, b, n, unit, dp = 1, sign) => ({ n, of: x => a + (b - a) * x, fmt: x => { const v = a + (b - a) * x; return (sign && v > 0.001 ? '+' : '') + v.toFixed(dp) + unit; } });
+const LOG = (a, b, n, f) => ({ n, of: x => a * Math.pow(b / a, x), fmt: x => f(a * Math.pow(b / a, x)) });
+const hzT = v => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + ' kHz' : v.toFixed(v < 100 ? 1 : 0) + ' Hz';
+const msT = v => v >= 1000 ? (v / 1000).toFixed(2) + ' s' : v.toFixed(v < 10 ? 2 : v < 100 ? 1 : 0) + ' ms';
+const LAW = {
+  eqf: LOG(20, 20000, 201, hzT), eqg: LIN(-15, 15, 121, ' dB', 2, true), eqq: LOG(10, 0.3, 72, v => v.toFixed(v < 1 ? 2 : 1)),
+  hpf: LOG(20, 200, 101, hzT), gain: LIN(-12, 60, 145, ' dB', 1, true), pan: { n: 101, of: x => x * 200 - 100, fmt: x => panText(x) },
+  gthr: LIN(-80, 0, 161, ' dB'), grange: LIN(3, 60, 58, ' dB', 0), att: LIN(0, 120, 121, ' ms', 0), hold: LOG(0.02, 2000, 101, msT), rel: LOG(5, 4000, 101, msT),
+  cthr: LIN(-60, 0, 121, ' dB'), knee: LIN(0, 5, 6, '', 0), mgain: LIN(0, 24, 49, ' dB', 1, true), mix: LIN(0, 100, 21, ' %', 0)
+};
+const EQ_TYPES = ['LCut', 'LShv', 'PEQ', 'VEQ', 'HShv', 'HCut'], RATIOS = ['1.1', '1.3', '1.5', '2', '2.5', '3', '4', '5', '7', '10', '20', '100'];
+const fin = v => typeof v === 'number' && v === v && isFinite(v);
+/* one EQ band's gain in dB at frequency f (48 kHz biquads, textbook forms) */
+function bandDb(type, f0, g, Q, f) {
+  const w0 = 2 * Math.PI * f0 / 48000, cs = Math.cos(w0), sn = Math.sin(w0), A = Math.pow(10, g / 40); let b0, b1, b2, a0, a1, a2;
+  if (type === 0 || type === 5) { const al = sn / (2 * 0.7071), k = type === 0 ? 1 + cs : 1 - cs; b0 = k / 2; b1 = type === 0 ? -k : k; b2 = k / 2; a0 = 1 + al; a1 = -2 * cs; a2 = 1 - al; }
+  else if (type === 1 || type === 4) { const al = sn / (2 * Math.max(0.3, Math.min(Q, 2))), r = 2 * Math.sqrt(A) * al, d = type === 1 ? 1 : -1;
+    b0 = A * ((A + 1) - d * (A - 1) * cs + r); b1 = d * 2 * A * ((A - 1) - d * (A + 1) * cs); b2 = A * ((A + 1) - d * (A - 1) * cs - r);
+    a0 = (A + 1) + d * (A - 1) * cs + r; a1 = -d * 2 * ((A - 1) + d * (A + 1) * cs); a2 = (A + 1) + d * (A - 1) * cs - r; }
+  else { const al = sn / (2 * Q); b0 = 1 + al * A; b1 = -2 * cs; b2 = 1 - al * A; a0 = 1 + al / A; a1 = -2 * cs; a2 = 1 - al / A; }
+  const w = 2 * Math.PI * f / 48000, c1 = Math.cos(w), c2 = Math.cos(2 * w);
+  const num = b0 * b0 + b1 * b1 + b2 * b2 + 2 * (b0 * b1 + b1 * b2) * c1 + 2 * b0 * b2 * c2, den = a0 * a0 + a1 * a1 + a2 * a2 + 2 * (a0 * a1 + a1 * a2) * c1 + 2 * a0 * a2 * c2;
+  return 10 * Math.log10(Math.max(num / den, 1e-12));
+}
+const HAS = { ch: ['CONFIG', 'EQ', 'GATE', 'COMP', 'SENDS'], aux: ['CONFIG', 'EQ', 'SENDS'], rtn: ['CONFIG', 'EQ', 'SENDS'], bus: ['CONFIG', 'EQ', 'COMP'], lr: ['CONFIG', 'EQ', 'COMP'], fxs: ['CONFIG'], dca: ['CONFIG'] };
+const eqBands = s => s.kind === 'bus' || s.kind === 'lr' ? 6 : 4;
+/* everything a strip's own screen shows */
+function chanPaths(s) {
+  const b = s.base, P = [...corePaths(s)], add = (pre, xs) => xs.forEach(x => P.push(pre + '/' + x)), T = HAS[s.kind];
+  if (T.includes('EQ')) { for (let k = 1; k <= eqBands(s); k++) add(`${b}/eq/${k}`, ['type', 'f', 'g', 'q']); P.push(b + '/eq/on'); if (eqBands(s) === 6) P.push(b + '/eq/mode'); }
+  if (s.kind === 'ch') { add(b + '/preamp', ['hpf', 'hpon', 'invert']); P.push(b + '/config/insrc'); add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release']); }
+  if (T.includes('COMP')) add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto']);
+  if (s.kind !== 'lr' && s.kind !== 'dca' && s.kind !== 'fxs') P.push(b + '/mix/lr');
+  return P;
+}
+const TAPE = ['STOP', 'PAUSE', 'PLAY', 'REC PAUSE', 'REC', 'FF', 'REW'];
+const TAPE_PATHS = ['/-stat/usbmounted', '/-stat/tape/state', '/-stat/tape/file', '/-stat/tape/etime', '/-stat/tape/rtime', '/-stat/usb/path', '/-stat/usb/count'];
+const clock = t => fin(t) && t >= 0 ? Math.floor(t / 60) + ':' + pad2(Math.floor(t % 60)) : '–:––';
+
 class App extends Component {
   constructor() {
     super();
     const last = load('xair.last', null);
-    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, connPop: false, liveAsk: false, rev: 0,
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, tab: 'EQ', band: 1, nameEdit: null, ask: null, connPop: false, liveAsk: false, rev: 0,
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
       prefs: { demoModel: 'XR16', ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
     this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
@@ -229,7 +269,7 @@ class App extends Component {
     this.sim = new Float32Array(40).fill(-60);
     this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
     this.demoInit(this.state.prefs.demoModel);
-    window.__app = this; window.__xm = { q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
+    window.__app = this; window.__xm = { LAW, bandDb, chanPaths, q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
   }
 
   /* ---------- stores ---------- */
@@ -256,6 +296,16 @@ class App extends Component {
     L.fxs.forEach((s, i) => core(s, ['HALL', 'PLATE', 'DELAY', 'CHORUS'][i], 6, 0.75));
     L.dca.forEach((s, i) => core(s, ['DRUMS', 'BAND', 'VOCALS', 'FX'][i], 7, 0.75));
     core(L.lr, '', 7, 0.75); D['/-stat/solo'] = 0;
+    /* processing defaults, as a freshly reset mixer reports them */
+    const EF4 = [0.2, 0.3, 0.665, 0.9], EF6 = [0.2, 0.3, 0.465, 0.665, 0.8, 0.9];
+    L.all.forEach(st => { for (const p of chanPaths(st)) { if (p in D) continue; const m = /\/eq\/(\d)\/(type|f|g|q)$/.exec(p), k = p.slice(p.lastIndexOf('/') + 1), nb = eqBands(st);
+      if (m) D[p] = m[2] === 'type' ? (+m[1] === 1 ? 1 : +m[1] === nb ? 4 : 2) : m[2] === 'f' ? (nb === 6 ? EF6 : EF4)[+m[1] - 1] : m[2] === 'g' ? 0.5 : q(0.46479, 72);
+      else if (/\/gate\//.test(p)) D[p] = { on: 0, mode: 3, thr: q(0.35, 161), range: 1, attack: q(0.00833, 121), hold: 0.88, release: 0.79 }[k];
+      else if (/\/dyn\//.test(p)) D[p] = { on: 0, mode: 0, det: 0, env: 1, thr: q(0.7, 121), ratio: 5, knee: 0.2, mgain: 0, attack: q(0.08333, 121), hold: 0.54, release: 0.51, mix: 1, auto: 0 }[k];
+      else D[p] = { on: 1, mode: 0, hpf: 0.3, hpon: 0, invert: 0, insrc: st.n - 1, lr: 1 }[k]; } });
+    for (let n = 1; n <= 16; n++) { D[`/headamp/${pad2(n)}/gain`] = q(0.5, 145); D[`/headamp/${pad2(n)}/phantom`] = 0; }
+    Object.assign(D, { '/-stat/usbmounted': 1, '/-stat/tape/state': 0, '/-stat/tape/file': 'REC_0007.WAV', '/-stat/tape/etime': 0, '/-stat/tape/rtime': 5400, '/-stat/usb/path': '/', '/-stat/usb/count': 3,
+      '/-stat/usb/001/name': 'PLAYBACK', '/-stat/usb/001/type': 1, '/-stat/usb/002/name': 'REC_0006.WAV', '/-stat/usb/002/type': 0, '/-stat/usb/003/name': 'REC_0007.WAV', '/-stat/usb/003/type': 0 });
     [...L.ch, L.aux, ...L.rtn].forEach((s, i) => L.dests.forEach((d, j) => { D[sendPath(s, d)] = q(d.k > 6 ? (i >= 12 && i < 15 ? 0.5 : 0) : ((i * 7 + j * 13) % 10) / 14, 161); }));
   }
 
@@ -269,14 +319,20 @@ class App extends Component {
     if (Date.now() - (this.uAct || 0) > 1500) { this.log('sys', 'blocked, no hand action: ' + path); return false; }
     if (same(this.desk[path], value)) return true;
     this.desk[path] = value; this.hold[path] = Date.now();
-    this.outq.set(path, [type, value]);
+    this.outq.set(path, [this.dtype[path] === 'i' || this.dtype[path] === 'f' || this.dtype[path] === 's' ? this.dtype[path] : type, value]);
     if (type === 'f') { if (!this.outT) this.outT = setTimeout(() => this.flushOut(), 30); } else this.flushOut();
     this.bump(); return true;
   }
   flushOut() {
     clearTimeout(this.outT); this.outT = 0;
-    for (const [p, a] of this.outq) { this.tx(p, [a]); this.sent++; this.log('out', p + ' ' + a[1]); }
+    for (const [p, a] of this.outq) { this.tx(p, [a]); this.sent++; this.log('out', p + ' ' + a[1]); const pr = this.partner(p); if (pr) setTimeout(() => this.need([pr], true), 200); }
     this.outq.clear();
+  }
+  /* a linked pair moves together inside the mixer: the other side's value is read again after a change */
+  partner(p) {
+    const m = /^\/(ch|bus)\/(\d+)(\/.+)$/.exec(p); if (!m || /\/pan$/.test(p)) return null;
+    const n = +m[2], lo = n % 2 ? n : n - 1; if (this.desk[`/config/${m[1] === 'ch' ? 'chlink' : 'buslink'}/${lo}-${lo + 1}`] !== 1) return null;
+    const o = n % 2 ? n + 1 : n - 1; return `/${m[1]}/${m[1] === 'ch' ? pad2(o) : o}${m[3]}`;
   }
   /* a one-shot command (clear solo…): same locks as set() */
   act(path, args) {
@@ -297,6 +353,7 @@ class App extends Component {
   }
   readCore(force) {
     const L = this.L(), P = ['/-stat/solo'];
+    for (let k = 1; k < 16; k += 2) P.push(`/config/chlink/${k}-${k + 1}`); for (let k = 1; k < 6; k += 2) P.push(`/config/buslink/${k}-${k + 1}`);
     L.all.forEach(s => P.push(...corePaths(s)));
     if (L.M.rec) P.push('/-stat/usbmounted', '/-stat/tape/state');
     this.need(P, force); this.readView(force);
@@ -306,9 +363,14 @@ class App extends Component {
     if (!this.linked()) return;
     const st = this.state, L = this.L(), P = [];
     if (st.sofOn) { const d = L.dests[st.sof]; if (d) [...L.ch, L.aux, ...L.rtn].forEach(s => P.push(sendPath(s, d))); }
-    const sh = st.sheet && L.byId[st.sheet]; if (sh && sh.sends) L.dests.forEach(d => P.push(sendPath(sh, d)));
+    const sh = st.screen === 'chan' && L.byId[st.sheet];
+    if (sh) { P.push(...chanPaths(sh)); L.dests.forEach(d => { P.push(d.strip.name); if (sh.sends) P.push(sendPath(sh, d)); }); const ha = this.headamp(sh); if (ha) P.push(ha + '/gain', ha + '/phantom'); }
+    if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
   }
+  /* the head amp that feeds a channel: its input source, as the mixer reports it */
+  headamp(s) { if (s.kind !== 'ch') return null; const i = this.val(s.base + '/config/insrc'); return fin(i) && i >= 0 && i < 16 ? '/headamp/' + pad2(i + 1) : null; }
+  openStrip(id) { const s = this.L().byId[id]; if (!s) return; const T = HAS[s.kind]; this.setState(st => ({ screen: 'chan', sheet: id, tab: T.includes(st.tab) ? st.tab : T.includes('EQ') ? 'EQ' : T[0], band: 1, nameEdit: null })); }
   visible() { const st = this.state, L = this.L(), b = L.banks[st.bank] || L.banks[0]; return [...b.strips, st.sofOn && L.dests[st.sof] ? L.dests[st.sof].strip : L.lr]; }
 
   /* ---------- link ---------- */
@@ -350,17 +412,18 @@ class App extends Component {
     if (this.wantIp === ip || !last || last.ip === ip || (last.name && last.name === info.name)) this.connect(info);
   }
   connect(info) {
+    if (this.cBusy) return; this.cBusy = true; setTimeout(() => { this.cBusy = false; }, 500);
     this.desk = {}; this.dtype = {}; this.hold = {}; this.pend.clear(); this.queue = []; this.outq.clear(); this.missing.clear(); this.mt.fill(-128); this.pk.fill(-128); this.wantIp = '';
     try { NATIVE.setLive(false); } catch (e) {}
     const last = { ip: info.ip, name: info.name, model: info.model }; save('xair.last', last);
     this.firstRead = true; this.lastRx = Date.now(); this.log('sys', `connected to ${info.model} "${info.name}" at ${info.ip} (read only)`);
-    this.setState(s => ({ last, ipText: info.ip, bank: 0, sofOn: false, sheet: null, connPop: false, liveAsk: false, conn: { ...s.conn, status: 'connected', ip: info.ip, name: info.name, model: info.model, fw: info.fw, raw: info.raw || [], live: false } }),
+    this.setState(s => ({ last, ipText: info.ip, screen: 'main', bank: 0, sofOn: false, sheet: null, ask: null, connPop: false, liveAsk: false, conn: { ...s.conn, status: 'connected', ip: info.ip, name: info.name, model: info.model, fw: info.fw, raw: info.raw || [], live: false } }),
       () => { this.pulse(); this.readCore(); });
   }
   disconnect() {
     try { NATIVE.setLive(false); } catch (e) {}
     this.noAuto = true; this.log('sys', 'disconnected'); this.searchT0 = Date.now() + 3600e3;   /* stay in demo until asked to search again */
-    this.setState(s => ({ conn: { ...s.conn, status: 'search', ip: '', live: false, found: [] }, sofOn: false, sheet: null }));
+    this.setState(s => ({ conn: { ...s.conn, status: 'search', ip: '', live: false, found: [] }, screen: 'main', sofOn: false, sheet: null }));
   }
   manual(ip) {
     ip = String(ip || '').trim(); if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) { this.toast('כתובת לא תקינה'); return; }
@@ -397,6 +460,7 @@ class App extends Component {
     for (const [p, o] of this.pend) if (o.t && now - o.t > 700) { if (o.n >= 4) { this.pend.delete(p); if (!(p in this.desk)) this.missing.add(p); } else { o.t = 0; this.queue.push(p); } }
     /* a lost packet must not leave a stale picture: re-read what is on screen */
     if (c.status === 'connected' && this.wn % 5 === 0 && !this.dumpRun && !this.fd && !this.pd) { const P = []; this.visible().forEach(s => P.push(...corePaths(s))); this.need(P, true); this.readView(true); }
+    if (c.status === 'connected' && this.state.screen === 'tape' && this.wn % 5) this.need(['/-stat/tape/state', '/-stat/tape/etime', '/-stat/tape/rtime'], true);
     if (this.dumpRun) this.dumpStep();
     const pn = this.pend.size; if (this.firstRead && pn <= 12) this.firstRead = false;
     if (pn !== this.pnShown) { this.pnShown = pn; this.bump(); }
@@ -488,7 +552,8 @@ class App extends Component {
   }
   componentDidUpdate(pp, ps) {
     const st = this.state;
-    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank) { this.readView(); this.paintSoon(); }
+    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.tab !== ps.tab) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
+    if (st.screen === 'chan' || st.screen === 'tape') this.readView();
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
   dims() { const { cw, ch } = this.state, s = Math.min(cw / DW, ch / 500); return { s, Hd: ch / s, offX: (cw - DW * s) / 2 }; }
@@ -588,7 +653,7 @@ class App extends Component {
       const isMain = s.kind === 'lr' || tgt;
       return html`
       <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
-        <button class="cname" style=${nameLook(col) + (isMain ? ';font-size:15px;letter-spacing:.02em' : '')} aria-label=${'Open ' + (nm || s.def)} onClick=${() => this.setState({ sheet: s.id })}>${nm || s.def}</button>
+        <button class="cname" style=${nameLook(col) + (isMain ? ';font-size:15px;letter-spacing:.02em' : '')} aria-label=${'Open ' + (nm || s.def)} onClick=${() => this.openStrip(s.id)}>${nm || s.def}</button>
         ${snd ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${D.label}</div>`
           : s.pan ? html`<button class="panmini" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
@@ -602,7 +667,7 @@ class App extends Component {
         </div>
         <div class="dbr">${dbText(v)}</div>
         <button class="fader" data-f=${fp} style=${'height:' + FH + 'px'} aria-label=${'Fader ' + dbText(v) + ' dB'}
-          onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.setState({ sheet: s.id }) }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.openStrip(s.id) }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
           ${marks.map(m => html`<span class="mk" style=${'top:' + m.top + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.tick + 'px'}></span>`)}
           <span class="slot"></span>
           ${this.meter(s.mt, T)}
@@ -649,13 +714,15 @@ class App extends Component {
           ${L.banks.map((b, n) => !b.strips.length ? null : SO && !b.ins ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${b.col}`}></i>${b.label}</button>`
             : html`<button class=${'layer' + (n === st.bank ? ' on' : '')} onClick=${() => this.setState({ bank: n })}><i style=${`background:${b.col};opacity:${n === st.bank ? 1 : 0.7};box-shadow:${n === st.bank ? '0 0 8px ' + b.col : 'none'}`}></i>${b.label}</button>`)}
           <div style="flex:1"></div>
-          ${L.M.rec && html`<div dir="rtl" style=${`${HEB};font-size:12px;line-height:1.35;color:#8c8272;padding:4px`}>נגן ומקליט USB: בשלב הבא</div>`}
+          ${L.M.rec && html`<button class="layer" dir="rtl" style=${`${HEB};font-size:15px;justify-content:center`} onClick=${() => this.setState({ screen: 'tape' })}>נגן ומקליט USB</button>`}
         </div>
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
       </div>
-      ${st.sheet && this.renderSheet(Hd)}
       ${st.connPop && this.renderConn(Hd)}
-      ${st.liveAsk && html`
+      ${st.liveAsk && this.renderLiveAsk(Hd)}`;
+  }
+  renderLiveAsk(Hd) {
+    return html`
         <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ liveAsk: false })}></button>
         <div class="pop" role="alertdialog" style=${`z-index:9;left:340px;top:${Math.round((Hd - 250) / 2)}px;width:500px;padding:22px;gap:14px;border-color:#ff7a3d`}>
           <span style="font-size:24px;font-weight:700;letter-spacing:.04em;color:#ffb08a">Turn on live control?</span>
@@ -664,48 +731,197 @@ class App extends Component {
             <button class="pill" style="flex:1;height:50px" onClick=${() => this.setState({ liveAsk: false })}>Cancel</button>
             <button class="pill" style="flex:1;height:50px;background:#ff7a3d;color:#1a0d05;border-color:#ff7a3d" onClick=${() => this.goLive()}>Turn on</button>
           </div>
-        </div>`}`;
+        </div>`;
   }
 
-  /* a strip's window: pan and its sends. The full channel screens (EQ, gate, compressor) come in the next stage. */
-  renderSheet(Hd) {
-    const st = this.state, L = this.L(), s = L.byId[st.sheet]; if (!s) return null;
-    const nm = this.val(s.name), col = this.val(s.color), pan = s.pan ? this.val(s.pan) : undefined, H = Math.min(Hd - 40, 500), FH = H - 150, T = FH - 44, W = s.sends ? 110 + L.dests.length * 84 + 66 : 420;
-    const close = () => this.setState({ sheet: null });
+  /* ---------- small controls: every one of them writes through set() only ---------- */
+  slider(label, path, law) {
+    const v = this.val(path), ok = fin(v), x = ok ? clamp(v, 0, 1) : 0;
+    return html`<div style="display:flex;align-items:center;gap:10px;height:46px;min-width:0">
+      <span style="width:86px;font-size:13px;letter-spacing:.1em;color:#b8a78a;text-transform:uppercase;flex:none">${label}</span>
+      <button data-p=${path} aria-label=${label} onPointerDown=${e => this.hsDown(path, law, e)} onPointerMove=${e => this.hsMove(e)} onPointerUp=${() => this.hsUp()} onPointerCancel=${() => this.hsUp()}
+        style="flex:1;min-width:0;height:40px;position:relative;border-radius:8px;border:1px solid #302b25;background:#100f0d;cursor:ew-resize;touch-action:none;padding:0;overflow:hidden">
+        <span style=${`position:absolute;left:0;top:0;bottom:0;width:${x * 100}%;background:linear-gradient(90deg,#3a2f1c,#8a6a3a);opacity:${ok ? 0.85 : 0}`}></span>
+        ${ok && html`<span class="hk" style=${`position:absolute;top:3px;bottom:3px;width:6px;margin-left:-3px;left:${x * 100}%;background:#f1e7d2;border-radius:3px`}></span>`}
+      </button>
+      <span class="hv" style="width:84px;text-align:right;font-family:var(--mono);font-size:14px;color:#f1e7d2;flex:none;white-space:nowrap">${v === undefined ? '···' : ok ? law.fmt(v) : '?'}</span></div>`;
+  }
+  hsDown(path, law, e) { capture(e); const v0 = this.val(path); if (!fin(v0)) return; this.hd = { path, law, x: e.clientX, start: v0, w: e.currentTarget.getBoundingClientRect().width, moved: false }; }
+  hsMove(e) { const h = this.hd; if (!h) return; const dx = e.clientX - h.x; if (!h.moved && Math.abs(dx) > 5) h.moved = true; if (h.moved) this.set(h.path, 'f', q(h.start + dx / h.w, h.law.n)); }
+  hsUp() { this.hd = null; }
+  tgl(label, path, col, confirm) {
+    const v = this.val(path), on = v === 1;
+    return html`<button class="pill" data-t=${path} aria-pressed=${String(on)} style=${`height:44px;padding:0 16px;flex:none;${on ? `background:${col || '#62b85c'};color:#10100e;border-color:${col || '#62b85c'}` : ''}${v === undefined ? ';opacity:.45' : ''}`}
+      onClick=${() => confirm && !on && v !== undefined ? this.setState({ ask: { text: confirm, path } }) : this.tog(path)}>${label}</button>`;
+  }
+  enm(path, labels) {
+    const v = this.val(path);
+    return html`<div style="display:flex;gap:4px;flex-wrap:wrap">${labels.map((l, k) => html`<button class=${'pill' + (v === k ? ' on' : '')} data-e=${path + '=' + k} style="height:40px;padding:0 11px;font-size:13px;letter-spacing:.04em" onClick=${() => this.pick(path, k)}>${l}</button>`)}</div>`;
+  }
+  pick(path, k) { if (this.val(path) === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', k); }
+
+  /* ---------- a strip's own screen ---------- */
+  renderChan(Hd) {
+    const st = this.state, L = this.L(), s = L.byId[st.sheet]; if (!s) { setTimeout(() => this.setState({ screen: 'main' }), 0); return null; }
+    const T = HAS[s.kind], tab = T.includes(st.tab) ? st.tab : T[0], nm = this.val(s.name), col = this.val(s.color), on = this.val(s.on), BH = Hd - 52 - 24;
+    const i = L.all.indexOf(s), go = d => this.openStrip(L.all[(i + d + L.all.length) % L.all.length].id), lab = 'font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase';
+    let body = null;
+    if (tab === 'EQ') body = this.tabEq(s, BH);
+    else if (tab === 'GATE') { const b = s.base + '/gate'; body = html`
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${this.tgl('GATE ON', b + '/on')}${this.enm(b + '/mode', ['EXP 2', 'EXP 3', 'EXP 4', 'GATE', 'DUCK'])}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 26px">${this.slider('Threshold', b + '/thr', LAW.gthr)}${this.slider('Range', b + '/range', LAW.grange)}${this.slider('Attack', b + '/attack', LAW.att)}${this.slider('Hold', b + '/hold', LAW.hold)}${this.slider('Release', b + '/release', LAW.rel)}</div>`; }
+    else if (tab === 'COMP') { const b = s.base + '/dyn'; body = html`
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${this.tgl('COMP ON', b + '/on')}${this.enm(b + '/mode', ['COMP', 'EXP'])}${this.enm(b + '/det', ['PEAK', 'RMS'])}${this.enm(b + '/env', ['LIN', 'LOG'])}${this.tgl('AUTO', b + '/auto', '#c9a25a')}</div>
+      <div style="display:flex;gap:10px;align-items:center"><span style=${lab + ';width:86px;flex:none'}>Ratio</span>${this.enm(b + '/ratio', RATIOS)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 26px">${this.slider('Threshold', b + '/thr', LAW.cthr)}${this.slider('Knee', b + '/knee', LAW.knee)}${this.slider('Attack', b + '/attack', LAW.att)}${this.slider('Make-up', b + '/mgain', LAW.mgain)}${this.slider('Hold', b + '/hold', LAW.hold)}${this.slider('Mix', b + '/mix', LAW.mix)}${this.slider('Release', b + '/release', LAW.rel)}</div>`; }
+    else if (tab === 'SENDS') { const FH = BH - 96, FT = FH - 44; body = html`<div style="display:flex;gap:4px;padding:8px;border-radius:8px;background:#141210;border:1px solid var(--line);align-self:flex-start">
+      ${L.dests.map(d => { const p = sendPath(s, d), v = this.val(p), dn = this.val(d.strip.name);
+        return html`<div style="width:84px;flex:none;display:flex;flex-direction:column;align-items:center;gap:3px">
+          <span style=${`font-size:10px;font-weight:700;letter-spacing:.14em;color:${d.col}`}>${d.label}</span>
+          <span style="font-size:13px;font-weight:700;color:#f1e7d2;max-width:80px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:16px">${dn || ''}</span>
+          <span class="dbr">${dbText(v)}</span>
+          <button class="fader" data-f=${p} style=${`height:${FH}px;width:80px`} aria-label=${d.label + ' send ' + dbText(v)}
+            onPointerDown=${e => this.faderDown({ path: p, steps: STEPS.level }, e, FT, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+            <span class="slot" style="left:37px"></span>
+            ${fin(v) && html`<span class="cap" style=${`left:20px;top:${Math.round((1 - clamp(v, 0, 1)) * FT)}px`}></span>`}
+          </button></div>`; })}</div>`; }
+    else { const ha = this.headamp(s), pre = s.base + '/preamp', ne = st.nameEdit; body = html`
+      <div style="display:flex;gap:26px;min-height:0">
+        <div style="width:330px;flex:none;display:flex;flex-direction:column;gap:10px">
+          <span style=${lab}>Name</span>
+          <div style="display:flex;gap:8px"><input value=${ne === null ? (typeof nm === 'string' ? nm : '') : ne} maxlength="16" onInput=${e => this.setState({ nameEdit: e.target.value })} aria-label="Name"
+            style="flex:1;min-width:0;height:44px;padding:0 12px;border-radius:8px;border:1px solid #3a342c;background:#100f0d;color:#f1e7d2;font-family:inherit;font-size:19px;font-weight:700" />
+            <button class=${'pill' + (ne !== null && ne !== nm ? ' on' : '')} style="padding:0 14px" disabled=${ne === null || ne === nm} onClick=${() => { if (this.set(s.name, 's', ne) !== false) this.setState({ nameEdit: null }); }}>SAVE</button></div>
+          <span style=${lab}>Colour</span>
+          <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:5px">${Array.from({ length: 16 }, (_, k) => html`<button data-c=${k} aria-label=${'Colour ' + k} aria-pressed=${String(col === k)} onClick=${() => this.pick(s.color, k)}
+            style=${`height:34px;border-radius:6px;cursor:pointer;border:0;${nameLook(k)};outline:${col === k ? '2px solid #f3c27a' : 'none'};outline-offset:2px;font-size:12px;font-weight:700`}>${k === 0 || k === 8 ? 'OFF' : 'Aa'}</button>`)}</div>
+        </div>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+          ${ha && html`${this.slider('Gain', ha + '/gain', LAW.gain)}`}
+          ${s.kind === 'ch' && html`<div style="display:flex;gap:8px;flex-wrap:wrap">${ha && this.tgl('48V', ha + '/phantom', '#e0513f', 'להפעיל מתח פנטום 48V בכניסה הזו? אל תפעיל על מיקרופון סרט או על ציוד שלא מיועד לזה.')}${this.tgl('POLARITY Ø', pre + '/invert', '#c9a25a')}${this.tgl('LOW CUT', pre + '/hpon', '#62b85c')}</div>
+            ${this.slider('Low cut', pre + '/hpf', LAW.hpf)}`}
+          ${s.pan && this.slider('Pan', s.pan, LAW.pan)}
+          ${s.kind !== 'lr' && s.kind !== 'dca' && s.kind !== 'fxs' && html`<div style="display:flex;gap:8px">${this.tgl('SEND TO MAIN LR', s.base + '/mix/lr', '#62b85c')}</div>`}
+        </div>
+      </div>`; }
     return html`
-      <button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
-      <div class="pop" style=${`z-index:7;left:${Math.round((DW - W) / 2)}px;top:${Math.round((Hd - H) / 2)}px;width:${W}px;height:${H}px;padding:14px 16px;gap:12px`}>
-        <div style="display:flex;align-items:center;gap:12px;flex:none">
-          <span class="tag" style=${nameLook(col) + ';height:34px;font-size:19px;min-width:120px'}>${nm || s.def}</span>
-          <span style="font-size:13px;letter-spacing:.14em;color:#b8a78a;text-transform:uppercase">${s.def}</span>
-          <div style="flex:1"></div>
-          <button class="small" onClick=${close}>CLOSE</button>
-        </div>
-        <div style="flex:1;min-height:0;display:flex;gap:14px">
-          <div style="width:${s.sends ? 110 : 380}px;flex:none;display:flex;flex-direction:column;gap:8px">
-            ${s.pan && html`<span style="font-size:11px;letter-spacing:.16em;color:#b8a78a">PAN</span>
-            <button class="panmini" style="height:44px;border-radius:22px" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
-              <span style="position:absolute;left:50%;top:9px;bottom:9px;width:1px;background:#4a4339"></span>
-              <span style="position:absolute;left:18px;right:18px;top:0;bottom:0">${pan !== undefined && html`<span class="knob" style=${`left:${pan * 100}%;width:26px;height:26px;margin:-13px 0 0 -13px`}></span>`}</span>
-            </button>
-            <span style="font-family:var(--mono);font-size:14px;text-align:center;color:#f1e7d2">${panText(pan)}</span>`}
-            <div style="flex:1"></div>
-            <span dir="rtl" style=${`${HEB};font-size:12.5px;line-height:1.4;color:#8c8272`}>איקיו, גייט וקומפרסור: בשלב הבא</span>
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button class="navbtn hot backbtn" onClick=${() => this.setState({ screen: 'main', sheet: null })} aria-label="Back to the mixer">${IC.back}<span>Mixer</span></button>
+        <button class="small" style="width:44px;height:40px;font-size:20px" aria-label="Previous strip" onClick=${() => go(-1)}>‹</button>
+        <span class="tag" style=${nameLook(col) + ';height:36px;font-size:19px;min-width:150px;max-width:230px;overflow:hidden;white-space:nowrap'}>${nm || s.def}</span>
+        <button class="small" style="width:44px;height:40px;font-size:20px" aria-label="Next strip" onClick=${() => go(1)}>›</button>
+        <span style="font-size:13px;letter-spacing:.14em;color:#b8a78a;text-transform:uppercase;white-space:nowrap">${s.def}</span>
+        <button class="pill" data-t=${s.on} aria-pressed=${String(on === 0)} style=${`height:40px;padding:0 14px;flex:none;${on === 0 ? 'background:#d0392b;color:#fff6ee;border-color:#d0392b' : ''}`} onClick=${() => this.tog(s.on)}>MUTE</button>
+        <div style="flex:1"></div>
+        ${this.connPill()}
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+      </header>
+      <div style="flex:1;min-height:0;display:flex;gap:12px;padding:12px 26px">
+        <div style="width:130px;flex:none;display:flex;flex-direction:column;gap:6px">${T.map(t => html`<button class=${'layer' + (t === tab ? ' on' : '')} data-tab=${t} onClick=${() => this.setState({ tab: t })}>${t}</button>`)}</div>
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:10px">${body}</div>
+      </div>
+      ${st.ask && html`
+        <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
+        <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:9;left:340px;top:${Math.round((Hd - 220) / 2)}px;width:500px;padding:22px;gap:16px;border-color:#e0513f;${HEB}`}>
+          <span style="font-size:17px;line-height:1.55;color:#f1e7d2">${st.ask.text}</span>
+          <div style="display:flex;gap:10px"><button class="pill" style="flex:1;height:50px" onClick=${() => this.setState({ ask: null })}>ביטול</button>
+            <button class="pill" data-yes="1" style="flex:1;height:50px;background:#e0513f;color:#fff6ee;border-color:#e0513f" onClick=${() => { const p = st.ask.path, v = st.ask.value; this.setState({ ask: null }); if (v === undefined) this.tog(p); else this.set(p, 'i', v); }}>אישור</button></div>
+        </div>`}
+      ${st.connPop && this.renderConn(Hd)}
+      ${st.liveAsk && this.renderLiveAsk(Hd)}`;
+  }
+
+  tabEq(s, BH) {
+    const st = this.state, b = s.base, NB = eqBands(s), sel = clamp(st.band, 1, NB), mode = NB === 6 ? this.val(b + '/eq/mode') : 0;
+    if (NB === 6 && fin(mode) && mode !== 0) return html`<div dir="rtl" style=${`${HEB};font-size:17px;line-height:1.6;color:#d9cdb3;padding:20px`}>האיקיו של הבאס הזה נמצא במצב גרפי. עריכה של איקיו גרפי תגיע בשלב הבא.</div>`;
+    const GW = 968, GH = Math.max(150, BH - 118), X = f => Math.log10(f / 20) / 3 * GW, Y = d => GH / 2 - d / 18 * GH / 2;
+    const bands = []; for (let k = 1; k <= NB; k++) { const t = this.val(`${b}/eq/${k}/type`), f = this.val(`${b}/eq/${k}/f`), g = this.val(`${b}/eq/${k}/g`), qq = this.val(`${b}/eq/${k}/q`);
+      bands.push(fin(t) && fin(f) && fin(g) && fin(qq) ? { k, t, f: LAW.eqf.of(clamp(f, 0, 1)), g: LAW.eqg.of(clamp(g, 0, 1)), q: LAW.eqq.of(clamp(qq, 0, 1)) } : { k, bad: true }); }
+    const eqOn = this.val(b + '/eq/on'), hpon = s.kind === 'ch' ? this.val(b + '/preamp/hpon') : 0, hpf = this.val(b + '/preamp/hpf');
+    let d = ''; for (let i = 0; i <= 140; i++) { const f = 20 * Math.pow(1000, i / 140); let db = 0;
+      if (eqOn !== 0) for (const B of bands) if (!B.bad) db += bandDb(B.t, B.f, B.t === 0 || B.t === 5 ? 0 : B.g, B.q, f);
+      if (hpon === 1 && fin(hpf)) db += bandDb(0, LAW.hpf.of(clamp(hpf, 0, 1)), 0, 0.7, f);
+      d += (i ? 'L' : 'M') + (i / 140 * GW).toFixed(1) + ' ' + clamp(Y(db), 0, GH).toFixed(1); }
+    const S = bands[sel - 1], bp = `${b}/eq/${sel}`, BC = ['#e0513f', '#e6c23e', '#62b85c', '#4a8ee8', '#d868d8', '#45c9cc'];
+    return html`
+      <svg class="eqg" viewBox=${`0 0 ${GW} ${GH}`} style=${`width:${GW}px;height:${GH}px;flex:none;background:#0d0c0b;border:1px solid var(--line);border-radius:8px;touch-action:none;opacity:${eqOn === 0 ? 0.55 : 1}`}
+        onPointerMove=${e => this.eqMove(e)} onPointerUp=${() => { this.ed = null; }} onPointerCancel=${() => { this.ed = null; }}>
+        ${[50, 100, 200, 500, 1000, 2000, 5000, 10000].map(f => html`<line x1=${X(f)} x2=${X(f)} y1="0" y2=${GH} stroke="#26221d" stroke-width="1"/><text x=${X(f) + 4} y=${GH - 5} fill="#6f6656" font-size="11" font-family="monospace">${f >= 1000 ? f / 1000 + 'k' : f}</text>`)}
+        ${[-12, -6, 0, 6, 12].map(g => html`<line x1="0" x2=${GW} y1=${Y(g)} y2=${Y(g)} stroke=${g ? '#26221d' : '#4a4339'} stroke-width="1"/><text x="4" y=${Y(g) - 3} fill="#6f6656" font-size="11" font-family="monospace">${g > 0 ? '+' + g : g}</text>`)}
+        <path d=${d} fill="none" stroke="#f3c27a" stroke-width="2.5" stroke-linejoin="round"/>
+        ${bands.map(B => B.bad ? null : html`<g data-band=${B.k} style="cursor:grab" onPointerDown=${e => this.eqDown(s, B.k, e, GW, GH)}>
+          <circle cx=${X(B.f)} cy=${Y(B.t === 0 || B.t === 5 ? 0 : B.g)} r="26" fill="transparent"/>
+          <circle cx=${X(B.f)} cy=${Y(B.t === 0 || B.t === 5 ? 0 : B.g)} r=${B.k === sel ? 15 : 12} fill=${BC[B.k - 1]} fill-opacity=${B.k === sel ? 0.95 : 0.55} stroke="#0d0c0b" stroke-width="2"/>
+          <text x=${X(B.f)} y=${Y(B.t === 0 || B.t === 5 ? 0 : B.g) + 5} text-anchor="middle" fill="#10100e" font-size="14" font-weight="700" style="pointer-events:none">${B.k}</text></g>`)}
+      </svg>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap">
+        ${this.tgl('EQ ON', b + '/eq/on')}
+        ${bands.map(B => html`<button class=${'pill' + (B.k === sel ? ' on' : '')} data-bs=${B.k} style=${`height:44px;width:46px;padding:0;flex:none;border-color:${BC[B.k - 1]}`} onClick=${() => this.setState({ band: B.k })}>${B.k}</button>`)}
+        <div style="flex:1"></div>
+        ${this.enm(bp + '/type', EQ_TYPES)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 18px">${this.slider('Freq', bp + '/f', LAW.eqf)}${this.slider('Gain', bp + '/g', LAW.eqg)}${this.slider('Q', bp + '/q', LAW.eqq)}</div>`;
+  }
+  eqDown(s, k, e, GW, GH) {
+    e.preventDefault(); const svg = e.currentTarget.ownerSVGElement; try { svg.setPointerCapture(e.pointerId); } catch (_) {}
+    const bp = `${s.base}/eq/${k}`, f0 = this.val(bp + '/f'), g0 = this.val(bp + '/g'), t = this.val(bp + '/type'); if (!fin(f0) || !fin(g0)) return;
+    const r = svg.getBoundingClientRect(); this.setState({ band: k });
+    this.ed = { bp, x: e.clientX, y: e.clientY, f0, g0, w: r.width, h: r.height, cut: t === 0 || t === 5, moved: false };
+  }
+  eqMove(e) {
+    const d = this.ed; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) > 6) d.moved = true; if (!d.moved) return;
+    if (this.set(d.bp + '/f', 'f', q(d.f0 + dx / d.w, LAW.eqf.n)) === false) { this.ed = null; return; }
+    if (!d.cut) this.set(d.bp + '/g', 'f', q(d.g0 - dy / d.h * 36 / 30, LAW.eqg.n));
+  }
+
+  /* ---------- USB stick recorder / player (XR16, XR12) ---------- */
+  renderTape(Hd) {
+    const st = this.state, mounted = this.val('/-stat/usbmounted'), state = this.val('/-stat/tape/state'), file = this.val('/-stat/tape/file'), et = this.val('/-stat/tape/etime'), rt = this.val('/-stat/tape/rtime'), n = this.val('/-stat/usb/count'), dir = this.val('/-stat/usb/path');
+    const rec = state === 3 || state === 4, play = state === 1 || state === 2, big = 'height:74px;flex:1;font-size:20px;letter-spacing:.1em', p = 'font-size:15px;line-height:1.55;color:#d9cdb3';
+    const go = v => this.pick('/-stat/tape/state', v), files = [];
+    if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) { const id = String(k).padStart(3, '0'), nm = this.val(`/-stat/usb/${id}/name`); if (typeof nm === 'string' && nm) files.push({ nm, dir: this.val(`/-stat/usb/${id}/type`) === 1 }); }
+    return html`
+      <header class="topbar" style="height:52px;gap:10px">
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+        <button class="navbtn hot backbtn" onClick=${() => this.setState({ screen: 'main' })} aria-label="Back to the mixer">${IC.back}<span>Mixer</span></button>
+        <span style="font-size:22px;font-weight:700;letter-spacing:.06em;flex:1">USB RECORDER · PLAYER</span>
+        ${this.connPill()}
+        <div class="wood" style="width:18px;align-self:stretch"></div>
+      </header>
+      <div style="flex:1;min-height:0;display:flex;gap:12px;padding:12px 26px">
+        <div class="sec" style="flex:1.3;min-width:0;gap:12px">
+          <div style="display:flex;align-items:baseline;gap:14px">
+            <span data-ts="1" style=${`font-size:26px;font-weight:700;letter-spacing:.08em;color:${rec ? '#ff6a55' : play ? '#9be08f' : '#f1e7d2'}`}>${fin(state) && TAPE[state] ? TAPE[state] : '···'}</span>
+            <span style="font-family:var(--mono);font-size:34px;color:#f1e7d2">${clock(et)}</span>
+            <span style="font-family:var(--mono);font-size:15px;color:#8c8272">${rec ? (fin(rt) && rt < -1 ? 'dropouts ' + (-rt - 1) : '') : fin(rt) && rt >= 0 ? '−' + clock(rt) : ''}</span>
           </div>
-          ${s.sends && html`<div style="flex:1;min-width:0;display:flex;gap:4px;padding:8px;border-radius:8px;background:#141210;border:1px solid var(--line)">
-            ${L.dests.map(d => { const p = sendPath(s, d), v = this.val(p), dn = this.val(d.strip.name);
-              return html`<div style="width:80px;flex:none;display:flex;flex-direction:column;align-items:center;gap:3px">
-                <span style=${`font-size:10px;font-weight:700;letter-spacing:.14em;color:${d.col}`}>${d.label}</span>
-                <span style="font-size:13px;font-weight:700;color:#f1e7d2;max-width:78px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:16px">${dn || ''}</span>
-                <span class="dbr">${dbText(v)}</span>
-                <button class="fader" data-f=${p} style=${`height:${FH}px;width:80px`} aria-label=${d.label + ' send ' + dbText(v)}
-                  onPointerDown=${e => this.faderDown({ path: p, steps: STEPS.level }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
-                  <span class="slot" style="left:37px"></span>
-                  ${v !== undefined && html`<span class="cap" style=${`left:20px;top:${Math.round((1 - v) * T)}px`}></span>`}
-                </button></div>`; })}
-          </div>`}
+          <span dir="ltr" style="font-family:var(--mono);font-size:15px;color:#d9cdb3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:20px">${typeof file === 'string' ? file : ''}</span>
+          <div style="display:flex;gap:8px">
+            <button class="pill" data-tp="0" style=${big} onClick=${() => go(0)}>■ STOP</button>
+            <button class=${'pill' + (state === 2 ? ' on' : '')} data-tp="2" style=${big} onClick=${() => go(2)}>▶ PLAY</button>
+            <button class=${'pill' + (state === 1 || state === 3 ? ' on' : '')} data-tp="p" style=${big} onClick=${() => go(rec ? (state === 3 ? 4 : 3) : state === 1 ? 2 : 1)}>❙❙ PAUSE</button>
+            <button class="pill" data-tp="4" style=${big + (rec ? ';background:#d0392b;color:#fff6ee;border-color:#d0392b' : ';color:#ff8a78;border-color:#7a2a22')} onClick=${() => rec ? go(0) : this.setState({ ask: { text: 'להתחיל הקלטה לדיסק?', path: '/-stat/tape/state', value: 4 } })}>● REC</button>
+          </div>
+          <span dir="rtl" style=${`${HEB};${p}`}>${mounted === 1 ? 'דיסק USB מחובר למיקסר.' : mounted === 0 ? 'המיקסר מדווח שאין דיסק USB מחובר.' : 'ממתין לדיווח מהמיקסר…'} הצליל של הנגן חוזר ברצועת USB שבשכבת Returns.</span>
+          <span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.5;color:#8c8272;margin-top:auto`}>המסך הזה נבנה לפי התיעוד ועוד לא נבדק מול דיסק אמיתי. בחירת קובץ לניגון מהרשימה תתווסף אחרי הבדיקה הראשונה.</span>
         </div>
-      </div>`;
+        <div class="sec" style="flex:1;min-width:0;gap:6px">
+          <span style="font-size:13px;letter-spacing:.14em;color:#b8a78a">FILES ${typeof dir === 'string' && dir ? '· ' + dir : ''} ${fin(n) ? '(' + n + ')' : ''}</span>
+          <div style="flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:3px">${files.length ? files.map(f => html`<div dir="ltr" style=${`font-family:var(--mono);font-size:14px;padding:7px 10px;border-radius:6px;background:#141210;border:1px solid var(--line);color:${f.dir ? '#f3c27a' : '#f1e7d2'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none`}>${f.dir ? '▸ ' : ''}${f.nm}</div>`)
+            : html`<span dir="rtl" style=${`${HEB};${p};color:#8c8272`}>אין קבצים להצגה.</span>`}</div>
+        </div>
+      </div>
+      ${st.ask && html`
+        <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
+        <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:9;left:340px;top:${Math.round((Hd - 200) / 2)}px;width:500px;padding:22px;gap:16px;border-color:#e0513f;${HEB}`}>
+          <span style="font-size:19px;line-height:1.55;color:#f1e7d2">${st.ask.text}</span>
+          <div style="display:flex;gap:10px"><button class="pill" style="flex:1;height:50px" onClick=${() => this.setState({ ask: null })}>ביטול</button>
+            <button class="pill" data-yes="1" style="flex:1;height:50px;background:#e0513f;color:#fff6ee;border-color:#e0513f" onClick=${() => { const a = st.ask; this.setState({ ask: null }); this.set(a.path, 'i', a.value); }}>אישור</button></div>
+        </div>`}
+      ${st.connPop && this.renderConn(Hd)}
+      ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
 
   renderConn(Hd) {
@@ -771,7 +987,8 @@ class App extends Component {
           <span style=${p + ';margin-top:auto;color:#8c8272'}>בשלבים הבאים: מסכי ערוץ, נגן ומקליט USB, אפקטים.</span>
         </div>
       </div>
-      ${st.connPop && this.renderConn(Hd)}`;
+      ${st.connPop && this.renderConn(Hd)}
+      ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
 
   render() {
@@ -779,7 +996,7 @@ class App extends Component {
     catch (e) {
       this.rErr = (this.rErr || 0) + 1;
       try { this.log('err', 'screen error on ' + this.state.screen + ': ' + String(e && e.message || e)); } catch (_) {}
-      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
+      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, ask: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
       return html`<div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0;background:#0b0a09"></div>`;
     }
   }
@@ -788,7 +1005,7 @@ class App extends Component {
     return html`
       <div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
-          ${st.screen === 'settings' ? this.renderSettings(Hd) : this.renderMain(Hd)}
+          ${st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'chan' ? this.renderChan(Hd) : st.screen === 'tape' ? this.renderTape(Hd) : this.renderMain(Hd)}
         </div>
         ${!st.started && html`
           <div class="overlay" dir="rtl">

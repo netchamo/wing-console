@@ -35,6 +35,18 @@
     store[`/dca/${n}/config/name`] = ['s', 'DCA' + n]; store[`/dca/${n}/config/color`] = ['i', 7]; store[`/dca/${n}/fader`] = ['f', g(0.75, 1024)]; store[`/dca/${n}/on`] = ['i', 1]; store[`/fx/${n}/type`] = ['i', n]; }
   for (let n = 1; n <= NBUS; n++) core('/bus/' + n, 'BUS' + n, 3, 40 + n, true);
   core('/lr', 'MAIN', 7, 50, true);
+  /* processing, with the values of a real XR16 report */
+  const eq = (b, n) => { for (let k = 1; k <= n; k++) { store[`${b}/eq/${k}/type`] = ['i', k === 1 ? 1 : k === n ? 4 : 2]; store[`${b}/eq/${k}/f`] = ['f', g(0.1 + k * 0.13, 201)]; store[`${b}/eq/${k}/g`] = ['f', g(0.5, 121)]; store[`${b}/eq/${k}/q`] = ['f', g(0.46479, 72)]; } store[b + '/eq/on'] = ['i', 1]; if (n === 6) store[b + '/eq/mode'] = ['i', 0]; };
+  const dyn = b => { const D = { on: ['i', 0], mode: ['i', 0], det: ['i', 0], env: ['i', 1], thr: ['f', g(0.65833, 121)], ratio: ['i', 5], knee: ['f', 0.2], mgain: ['f', g(0.27083, 49)], attack: ['f', g(0.08333, 121)], hold: ['f', 0.54], release: ['f', 0.51], mix: ['f', 1], auto: ['i', 0] }; for (const k in D) store[b + '/dyn/' + k] = D[k]; };
+  for (let n = 1; n <= NCH; n++) { const b = '/ch/' + pad2(n); eq(b, 4); dyn(b); store[b + '/mix/lr'] = ['i', 1]; store[b + '/config/insrc'] = ['i', n - 1]; store[b + '/preamp/hpf'] = ['f', Math.fround(0.7)]; store[b + '/preamp/hpon'] = ['i', 1]; store[b + '/preamp/invert'] = ['i', 0];
+    const G = { on: ['i', 0], mode: ['i', 3], thr: ['f', g(0.225, 161)], range: ['f', 1], attack: ['f', g(0.00833, 121)], hold: ['f', Math.fround(0.88)], release: ['f', Math.fround(0.79)] }; for (const k in G) store[b + '/gate/' + k] = G[k];
+    store[`/headamp/${pad2(n)}/gain`] = ['f', g(0.17361, 145)]; store[`/headamp/${pad2(n)}/phantom`] = ['i', 0]; }
+  ['/rtn/aux', '/rtn/1', '/rtn/2', '/rtn/3', '/rtn/4'].forEach(b => { eq(b, 4); store[b + '/mix/lr'] = ['i', 1]; });
+  for (let n = 1; n <= NBUS; n++) { eq('/bus/' + n, 6); dyn('/bus/' + n); store[`/bus/${n}/mix/lr`] = ['i', 0]; }
+  eq('/lr', 6); dyn('/lr');
+  for (let k = 1; k < 16; k += 2) store[`/config/chlink/${k}-${k + 1}`] = ['i', k === 7 ? 1 : 0];
+  for (let k = 1; k < 6; k += 2) store[`/config/buslink/${k}-${k + 1}`] = ['i', 0];
+  Object.assign(store, { '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
   for (let k = 1; k <= 54; k++) store['/-stat/solosw/' + pad2(k)] = ['i', 0];
   store['/-stat/solo'] = ['i', 0]; store['/-stat/usbmounted'] = ['i', MODEL === 'XR18' ? 0 : 1]; store['/-stat/tape/state'] = ['i', 0]; store['/-prefs/name'] = ['s', 'FAKE-' + MODEL];
 
@@ -55,6 +67,9 @@
     fake.sets.push([m.addr, m.types, m.args[0]]); window.calls.push(['set', m.addr, m.args[0]]);
     if (!fake.live) { fake.blocked.push(m.addr); return; }   /* the native side drops values while live is off */
     if (store[m.addr]) store[m.addr] = [m.types[0], m.args[0]];
+    /* a linked pair: the mixer moves the other channel itself */
+    const L = /^\/ch\/(\d+)(\/.+)$/.exec(m.addr);
+    if (L && !/\/pan$/.test(m.addr)) { const n = +L[1], lo = n % 2 ? n : n - 1, o = n % 2 ? n + 1 : n - 1, pr = `/ch/${pad2(o)}${L[2]}`; if ((store[`/config/chlink/${lo}-${lo + 1}`] || [])[1] === 1 && store[pr]) store[pr] = [m.types[0], m.args[0]]; }
   }
   setInterval(() => { if (!fake.meters || fake.silent) return; const b = new Uint8Array(4 + 80), d = new DataView(b.buffer); d.setInt32(0, 40, true); for (let i = 0; i < 40; i++) d.setInt16(4 + 2 * i, Math.round((-40 + 30 * Math.random()) * 256), true); push('/meters/1', [['b', b]]); }, 100);
   window.XAirNative = { ready() {}, version() { return 'test'; }, wifi() { return true; }, wifiAddress() { return '192.168.1.50/24'; }, netInfo() { return '[]'; },

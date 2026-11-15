@@ -126,3 +126,20 @@ rate, name).
   `attack` 1/120, `hold`/`release` 1/100.
 - A chat paste is cut at 20 000 characters → the report is now split into parts under 18 000.
 - The app shows six buses when connected and hides the last ones the mixer never answers for.
+
+## Confirmed by the full XR16 report (15 Nov 2026, three parts)
+
+- **Six buses on the XR16**: `/bus/1..6` all answer (the user named 5 "Group master" and 6 "fx").
+- Do not exist: `insert/fxslot`, send `pan` on even sends and on FX sends 07–10 (pan lives on 01/03/05 only),
+  `/headamp/17..18/phantom`, `/lr/mix/lr`, `/lr/grp/*`, `/lr/dyn/keysrc`.
+- `/headamp/17..18/gain` is on a 1/64 grid (−12…+20 dB). Channels read their head amp through `config/insrc` (0–15).
+- **FX parameters have mixed OSC types** (`/fx/N/par/NN` is `f` for continuous values and `i` for switches/lists) and
+  the unused ones answer **NaN**. A value must be written with the type the mixer reported (`dtype`), never guessed.
+- Low cut: real values 0.3 and 0.7 give exactly 40 Hz and 100 Hz with a 20–200 Hz log law → `LAW.hpf` uses 20–200.
+  Still worth one look next to the official app.
+- Defaults seen: gate hold 0.88 = 502 ms, release 0.79 = 983 ms; comp attack 10 ms, hold 10 ms, release 151 ms; Q 0.46479 = 2.0
+  – all equal to the X32 family defaults, so the X32 laws hold.
+- `chlink`/`buslink` report stereo pairs; the mixer moves the partner itself (the app re-reads the partner after a change).
+- Names carry a `_NN` suffix on this mixer ("Guitar _23") – origin not known yet (asked the user).
+- The user's tablet hops between two Wi-Fi networks (mixer LAN without internet ↔ phone hotspot); the link recovered by itself.
+- `usbmounted` was 0 – the recorder paths are still unverified on a real stick.

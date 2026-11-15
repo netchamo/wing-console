@@ -186,3 +186,9 @@ Open question still unanswered: **does he have an XR16 available for testing?** 
 - Tests: `cd dev/xair-tests && python3 regen.py && node run.mjs` (51 checks, fake mixer in
   `fake-mixer.js`; `node shot.mjs` writes screenshots to `/tmp/shots`). Run before every release.
 - Next: channel screens (EQ + RTA via `/meters/4`, gate, comp, config), USB player/recorder, FX.
+
+**Update 0.2.0 (15 Nov, evening):** a full report from the user's real XR16 arrived (see the "Confirmed" sections of
+`docs/XAIR-PROTOCOL.md`). Added: strip screen (`renderChan`: CONFIG / EQ with draggable graph / GATE / COMP / SENDS),
+USB recorder screen (`renderTape`, built from documentation, not yet tried with a stick), parameter laws in `LAW`,
+writes use the OSC type the mixer reported (`dtype`). A chat paste is cut at 20 000 characters – keep report parts short.
+Tests: 62 checks. Next: FX slots (mind the mixed types and NaN), RTA in the EQ, graphic EQ on buses, file picking in the player.
