@@ -192,3 +192,22 @@ Open question still unanswered: **does he have an XR16 available for testing?** 
 USB recorder screen (`renderTape`, built from documentation, not yet tried with a stick), parameter laws in `LAW`,
 writes use the OSC type the mixer reported (`dtype`). A chat paste is cut at 20 000 characters – keep report parts short.
 Tests: 62 checks. Next: FX slots (mind the mixed types and NaN), RTA in the EQ, graphic EQ on buses, file picking in the player.
+
+## 9. The user's requirements after his first look (15.11, evening) – these win
+
+His first look at an early X-Air build: generic screens with plain slider lists. **Not what he wants.**
+- **Reuse, don't redesign.** Copy the real components from `src/wing-console.html` and adapt the data
+  layer only: main strips + faders (with the knob hit area / long-press rules), top bar, channel tabs,
+  HOME tiles, EQ screen (`renderEQ`: graph, RTA, Q areas of all bands, band pills, type row, boxes,
+  filter panel with lit LC/HC handles), gate and comp screens with their graphs (`miniGate`,
+  `miniComp`, the dyn screens – not slider lists), sends window, FX rack / picker / big faces with
+  pictures that react to every knob + Hebrew info, settings, toasts, read-only/LIVE, demo.
+- **Player / recorder**: same place and same look as in the WING app (PLAYER and REC buttons in the
+  main top bar next to the scene, same panels). XR16 has the USB-stick 2-track recorder/player.
+- **EQ**: the curve must stay inside the graph (clip it; no shelf curve running out of the frame).
+  Channel EQ = the 4 bands **plus the low cut** shown and editable on the EQ screen (handle on the
+  graph + LC row with on/off and frequency), not only in CONFIG. Band types of X-Air
+  (LCut / LShv / PEQ / VEQ / HShv / HCut) must all be read, drawn and written back unchanged.
+- **FX**: the effect screens should be the big visual faces (like the WING app), react to every
+  control, and be easy to aim and shape. Nothing changes by itself; only hand actions are sent.
+- Show him a screenshot-level result in demo before asking him to test with the mixer.
