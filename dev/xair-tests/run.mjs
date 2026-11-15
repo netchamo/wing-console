@@ -22,8 +22,8 @@ const status = p => p.evaluate(() => __app.state.conn.status + '/' + __app.state
 const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'Buses', 'FX · DCA', 'In 1–8', 'SENDS']) if (await tap(p, x)) t++;
   const nd = await p.evaluate(() => __app.L().dests.length); for (let k = 0; k < nd; k++) { await p.evaluate(k => document.querySelectorAll('.sofrow button')[k].click(), k); await p.waitForTimeout(90); t++; }
   for (const x of ['Returns', 'In 1–8', 'SENDS']) if (await tap(p, x)) t++;
-  for (const k of [0, 3, 8]) { await p.evaluate(k => document.querySelectorAll('.strip .cname')[k].click(), k); await p.waitForTimeout(200); for (const tb of ['CONFIG', 'EQ', 'GATE', 'COMP', 'SENDS']) if (await click(p, `[data-tab="${tb}"]`)) t++; await click(p, '[data-bs="3"]'); await click(p, '[aria-label="Next strip"]'); await back(p); }
-  if (await tap(p, 'נגן ומקליט USB')) { t++; await p.waitForTimeout(300); await back(p); }
+  for (const k of [0, 3, 8]) { await p.evaluate(k => document.querySelectorAll('.strip .cname')[k].click(), k); await p.waitForTimeout(200); for (const tb of ['Config', 'EQ', 'Gate', 'Comp', 'Sends', 'Home']) if (await click(p, `[data-tab="${tb}"]`)) t++; await click(p, '[data-bs="3"]'); await click(p, '[aria-label="Next strip"]'); await back(p); }
+  if (await p.$('[data-nav="tape"]')) { await p.evaluate(() => document.querySelector('[data-nav="tape"]').click()); t++; await p.waitForTimeout(300); await p.evaluate(() => document.querySelector('.backbtn').click()); await p.waitForTimeout(160); }
   await tap(p, 'הגדרות'); await p.waitForTimeout(150); await p.evaluate(() => document.querySelector('.backbtn').click()); await p.waitForTimeout(150); return t; };
 
 /* ---------- units ---------- */
@@ -73,12 +73,15 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   await p.evaluate(() => document.querySelectorAll('.strip .ms button')[0].click()); await p.waitForTimeout(100);
   ok('read only: mute tap sends nothing', (await sets(p)).length === 0 && await p.evaluate(() => __app.desk['/ch/01/mix/on'] === 1));
   await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(700);
+  ok('a channel opens on HOME with the WING tabs', await p.evaluate(() => __app.state.screen === 'home' && [...document.querySelectorAll('.tab')].map(e => e.textContent).join(',') === 'Home,Config,EQ,Gate,Comp,Sends'));
   await click(p, '[data-tab="EQ"]');
-  await hdrag(p, '[data-p="/ch/01/eq/1/f"]', 60); await hdrag(p, '[data-band="2"]', 50, -30); await click(p, '[data-tab="CONFIG"]'); await click(p, '[data-c="5"]'); await click(p, '[data-t="/ch/01/preamp/invert"]');
-  const shown = await p.evaluate(() => { const t = sel => { const e = document.querySelector(sel); return e ? e.parentElement.querySelector('.hv').textContent.trim() : null; }; return [t('[data-p="/ch/01/preamp/hpf"]'), t('[data-p="/headamp/01/gain"]')]; });
-  ok('real XR16 values read as on the mixer: low cut 100 Hz, gain +0.5 dB', shown[0] === '100 Hz' && shown[1] === '+0.5 dB', JSON.stringify(shown));
-  await click(p, '[data-tab="GATE"]'); const gt = await p.evaluate(() => ['hold', 'release', 'thr'].map(k => document.querySelector(`[data-p="/ch/01/gate/${k}"]`).parentElement.querySelector('.hv').textContent.trim()));
+  await hdrag(p, '[data-p="/ch/01/eq/1/f"]', 60); await hdrag(p, '[data-band="2"]', 50, -30); await hdrag(p, '[data-band="0"]', 40); await click(p, '[data-tab="Config"]'); await click(p, '[data-name]'); await click(p, '[data-c="5"]'); await tap(p, 'CLOSE'); await click(p, '[data-t="/ch/01/preamp/invert"]');
+  const shown = await p.evaluate(() => ['hpf', 'gain'].map(k => document.querySelector(`[data-v="${k}"]`).textContent.trim()));
+  ok('real XR16 values read as on the mixer: low cut 100 Hz, gain +0.5 dB', shown[0] === '100 Hz' && shown[1] === '+0.5', JSON.stringify(shown));
+  await click(p, '[data-tab="Gate"]'); await hdrag(p, '[data-p="/ch/01/gate/thr"]', 60); await hdrag(p, '[data-thr="graph"]', 30, -30);
+  const gt = await p.evaluate(() => ['hold', 'release', 'thr'].map(k => document.querySelector(`[data-p="/ch/01/gate/${k}"] em`).textContent.trim()));
   ok('gate times read as on the mixer: hold 502 ms, release 983 ms, threshold -62.0 dB', gt[0] === '502 ms' && gt[1] === '983 ms' && gt[2] === '-62.0 dB', JSON.stringify(gt));
+  await click(p, '[data-tab="Comp"]'); await hdrag(p, '[data-ratio]', 0, 40); await click(p, '[data-tab="Sends"]'); await click(p, '[data-sp="4"]'); await click(p, '[data-tap="4"]'); await tap(p, 'CLOSE');
   await back(p); ok('read only: the channel screen sends nothing', (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
@@ -103,16 +106,30 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('live: an EQ slider sends only that value, on the 201 grid', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/eq/1/f' && s[1] === 'f' && Math.abs(s[2] * 200 - Math.round(s[2] * 200)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
   c0 = S.length; await hdrag(p, '[data-band="2"]', 50, -30); S = await sets(p);
   ok('live: dragging an EQ point sends its freq and gain only', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/eq/2/f' || s[0] === '/ch/01/eq/2/g') && S.slice(c0).some(s => s[0] === '/ch/01/eq/2/g'), JSON.stringify(S.slice(c0, c0 + 4)));
-  c0 = S.length; await click(p, '[data-e="/ch/01/eq/2/type=4"]'); await click(p, '[data-tab="CONFIG"]'); await click(p, '[data-c="5"]'); S = await sets(p);
+  c0 = S.length; await hdrag(p, '[data-band="0"]', 40); S = await sets(p);
+  ok('live: the low cut point on the EQ graph sends the low cut frequency only', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/preamp/hpf' && Math.abs(s[2] * 100 - Math.round(s[2] * 100)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; await click(p, '[data-bs="2"]'); await click(p, '[data-e="/ch/01/eq/2/type=4"]'); await click(p, '[data-tab="Config"]'); await click(p, '[data-name]'); await click(p, '[data-c="5"]'); S = await sets(p);
   ok('live: band type and colour send one value each', S.length === c0 + 2 && S[c0][0] === '/ch/01/eq/2/type' && S[c0][2] === 4 && S[c0 + 1][0] === '/ch/01/config/color' && S[c0 + 1][1] === 'i' && S[c0 + 1][2] === 5, JSON.stringify(S.slice(c0)));
+  c0 = S.length; await p.fill('input[aria-label="Name"]', 'Guitar'); await p.mouse.move(8, 8); await tap(p, 'SAVE'); S = await sets(p);
+  ok('live: a name is sent as text', S.length === c0 + 1 && S[c0][0] === '/ch/01/config/name' && S[c0][1] === 's' && S[c0][2] === 'Guitar', JSON.stringify(S.slice(c0)));
+  await p.waitForTimeout(800); await p.evaluate(() => fake.emit('/ch/01/config/name', 's', 'Guitar _23')); await p.waitForTimeout(250); await click(p, '[data-name]');
+  const shownName = await p.evaluate(() => [document.querySelector('.topbar .tag').textContent.trim(), document.querySelector('input[aria-label="Name"]').value]);
+  c0 = S.length; await p.fill('input[aria-label="Name"]', 'Gtr'); await p.mouse.move(9, 9); await tap(p, 'SAVE'); S = await sets(p);
+  ok('names: the "_23" tail is hidden everywhere and kept when a name is saved', shownName[0] === 'Guitar' && shownName[1] === 'Guitar' && S.length === c0 + 1 && S[c0][2] === 'Gtr_23', JSON.stringify([shownName, S.slice(c0)]));
   c0 = S.length; await click(p, '[data-t="/headamp/01/phantom"]'); const asked = await p.evaluate(() => !!__app.state.ask); const before = (await sets(p)).length; await click(p, '[data-yes]'); S = await sets(p);
   ok('live: 48V asks first, then sends one value', asked && before === c0 && S.length === c0 + 1 && S[c0][0] === '/headamp/01/phantom' && S[c0][2] === 1, JSON.stringify(S.slice(c0)));
-  c0 = S.length; await p.fill('input[aria-label="Name"]', 'Guitar'); await tap(p, 'SAVE'); S = await sets(p);
-  ok('live: a name is sent as text', S.length === c0 + 1 && S[c0][0] === '/ch/01/config/name' && S[c0][1] === 's' && S[c0][2] === 'Guitar', JSON.stringify(S.slice(c0)));
+  c0 = S.length; await drag(p, '/headamp/01/gain', -30); S = await sets(p);
+  ok('live: the gain fader sends the head amp gain on the 145 grid', S.length > c0 && S.slice(c0).every(s => s[0] === '/headamp/01/gain' && Math.abs(s[2] * 144 - Math.round(s[2] * 144)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; await click(p, '[data-tab="Gate"]'); await hdrag(p, '[data-thr="graph"]', 0, -40); S = await sets(p);
+  ok('live: the gate threshold handle sends the threshold on the 161 grid', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/01/gate/thr' && Math.abs(s[2] * 160 - Math.round(s[2] * 160)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; await click(p, '[data-e="/ch/01/gate/mode=0"]'); await click(p, '[data-tab="Comp"]'); await hdrag(p, '[data-ratio]', 0, 40); S = await sets(p);
+  ok('live: gate shape and the ratio handle send whole numbers', S.length >= c0 + 2 && S[c0][0] === '/ch/01/gate/mode' && S[c0][1] === 'i' && S[c0][2] === 0 && S.slice(c0 + 1).every(s => s[0] === '/ch/01/dyn/ratio' && s[1] === 'i' && Number.isInteger(s[2])), JSON.stringify(S.slice(c0)));
+  c0 = S.length; await click(p, '[data-tab="Sends"]'); await click(p, '[data-sp="4"]'); await click(p, '[data-tap="4"]'); await tap(p, 'CLOSE'); S = await sets(p);
+  ok('live: the send button changes where that send is taken from', S.length === c0 + 1 && S[c0][0] === '/ch/01/mix/05/tap' && S[c0][1] === 'i' && S[c0][2] === 4, JSON.stringify(S.slice(c0)));
   await back(p); c0 = S.length; await drag(p, '/ch/07/mix/fader', -40); await p.waitForTimeout(700); S = await sets(p);
   const pair = await p.evaluate(() => [__app.desk['/ch/07/mix/fader'], __app.desk['/ch/08/mix/fader'], fake.store['/ch/08/mix/fader'][1]]);
   ok('live: a linked pair – only the touched fader is sent, the partner is read back', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/07/mix/fader') && pair[0] === pair[1] && pair[1] === pair[2], JSON.stringify(pair));
-  c0 = S.length; await tap(p, 'נגן ומקליט USB'); await p.waitForTimeout(500); await click(p, '[data-tp="2"]'); await click(p, '[data-tp="4"]'); const recAsk = await p.evaluate(() => !!__app.state.ask) && (await sets(p)).length === c0 + 1; await click(p, '[data-yes]'); S = await sets(p);
+  c0 = S.length; await click(p, '[data-nav="tape"]'); await p.waitForTimeout(500); await click(p, '[data-tp="2"]'); await click(p, '[data-tp="4"]'); const recAsk = await p.evaluate(() => !!__app.state.ask) && (await sets(p)).length === c0 + 1; await click(p, '[data-yes]'); S = await sets(p);
   ok('live: PLAY sends state 2; REC asks first, then state 4', recAsk && S.length === c0 + 2 && S[c0][0] === '/-stat/tape/state' && S[c0][1] === 'i' && S[c0][2] === 2 && S[c0 + 1][2] === 4, JSON.stringify(S.slice(c0)));
   await click(p, '[data-tp="0"]'); await back(p); c0 = (await sets(p)).length;
   await p.evaluate(() => fake.emit('/ch/05/mix/fader', 'f', 0.25)); await p.waitForTimeout(250);
@@ -145,14 +162,16 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
 
 /* ---------- models and the mixer report ---------- */
 { const p = await open('index.html?model=XR18', { width: 1200, height: 540 }); await p.waitForTimeout(2500); await tap(p, 'Buses');
-  ok('XR18: model detected, 6 buses, no recorder note', (await status(p)) === 'connected/XR18W/false' && (await names(p)).filter(x => /^BUS/.test(x)).length === 6 && !(await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB'))));
+  ok('XR18: model detected, 6 buses, no recorder note', (await status(p)) === 'connected/XR18W/false' && (await names(p)).filter(x => /^BUS/.test(x)).length === 6 && !(await p.$('[data-nav="tape"]')));
   await tap(p, 'הגדרות'); await tap(p, 'הכן דוח'); await p.waitForTimeout(45000);
   const d = await p.evaluate(() => ({ d: __app.state.dump, t: __app.dumpText.slice(0, 400), sizes: __app.dumpParts.map(x => x.length), f: /\/ch\/01: config\/name="D01" config\/color=i1 mix\/fader=f0\.\d+/.test(__app.dumpText), sets: fake.sets.length }));
   ok('mixer report: reads only, finishes, in parts a chat can take, values typed', d.d && d.d.done && d.sets === 0 && /XR18W/.test(d.t) && d.sizes.length > 1 && d.sizes.every(x => x < 19000) && d.f, JSON.stringify(d));
   ok('no page errors (1200×540)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
 { const p = await open('index.html?model=XR12'); await p.waitForTimeout(2500);
   await p.waitForTimeout(3500); await tap(p, 'Buses'); ok('XR12 that answers for 2 buses only: 2 shown', (await names(p)).filter(x => /^BUS/.test(x)).length === 2, (await names(p)).join(','));
-  ok('XR12: 12 channels, recorder note', (await status(p)) === 'connected/XR12W/false' && await tap(p, 'In 9–12') && (await names(p)).length === 5 && await p.evaluate(() => document.getElementById('stage').textContent.includes('נגן ומקליט USB')));
+  ok('XR12: 12 channels, recorder note', (await status(p)) === 'connected/XR12W/false' && await tap(p, 'In 9–12') && (await names(p)).length === 5 && !!(await p.$('[data-nav="tape"]')));
+  await tap(p, 'הגדרות'); await click(p, '[data-pref="entereq"]'); await click(p, '[data-pref="navtrue"]'); await back(p); await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(300);
+  ok('settings: entry screen and back side are kept', await p.evaluate(() => __app.state.screen === 'eq' && !document.querySelector('.topbar').classList.contains('backR') && JSON.parse(localStorage.getItem('xair.prefs')).enter === 'eq'));
   await p.close(); }
 
 console.log(`\n${n - fails} of ${n} passed`); await B.close(); srv.close(); process.exit(fails ? 1 : 0);

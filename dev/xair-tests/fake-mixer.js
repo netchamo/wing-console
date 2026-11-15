@@ -28,7 +28,7 @@
 
   const store = {};
   const core = (b, name, col, i, pan) => { store[b + '/config/name'] = ['s', name]; store[b + '/config/color'] = ['i', col]; store[b + '/mix/fader'] = ['f', g(0.3 + (i * 0.037) % 0.6, 1024)]; store[b + '/mix/on'] = ['i', i % 5 === 3 ? 0 : 1]; if (pan) store[b + '/mix/pan'] = ['f', g((i * 0.13) % 1, 101)]; };
-  const sends = b => { for (let k = 1; k <= 10; k++) { store[`${b}/mix/${pad2(k)}/level`] = ['f', g((k * 0.071 + b.length * 0.03) % 1, 161)]; store[`${b}/mix/${pad2(k)}/pan`] = ['f', 0.5]; store[`${b}/mix/${pad2(k)}/tap`] = ['i', 3]; } };
+  const sends = b => { for (let k = 1; k <= 10; k++) { store[`${b}/mix/${pad2(k)}/level`] = ['f', g((k * 0.071 + b.length * 0.03) % 1, 161)]; store[`${b}/mix/${pad2(k)}/pan`] = ['f', 0.5]; store[`${b}/mix/${pad2(k)}/tap`] = ['i', k > 6 ? 4 : k > 4 ? 5 : 2]; store[`${b}/mix/${pad2(k)}/grpon`] = ['i', 0]; if (!(k < 6 && k % 2)) delete store[`${b}/mix/${pad2(k)}/pan`]; } };
   for (let n = 1; n <= NCH; n++) { const b = '/ch/' + pad2(n); core(b, n === 7 ? '' : 'D' + pad2(n), n % 16, n, true); sends(b); store[b + '/preamp/hpf'] = ['f', 0.25]; store[b + '/eq/1/f'] = ['f', 0.2]; store[b + '/eq/1/type'] = ['i', 1]; }
   core('/rtn/aux', 'USBRTN', 15, 20, true); sends('/rtn/aux');
   for (let n = 1; n <= 4; n++) { core('/rtn/' + n, 'RTN' + n, 13, 21 + n, true); sends('/rtn/' + n); core('/fxsend/' + n, 'FXS' + n, 6, 30 + n, false);
@@ -39,6 +39,7 @@
   const eq = (b, n) => { for (let k = 1; k <= n; k++) { store[`${b}/eq/${k}/type`] = ['i', k === 1 ? 1 : k === n ? 4 : 2]; store[`${b}/eq/${k}/f`] = ['f', g(0.1 + k * 0.13, 201)]; store[`${b}/eq/${k}/g`] = ['f', g(0.5, 121)]; store[`${b}/eq/${k}/q`] = ['f', g(0.46479, 72)]; } store[b + '/eq/on'] = ['i', 1]; if (n === 6) store[b + '/eq/mode'] = ['i', 0]; };
   const dyn = b => { const D = { on: ['i', 0], mode: ['i', 0], det: ['i', 0], env: ['i', 1], thr: ['f', g(0.65833, 121)], ratio: ['i', 5], knee: ['f', 0.2], mgain: ['f', g(0.27083, 49)], attack: ['f', g(0.08333, 121)], hold: ['f', 0.54], release: ['f', 0.51], mix: ['f', 1], auto: ['i', 0] }; for (const k in D) store[b + '/dyn/' + k] = D[k]; };
   for (let n = 1; n <= NCH; n++) { const b = '/ch/' + pad2(n); eq(b, 4); dyn(b); store[b + '/mix/lr'] = ['i', 1]; store[b + '/config/insrc'] = ['i', n - 1]; store[b + '/preamp/hpf'] = ['f', Math.fround(0.7)]; store[b + '/preamp/hpon'] = ['i', 1]; store[b + '/preamp/invert'] = ['i', 0];
+    for (const k of ['gate', 'dyn']) { store[`${b}/${k}/keysrc`] = ['i', 0]; store[`${b}/${k}/filter/on`] = ['i', 0]; store[`${b}/${k}/filter/type`] = ['i', 6]; store[`${b}/${k}/filter/f`] = ['f', g(0.565, 201)]; }
     const G = { on: ['i', 0], mode: ['i', 3], thr: ['f', g(0.225, 161)], range: ['f', 1], attack: ['f', g(0.00833, 121)], hold: ['f', Math.fround(0.88)], release: ['f', Math.fround(0.79)] }; for (const k in G) store[b + '/gate/' + k] = G[k];
     store[`/headamp/${pad2(n)}/gain`] = ['f', g(0.17361, 145)]; store[`/headamp/${pad2(n)}/phantom`] = ['i', 0]; }
   ['/rtn/aux', '/rtn/1', '/rtn/2', '/rtn/3', '/rtn/4'].forEach(b => { eq(b, 4); store[b + '/mix/lr'] = ['i', 1]; });

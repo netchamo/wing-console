@@ -211,3 +211,26 @@ His first look at an early X-Air build: generic screens with plain slider lists.
 - **FX**: the effect screens should be the big visual faces (like the WING app), react to every
   control, and be easy to aim and shape. Nothing changes by itself; only hand actions are sent.
 - Show him a screenshot-level result in demo before asking him to test with the mixer.
+
+## 10. Air Console 0.3.0 – the strip screens ported from the WING app (15 Nov, night)
+
+Done for chapter 9 (stages 1–4 of the plan the user approved):
+- Strip screens are separate screens with the WING header (`chanHeader`: arrows, `.tab` row, back; `prefs.navSwap`, class `backR`):
+  `renderHome` (tiles + mini graphs + drag bars + INPUT column + `chanStrip`), `renderConfig` (input card with gain fader and +48V,
+  name/colour pop, PAN panel with `hslide`, MAIN LR, PHASE, LOW CUT section), `renderEq` (the user likes this design – **do not
+  restyle it**; low cut is band 0 with an LC handle and its own row; shelves use a fixed slope; the curve is clamped to the frame),
+  `renderGate` / `renderComp` (WING graphs: transfer curve with threshold/ratio handles, 6-second history with the THRESHOLD tab,
+  IN/GR/OUT meters, `.box.big` drag boxes via `pbox`/`ibox`), `renderSendsTab` (faders + one button per send → pop with the tap,
+  GROUP ON and pan).
+- Data layer: `gv(s)` / `cv(s)` turn the mixer's floats into shown values; every write still goes through `set()` on the mixer's
+  grid. `dynTick` (20 Hz) drives the moving pictures: connected = `/meters/1` level + `/meters/6` reduction when it arrives
+  (scale/sign of `/meters/6` is `VERIFY`; the report now prints `meters6` and `meters1`), demo = simulated hits.
+- Names: `cleanName()` hides the `_NN` tail (written by another app) everywhere; `nameSuffix()` puts it back on save.
+- Gate mode order used: `EXP 2, EXP 3, EXP 4, GATE, DUCK` (X32 order, default 3 = GATE as on the user's untouched channels;
+  one community list says GATE first) → `VERIFY` with the user: his channel 1 has mode 0.
+- Settings ported: back-button side, entry screen. Not ported on purpose: models, dynamic EQ, icons, post-fader meters
+  (the mixer has none of these).
+- PLAYER / REC buttons sit in the main top bar (XR16/XR12) and open `renderTape` – still the first version; port the WING
+  player/recorder panels after a report with a USB stick mounted. Then FX (big faces). Not done yet: fine window (long press
+  on a box), drag pop, key-filter graph, RTA in the EQ, graphic EQ on buses.
+- Tests: 70 checks (`dev/xair-tests/run.mjs`); `node shot2.mjs` = demo screenshots of every strip screen.
