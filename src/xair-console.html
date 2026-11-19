@@ -79,7 +79,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.3.0';
+const DW = 1180, APP_VER = '0.4.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -263,6 +263,11 @@ const BAND_COL = ['#e0513f', '#e6c23e', '#62b85c', '#4a8ee8', '#d868d8', '#45c9c
 const TABS = { ch: ['Home', 'Config', 'EQ', 'Gate', 'Comp', 'Sends'], aux: ['Home', 'Config', 'EQ', 'Sends'], rtn: ['Home', 'Config', 'EQ', 'Sends'], bus: ['Home', 'Config', 'EQ', 'Comp'], lr: ['Home', 'Config', 'EQ', 'Comp'], fxs: ['Config'], dca: ['Config'] };
 const tabsOf = s => TABS[s.kind];
 const SCREEN_OF = { Home: 'home', Config: 'config', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
+/* the analyser: 100 bins from 20 Hz to 20 kHz (meters/4, 1/256 dB). Source index on the mixer (/-stat/rta/source):
+   ch 0–15, aux 16, FX returns 17–20, buses 21–26, FX sends 27–30, main LR 31 */
+const RTA_N = 100, rtaHz = k => 20 * Math.pow(1000, k / (RTA_N - 1));
+const rtaIdx = s => s.kind === 'ch' ? s.n - 1 : s.kind === 'aux' ? 16 : s.kind === 'rtn' ? 16 + s.n : s.kind === 'bus' ? 20 + s.n : s.kind === 'fxs' ? 26 + s.n : s.kind === 'lr' ? 31 : -1;
+const EQ_R = [18, 12, 6, 3], EQ_STEP = { 18: 6, 12: 3, 6: 2, 3: 1 };
 const PH_ASK = 'להפעיל מתח פנטום 48V בכניסה הזו? אל תפעיל על מיקרופון סרט או על ציוד שלא מיועד לזה.';
 const TAPE = ['STOP', 'PAUSE', 'PLAY', 'REC PAUSE', 'REC', 'FF', 'REW'];
 const TAPE_PATHS = ['/-stat/usbmounted', '/-stat/tape/state', '/-stat/tape/file', '/-stat/tape/etime', '/-stat/tape/rtime', '/-stat/usb/path', '/-stat/usb/count'];
@@ -272,11 +277,11 @@ class App extends Component {
   constructor() {
     super();
     const last = load('xair.last', null);
-    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, connPop: false, liveAsk: false, rev: 0,
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, panPop: null, connPop: false, liveAsk: false, rev: 0,
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
-      prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
+      prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', eqR: 18, rta: true, ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
     this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
-    this.gr = new Float32Array(39); this.grAt = 0; this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
+    this.gr = new Float32Array(39); this.grAt = 0; this.rtaR = new Float32Array(RTA_N).fill(-90); this.rtaS = new Float32Array(RTA_N).fill(-90); this.rtaAt = 0; this.rtaDemo = ''; this.ptrs = new Map(); this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
     this.sim = new Float32Array(40).fill(-60);
     this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
     this.demoInit(this.state.prefs.demoModel);
@@ -378,6 +383,7 @@ class App extends Component {
     const sh = CH_SCREENS.includes(st.screen) && L.byId[st.sheet];
     if (sh) { P.push(...chanPaths(sh)); const ha = this.headamp(sh); if (ha) P.push(ha + '/gain', ha + '/phantom'); if (sh.kind === 'ch') L.ch.forEach(c => P.push(c.name));
       L.dests.forEach(d => { P.push(d.strip.name); if (sh.sends) { const b = sh.base + '/mix/' + pad2(d.k); P.push(b + '/level', b + '/tap', b + '/grpon'); if (d.k < 6 && d.k % 2) P.push(b + '/pan'); } }); }
+    if (this.rtaWant() >= 0) P.push('/-stat/rta/source', '/-stat/rta/pos');
     if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
   }
@@ -404,7 +410,7 @@ class App extends Component {
     const c = this.state.conn;
     if (!this.linked() || ip !== c.ip) return;
     this.lastRx = Date.now();
-    if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); else if (m.addr === '/meters/6' && m.args[0] instanceof Uint8Array) this.onGr(m.args[0]); return; }
+    if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); else if (m.addr === '/meters/6' && m.args[0] instanceof Uint8Array) this.onGr(m.args[0]); else if (m.addr === '/meters/4' && m.args[0] instanceof Uint8Array) this.onRta(m.args[0]); return; }
     if (!m.args.length) return;
     const v = m.args[0];
     this.pend.delete(m.addr); this.missing.delete(m.addr); this.dtype[m.addr] = m.types[0];
@@ -452,6 +458,7 @@ class App extends Component {
   pulse() {
     if (!this.linked()) return;
     this.tx('/xremote'); this.tx('/meters', [['s', '/meters/1'], ['i', 0]]); this.tx('/meters', [['s', '/meters/6'], ['i', 0]]); this.tx('/xinfo');
+    if (this.rtaWant() >= 0) this.tx('/meters', [['s', '/meters/4'], ['i', 0]]);
   }
   /* once a second: link health, retries, searching */
   watch() {
@@ -491,6 +498,43 @@ class App extends Component {
     this.paintSoon();
   }
   /* gate and compressor reduction of every strip, as the mixer measures it (1/256 dB) */
+  onRta(b) {
+    if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(RTA_N, (b.length - 4) >> 1);
+    for (let i = 0; i < n; i++) this.rtaR[i] = d.getInt16(4 + 2 * i, true) / 256;
+    this.rtaAt = Date.now(); this.rtaSmooth(this.rtaR);
+  }
+  /* rises at once, falls back gently, so the picture reads like an analyser and not like noise */
+  rtaSmooth(R) { const S = this.rtaS; for (let i = 0; i < RTA_N; i++) S[i] = R[i] > S[i] ? R[i] : S[i] * 0.72 + R[i] * 0.28; const sc = this.state.screen; if (sc === 'eq' || sc === 'home') this.bump(); }
+  /* the strip whose spectrum is wanted now: the EQ and HOME screens of a strip that has an EQ */
+  rtaWant() { const st = this.state; if (st.prefs.rta === false || (st.screen !== 'eq' && st.screen !== 'home')) return -1; const s = this.L().byId[st.sheet]; return s && tabsOf(s).includes('EQ') ? rtaIdx(s) : -1; }
+  /* the spectrum of a strip, or null when the mixer analyses another one */
+  rtaFor(s) {
+    if (this.state.prefs.rta === false) return null;
+    if (!this.linked()) return this.rtaDemo === s.id ? this.rtaS : null;
+    return Date.now() - this.rtaAt < 1500 && this.desk['/-stat/rta/source'] === rtaIdx(s) ? this.rtaS : null;
+  }
+  /* point the mixer's analyser at the strip being edited (live only, as in the WING app); give the old source back on leaving */
+  rtaFollow() {
+    if (!this.linked()) return; const want = this.rtaWant(), src = '/-stat/rta/source', cur = this.desk[src];
+    if (want >= 0) {
+      this.tx('/meters', [['s', '/meters/4'], ['i', 0]]);
+      if (!this.state.conn.live || cur === undefined || cur === want) return;
+      if (this.rtaPrev === undefined) this.rtaPrev = cur;
+      if (this.set(src, 'i', want)) this.log('sys', 'RTA source ' + cur + ' → ' + want);
+    } else if (this.rtaPrev !== undefined) {
+      const prev = this.rtaPrev; this.rtaPrev = undefined;
+      if (this.state.conn.live && cur !== undefined && cur !== prev && this.set(src, 'i', prev)) this.log('sys', 'RTA source back to ' + prev);
+    }
+  }
+  /* demo: pink noise shaped by the strip's own EQ, moving with its level */
+  rtaDemoTick() {
+    const st = this.state; if (this.linked() || this.rtaWant() < 0) return; const s = this.L().byId[st.sheet];
+    if (this.rtaDemo !== s.id) { this.rtaS.fill(-90); this.rtaDemo = s.id; }
+    const E = this.eqData(s), lv = s.mt.length ? Math.max(...s.mt.map(i => this.mt[i])) : -30, t = Date.now() / 1000;
+    for (let k = 0; k < RTA_N; k++) { const f = rtaHz(k), o = Math.log2(f / 1000);
+      this.rtaR[k] = clamp(lv - 14 - 3.2 * o - (f < 60 ? (60 - f) / 3 : 0) - (f > 12000 ? (f - 12000) / 900 : 0) + 4 * Math.sin(o * 3.1 + t * 1.7) + 7 * (Math.random() - 0.6) + this.eqDb(E, f), -90, 0); }
+    this.rtaSmooth(this.rtaR);
+  }
   onGr(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(39, d.getInt32(0, true), (b.length - 4) >> 1); for (let i = 0; i < n; i++) this.gr[i] = d.getInt16(4 + 2 * i, true) / 256; this.grAt = Date.now(); }
   paintSoon() { if (this.pq) return; this.pq = true; requestAnimationFrame(() => { this.pq = false; this.paint(); }); }
   paint() {
@@ -531,6 +575,7 @@ class App extends Component {
     const fold = {}; miss.forEach(p => { const k = p.replace(/\d+/g, 'N'); fold[k] = (fold[k] || 0) + 1; });
     /* the short answers first, the sixteen channels after them; cut into parts a chat can take */
     const body = ['xinfo ' + JSON.stringify(c.raw || []), `asked ${R.P.length}, answered ${R.P.length - miss.length}`,
+      'rta source ' + this.desk['/-stat/rta/source'] + ' pos ' + this.desk['/-stat/rta/pos'] + ' meters4 ' + (this.rtaAt ? Array.from(this.rtaR).map(v => +v.toFixed(1)).join(',') : 'none'),
       'meters6 ' + (this.grAt ? Array.from(this.gr).map(v => +v.toFixed(1)).join(',') : 'none'), 'meters1 ' + Array.from(this.mt).map(v => +v.toFixed(1)).join(','),
       'strips with no fader answer: ' + (miss.filter(p => /\/fader$/.test(p)).join(' ') || 'none'),
       'no answer (N = a number): ' + (Object.keys(fold).map(k => k + ' x' + fold[k]).join(' ') || 'none'),
@@ -556,7 +601,7 @@ class App extends Component {
     const ua = e => { if (e.isTrusted !== false) this.uAct = Date.now(); };
     ['pointerdown', 'pointermove', 'click', 'keydown', 'input'].forEach(t => document.addEventListener(t, ua, true));
     this.dv = setInterval(() => this.demoTick(), 90);
-    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} }, 50);
+    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} try { this.rtaDemoTick(); } catch (e) {} }, 50);
     if (NATIVE) {
       window.__xairNative = list => this.onNative(list);
       try { NATIVE.ready(); } catch (e) {}
@@ -571,6 +616,7 @@ class App extends Component {
     const st = this.state;
     if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
     if (CH_SCREENS.includes(st.screen) || st.screen === 'tape') this.readView();
+    if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
   topCls() { return 'topbar' + (this.state.prefs.navSwap ? '' : ' backR'); }
@@ -610,17 +656,49 @@ class App extends Component {
     if (f.moved && !f.dead && !f.tapOpen) this.set(f.spec.path, 'f', q(f.start - dy / (f.px * f.slow), f.spec.steps));
   }
   faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) { this.eatClicks(); f.spec.tap(); } }
-  panDown(path, e) {
-    capture(e); const v0 = this.val(path); if (v0 === undefined) return;
+  panDown(path, e, s) {
+    capture(e); clearTimeout(this.pt); const v0 = this.val(path); if (v0 === undefined) return;
     if (this.dbl('p' + path)) { this.set(path, 'f', q(0.5, STEPS.pan)); this.pd = null; return; }
     this.pd = { path, x: e.clientX, start: v0, w: e.currentTarget.getBoundingClientRect().width, moved: false };
+    if (s) this.pt = setTimeout(() => { const p = this.pd; if (p && !p.moved) { p.opened = true; try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} this.setState({ panPop: { path, id: s.id } }); } }, 450);
   }
   panMove(e) {
-    const p = this.pd; if (!p) return; const dx = e.clientX - p.x;
-    if (!p.moved && Math.abs(dx) > 4) p.moved = true;
+    const p = this.pd; if (!p || p.opened) return; const dx = e.clientX - p.x;
+    if (!p.moved && Math.abs(dx) > 4) { p.moved = true; clearTimeout(this.pt); }
     if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6), 0, 1); if (Math.abs(v - 0.5) < 0.015) v = 0.5; this.set(p.path, 'f', q(v, STEPS.pan)); }
   }
-  panUp() { this.pd = null; }
+  panUp() { clearTimeout(this.pt); if (this.pd && this.pd.opened) this.eatClicks(300); this.pd = null; }
+  /* the fine pan window: a long press on any pan */
+  renderPanPop(Hd) {
+    const pp = this.state.panPop, s = this.L().byId[pp.id]; if (!s) return null;
+    const v = this.val(pp.path), ok = fin(v), x = ok ? clamp(v, 0, 1) : 0.5, close = () => this.setState({ panPop: null }), setX = f => this.set(pp.path, 'f', q(f, STEPS.pan));
+    const ticks = []; for (let t = 0; t <= 20; t++) { const h = t === 10 ? 34 : t % 5 === 0 ? 22 : 10; ticks.push(html`<span style=${`position:absolute;left:${t / 20 * 100}%;top:50%;width:1px;height:${h}px;margin-top:${-h / 2}px;background:${t === 10 ? '#7aa7e0' : '#4a4339'}`}></span>`); }
+    const end = () => { this.ppd = null; };
+    return html`<button class="scrim" style="z-index:8" aria-label="Close pan" onClick=${close}></button>
+      <div class="pop" data-panpop="1" style=${`z-index:9;left:250px;top:${Math.max(62, Math.round((Hd - 330) / 2))}px;width:680px;padding:18px 22px;gap:14px;border-color:#4a6488`}>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="tag" style=${nameLook(this.val(s.color))}>${this.nm(s) || s.def}</span>
+          <span style="font-size:22px;font-weight:600;letter-spacing:.04em">Pan</span><span style="flex:1"></span>
+          <span data-v="panpop" style="font-family:var(--mono);font-size:28px;color:#a9c6ee">${ok ? panText(v) : '···'}</span>
+          <button class="small" onClick=${close}>CLOSE</button>
+        </div>
+        <button class="panmini" data-pp="track" style="height:64px;width:100%;border-radius:32px;border-color:#3a342c" aria-label=${'Pan ' + panText(v)}
+          onPointerDown=${e => { capture(e); if (!ok) return; if (this.dbl('ppc')) { setX(0.5); return; } this.ppd = { x: e.clientX, n0: x, w: e.currentTarget.getBoundingClientRect().width - 56, moved: false }; }}
+          onPointerMove=${e => { const d = this.ppd; if (!d) return; const dx = e.clientX - d.x; if (!d.moved && Math.abs(dx) < 3) return; d.moved = true; let f = clamp(d.n0 + dx / (d.w * 2), 0, 1); if (Math.abs(f - 0.5) < 0.008) f = 0.5; setX(f); }}
+          onPointerUp=${end} onPointerCancel=${end}>
+          <span style="position:absolute;left:28px;right:28px;top:0;bottom:0">${ticks}
+            <span class="knob" style=${`left:${x * 100}%;width:40px;height:40px;margin:-20px 0 0 -20px;background:radial-gradient(circle at 35% 30%,#dbe8f8,#7aa7e0 55%,#34507a)`}></span></span>
+          <span style="position:absolute;left:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">L</span>
+          <span style="position:absolute;right:10px;top:50%;margin-top:-9px;font-size:14px;font-weight:700;color:#b8a78a">R</span>
+        </button>
+        <span style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8c8272;text-align:center">Drag anywhere: half speed · double tap: center</span>
+        <div style="display:flex;gap:6px">
+          <button class="pill" data-pps="-1" style="width:64px;height:50px;font-size:22px" aria-label="One step left" onClick=${() => ok && setX(x - 1 / 100)}>‹</button>
+          ${[[0, 'L100'], [0.25, 'L50'], [0.375, 'L25'], [0.5, 'C'], [0.625, 'R25'], [0.75, 'R50'], [1, 'R100']].map(([f, t]) => html`<button class=${'pill' + (ok && Math.abs(x - f) < 0.001 ? ' on' : '')} data-ppv=${t} style="flex:1;height:50px;padding:0;font-family:var(--mono);font-size:15px" onClick=${() => ok && setX(f)}>${t}</button>`)}
+          <button class="pill" data-pps="1" style="width:64px;height:50px;font-size:22px" aria-label="One step right" onClick=${() => ok && setX(x + 1 / 100)}>›</button>
+        </div>
+      </div>`;
+  }
   tog(path) { const v = this.val(path); if (v === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', v ? 0 : 1); }
   anySolo() { const v = this.val('/-stat/solo'); if (this.linked()) return v === 1 || this.L().all.some(s => this.desk[s.solo] === 1); return this.L().all.some(s => this.demo[s.solo] === 1); }
   clearSolo() {
@@ -673,7 +751,7 @@ class App extends Component {
       <div class="strip" style=${tgt ? `margin-left:8px;border-color:${tcol};box-shadow:0 0 14px ${tcol}55` : isMain ? 'margin-left:8px;border-color:#6a5232' : ''}>
         <button class="cname" style=${nameLook(col) + (isMain ? ';font-size:15px;letter-spacing:.02em' : '')} aria-label=${'Open ' + (nm || s.def)} onClick=${() => this.openStrip(s.id)}>${nm || s.def}</button>
         ${snd ? html`<div class="panmini" style=${`display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;letter-spacing:.12em;color:${tcol};border-color:${tcol}66`}>→ ${D.label}</div>`
-          : s.pan ? html`<button class="panmini" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
+          : s.pan ? html`<button class="panmini" aria-label=${'Pan ' + panText(pan)} onPointerDown=${e => this.panDown(s.pan, e, s)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
           <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">${pan !== undefined && html`<span class="knob" style=${`left:${pan * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>`}</span>
         </button>` : html`<div class="panmini" style="border-color:transparent;background:transparent"></div>`}
@@ -738,6 +816,7 @@ class App extends Component {
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
       </div>
       ${st.connPop && this.renderConn(Hd)}
+      ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
   renderLiveAsk(Hd) {
@@ -881,15 +960,19 @@ class App extends Component {
             <button class="pill" data-yes="1" style="flex:1;height:50px;background:#e0513f;color:#fff6ee;border-color:#e0513f" onClick=${() => { const a = st.ask; this.setState({ ask: null }); if (a.value === undefined) this.tog(a.path); else this.set(a.path, 'i', a.value); }}>אישור</button></div>
         </div>`}
       ${st.connPop && this.renderConn(Hd)}
+      ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
   /* the strip's own fader on the right of its screens */
   chanStrip(Hd, s) {
-    const FH = Math.round(Hd - 72 - 12 - 26 - 32 - 14 - 18), T = FH - 44, v = this.val(s.fader), on = this.val(s.on), solo = this.val(s.solo), col = this.val(s.color);
+    const FH = Math.round(Hd - 72 - 12 - 26 - 32 - 14 - 18 - (s.pan ? 36 : 0)), T = FH - 44, v = this.val(s.fader), on = this.val(s.on), solo = this.val(s.solo), col = this.val(s.color), pan = s.pan ? this.val(s.pan) : undefined;
     const marks = [[1, '+10'], [0.875, '+5'], [0.75, '0'], [0.625, '-5'], [0.5, '-10'], [0.375, '-20'], [0.25, '-30'], [0.125, '-50'], [0, '-∞']].map(m => ({ label: m[1], c: Math.round((1 - m[0]) * T + 22) }));
     return html`
       <div class="strip" style="width:112px;flex:none">
         <span class="tag" style=${'justify-content:center;overflow:hidden;white-space:nowrap;' + nameLook(col)}>${this.nm(s) || s.def}</span>
+        ${s.pan && html`<button class="panmini" data-pan=${s.pan} aria-label=${'Pan ' + panText(pan) + ', long press for fine'} onPointerDown=${e => this.panDown(s.pan, e, s)} onPointerMove=${e => this.panMove(e)} onPointerUp=${() => this.panUp()} onPointerCancel=${() => this.panUp()}>
+          <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
+          <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">${fin(pan) && html`<span class="knob" style=${`left:${clamp(pan, 0, 1) * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>`}</span></button>`}
         <div class="ms">
           <button data-t=${s.on} onClick=${() => this.tog(s.on)} aria-pressed=${String(on === 0)}
             style=${on === 0 ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}>MUTE</button>
@@ -1380,13 +1463,17 @@ class App extends Component {
     return { NB, bands, eqOn: this.val(b + '/eq/on'), lc: s.kind === 'ch' && fin(hpf) ? { on: hpon === 1, f: LAW.hpf.of(clamp(hpf, 0, 1)) } : null };
   }
   eqDb(E, f) { let db = 0; if (E.eqOn !== 0) for (const B of E.bands) if (!B.bad) db += bandDb(B.t, B.f, B.t === 0 || B.t === 5 ? 0 : B.g, B.q, f); if (E.lc && E.lc.on) db += bandDb(0, E.lc.f, 0, 0.7, f); return db; }
+  /* the analyser as an area under the curve, as in the WING app */
+  rtaPath(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = H - clamp((R[k] + 66) / 60, 0.02, 1) * (H - top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d + `L ${W} ${H} L 0 ${H} Z`; }
   miniEq(s, W, H) {
-    const E = this.eqData(s), Y = d => clamp(H / 2 - d / 18 * H / 2, 2, H - 2); let d = '';
+    const E = this.eqData(s), Y = d => clamp(H / 2 - d / 18 * H / 2, 2, H - 2), R = this.rtaFor(s); let d = '';
     for (let i = 0; i <= 80; i++) d += (i ? 'L' : 'M') + (i / 80 * W).toFixed(1) + ' ' + Y(this.eqDb(E, 20 * Math.pow(1000, i / 80))).toFixed(1);
     const grid = [100, 1000, 10000].map(f => `M ${(W * Math.log10(f / 20) / 3).toFixed(1)} 0 V ${H}`).join(' ');
     return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
+      ${R && html`<path data-rta="mini" d=${this.rtaPath(R, W, H, 4)} fill="#5e8796" fill-opacity=".26" stroke="#7fa6b4" stroke-opacity=".6" stroke-width="1"/>`}
       <path d=${grid} stroke="#1c2a30" stroke-width="1" fill="none"/><path d=${`M 0 ${H / 2} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
       <path d=${d} stroke="#f6b45e" stroke-width="2.2" fill="none" opacity=${E.eqOn === 0 ? 0.35 : 1}/>
+      ${E.lc && html`<rect x=${clamp(Math.log10(E.lc.f / 20) / 3 * W, 1, W) - 1} y="2" width="3" height=${H - 4} fill="#8fd0e0" opacity=${E.lc.on ? 0.8 : 0.25}/>`}
       ${E.bands.map(B => B.bad ? null : html`<circle cx=${(Math.log10(B.f / 20) / 3 * W).toFixed(1)} cy=${Y(B.t === 0 || B.t === 5 ? 0 : B.g).toFixed(1)} r="5" fill=${BAND_COL[B.k - 1]}/>`)}
     </svg>`;
   }
@@ -1394,27 +1481,38 @@ class App extends Component {
     const st = this.state, s = this.L().byId[st.sheet], b = s.base, E = this.eqData(s), NB = E.NB, BH = Hd - 52 - 20, mode = NB === 6 ? this.val(b + '/eq/mode') : 0;
     if (NB === 6 && fin(mode) && mode !== 0) return html`${this.chanHeader('EQ', s)}<div dir="rtl" style=${`${HEB};font-size:17px;line-height:1.6;color:#d9cdb3;padding:30px`}>האיקיו של הבאס הזה נמצא במצב גרפי. עריכה של איקיו גרפי תגיע בשלב הבא.</div>${this.chanPops(Hd, s)}`;
     const sel = E.lc ? clamp(st.band, 0, NB) : clamp(st.band || 1, 1, NB);
-    const GW = 1124, GH = Math.max(150, BH - 118), X = f => Math.log10(f / 20) / 3 * GW, Y = d => GH / 2 - d / 18 * GH / 2;
+    const st0 = this.state.prefs, ER = EQ_R.includes(st0.eqR) ? st0.eqR : 18, GW = 1124, GH = Math.max(150, BH - 118), X = f => Math.log10(f / 20) / 3 * GW, Y = d => GH / 2 - d / ER * GH / 2, Yp = d => clamp(Y(d), 14, GH - 14);
+    this.eqR = ER; const R = this.rtaFor(s), src = this.val('/-stat/rta/source'), pos = this.val('/-stat/rta/pos'), lines = []; for (let g = EQ_STEP[ER]; g < ER; g += EQ_STEP[ER]) lines.push(g, -g);
     /* the curve never leaves the frame: it is cut at the edges */
     let d = ''; for (let i = 0; i <= 160; i++) d += (i ? 'L' : 'M') + (i / 160 * GW).toFixed(1) + ' ' + clamp(Y(this.eqDb(E, 20 * Math.pow(1000, i / 160))), 1.5, GH - 1.5).toFixed(1);
     const bp = `${b}/eq/${sel}`, selT = sel ? this.val(bp + '/type') : 0, noQ = selT === 0 || selT === 1 || selT === 4 || selT === 5, noG = selT === 0 || selT === 5, hp = b + '/preamp';
     return html`
       ${this.chanHeader('EQ', s)}
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 14px">
-      <svg class="eqg" viewBox=${`0 0 ${GW} ${GH}`} style=${`width:${GW}px;height:${GH}px;flex:none;background:#0d0c0b;border:1px solid var(--line);border-radius:8px;touch-action:none;overflow:hidden;opacity:${E.eqOn === 0 ? 0.55 : 1}`}
-        onPointerMove=${e => this.eqMove(e)} onPointerUp=${() => { this.ed = null; }} onPointerCancel=${() => { this.ed = null; }}>
+      <div style=${`position:relative;width:${GW}px;height:${GH}px;flex:none`}>
+      <svg class="eqg" viewBox=${`0 0 ${GW} ${GH}`} style=${`width:${GW}px;height:${GH}px;display:block;background:#0d0c0b;border:1px solid var(--line);border-radius:8px;touch-action:none;overflow:hidden;opacity:${E.eqOn === 0 ? 0.55 : 1}`}
+        onPointerDown=${e => this.eqPtr(e, s)} onPointerMove=${e => this.eqMove(e)} onPointerUp=${e => this.eqEnd(e)} onPointerCancel=${e => this.eqEnd(e)} onWheel=${e => this.eqWheel(e, s)}>
+        ${R && html`<path data-rta="eq" d=${this.rtaPath(R, GW, GH, 8)} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".55" stroke-width="1"/>`}
         ${[50, 100, 200, 500, 1000, 2000, 5000, 10000].map(f => html`<line x1=${X(f)} x2=${X(f)} y1="0" y2=${GH} stroke="#26221d" stroke-width="1"/><text x=${X(f) + 4} y=${GH - 5} fill="#6f6656" font-size="11" font-family="monospace">${f >= 1000 ? f / 1000 + 'k' : f}</text>`)}
-        ${[-12, -6, 0, 6, 12].map(g => html`<line x1="0" x2=${GW} y1=${Y(g)} y2=${Y(g)} stroke=${g ? '#26221d' : '#4a4339'} stroke-width="1"/><text x="4" y=${Y(g) - 3} fill="#6f6656" font-size="11" font-family="monospace">${g > 0 ? '+' + g : g}</text>`)}
+        ${[0, ...lines].map(g => html`<line x1="0" x2=${GW} y1=${Y(g)} y2=${Y(g)} stroke=${g ? '#26221d' : '#4a4339'} stroke-width="1"/><text x="4" y=${Y(g) - 3} fill="#6f6656" font-size="11" font-family="monospace">${g > 0 ? '+' + g : g}</text>`)}
         <path d=${d} fill="none" stroke="#f3c27a" stroke-width="2.5" stroke-linejoin="round"/>
         ${E.lc && html`<g data-band="0" style="cursor:grab" onPointerDown=${e => this.eqDown(s, 0, e)}>
-          <circle cx=${X(E.lc.f)} cy=${Y(0)} r="26" fill="transparent"/>
-          <rect x=${X(E.lc.f) - 17} y=${Y(0) - 13} width="34" height="26" rx="7" fill=${E.lc.on ? '#8fd0e0' : '#2a3a40'} fill-opacity=${sel === 0 ? 0.95 : 0.7} stroke=${E.lc.on ? '#d6f3fa' : '#0d0c0b'} stroke-width="2" style=${E.lc.on ? 'filter:drop-shadow(0 0 6px #8fd0e0)' : ''}/>
-          <text x=${X(E.lc.f)} y=${Y(0) + 5} text-anchor="middle" fill=${E.lc.on ? '#10100e' : '#8fa3aa'} font-size="13" font-weight="700" style="pointer-events:none">LC</text></g>`}
+          ${(() => { const lx = Math.max(X(E.lc.f), 24); return html`<line x1=${lx} x2=${lx} y1="0" y2=${GH} stroke="#8fd0e0" stroke-width="1" stroke-dasharray="3 5" opacity=${E.lc.on ? 0.5 : 0.25}/>
+          <circle cx=${lx} cy=${GH - 40} r="28" fill="transparent"/>
+          <rect x=${lx - 19} y=${GH - 54} width="38" height="28" rx="7" fill=${E.lc.on ? '#8fd0e0' : '#16252a'} fill-opacity=${sel === 0 || E.lc.on ? 0.95 : 0.85} stroke=${E.lc.on ? '#d6f3fa' : '#8fd0e0'} stroke-width="2" stroke-dasharray=${E.lc.on ? '' : '4 3'} style=${E.lc.on ? 'filter:drop-shadow(0 0 6px #8fd0e0)' : ''}/>
+          <text x=${lx} y=${GH - 35} text-anchor="middle" fill=${E.lc.on ? '#10100e' : '#8fd0e0'} font-size="13" font-weight="700" style="pointer-events:none">LC</text>`; })()}</g>`}
         ${E.bands.map(B => B.bad ? null : html`<g data-band=${B.k} style="cursor:grab" onPointerDown=${e => this.eqDown(s, B.k, e)}>
-          <circle cx=${X(B.f)} cy=${Y(B.t === 0 || B.t === 5 ? 0 : B.g)} r="26" fill="transparent"/>
-          <circle cx=${X(B.f)} cy=${Y(B.t === 0 || B.t === 5 ? 0 : B.g)} r=${B.k === sel ? 15 : 12} fill=${BAND_COL[B.k - 1]} fill-opacity=${B.k === sel ? 0.95 : 0.55} stroke="#0d0c0b" stroke-width="2"/>
-          <text x=${X(B.f)} y=${Y(B.t === 0 || B.t === 5 ? 0 : B.g) + 5} text-anchor="middle" fill="#10100e" font-size="14" font-weight="700" style="pointer-events:none">${B.k}</text></g>`)}
+          <circle cx=${X(B.f)} cy=${Yp(B.t === 0 || B.t === 5 ? 0 : B.g)} r="26" fill="transparent"/>
+          <circle cx=${X(B.f)} cy=${Yp(B.t === 0 || B.t === 5 ? 0 : B.g)} r=${B.k === sel ? 15 : 12} fill=${BAND_COL[B.k - 1]} fill-opacity=${B.k === sel ? 0.95 : 0.55} stroke="#0d0c0b" stroke-width="2"/>
+          <text x=${X(B.f)} y=${Yp(B.t === 0 || B.t === 5 ? 0 : B.g) + 5} text-anchor="middle" fill="#10100e" font-size="14" font-weight="700" style="pointer-events:none">${B.k}</text></g>`)}
       </svg>
+      <div style="position:absolute;right:8px;top:8px;display:flex;gap:6px;align-items:center">
+        ${this.linked() && this.state.prefs.rta !== false && !R && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:6px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2f4a52;color:#8fa3aa`}>${src !== undefined && src !== rtaIdx(s) ? 'האנלייזר של המיקסר על ערוץ אחר. הדלק LIVE והוא יעבור לכאן' : 'ממתין לאנלייזר מהמיקסר…'}</span>`}
+        <button class="small" data-rtab="1" aria-pressed=${String(this.state.prefs.rta !== false)} style=${`height:36px;border-color:${this.state.prefs.rta !== false ? '#7fa6b4' : '#3a342c'};${this.state.prefs.rta !== false ? 'color:#cfe0e5' : ''}`} onClick=${() => this.setPref({ rta: this.state.prefs.rta === false })}>${this.state.prefs.rta !== false ? 'RTA ON' : 'RTA OFF'}</button>
+        ${this.linked() && this.state.prefs.rta !== false && html`<button class="small" data-rtapos="1" style="height:36px" onClick=${() => this.pick('/-stat/rta/pos', pos === 1 ? 0 : 1)}>${pos === 1 ? 'POST EQ' : pos === 0 ? 'PRE EQ' : 'RTA ···'}</button>`}
+        <button class="small" data-eqr=${ER} style="height:36px;font-family:var(--mono);font-size:13px;color:#cbbd9f" onClick=${() => this.setPref({ eqR: EQ_R[(EQ_R.indexOf(ER) + 1) % EQ_R.length] })}>±${ER} dB</button>
+      </div>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:nowrap">
         ${this.tgl('EQ ON', b + '/eq/on')}
         ${E.lc && html`<button class=${'pill' + (sel === 0 ? ' on' : '')} data-bs="0" style="height:44px;width:54px;padding:0;flex:none;border-color:#8fd0e0" onClick=${() => this.setState({ band: 0 })}>LC</button>`}
@@ -1429,18 +1527,37 @@ class App extends Component {
   }
   eqDown(s, k, e) {
     e.preventDefault(); const svg = e.currentTarget.ownerSVGElement; try { svg.setPointerCapture(e.pointerId); } catch (_) {}
-    const r = svg.getBoundingClientRect(); this.setState({ band: k });
+    const r = svg.getBoundingClientRect(); this.setState({ band: k }); this.selBand = k;
+    if (this.pinch) return;
     if (k === 0) { const p = s.base + '/preamp/hpf', f0 = this.val(p); if (!fin(f0)) return; this.ed = { lc: p, x: e.clientX, f0, w: r.width, moved: false }; return; }
     const bp = `${s.base}/eq/${k}`, f0 = this.val(bp + '/f'), g0 = this.val(bp + '/g'), t = this.val(bp + '/type'); if (!fin(f0) || !fin(g0)) return;
     this.ed = { bp, x: e.clientX, y: e.clientY, f0, g0, w: r.width, h: r.height, cut: t === 0 || t === 5, moved: false };
   }
+  /* every finger on the graph; two fingers = pinch the Q of the selected band */
+  eqPtr(e, s) {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+    this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (this.ptrs.size !== 2) return;
+    const k = this.selBand !== undefined ? this.selBand : this.state.band, qp = `${s.base}/eq/${k}/q`, t = this.val(`${s.base}/eq/${k}/type`), q0 = this.val(qp);
+    this.ed = null;
+    if (!k || !fin(q0) || !(t === 2 || t === 3)) { this.pinch = { dead: true }; if (k && fin(t)) this.toastRO('לבנד מסוג מדף או קאט אין Q'); return; }
+    const [a, b] = [...this.ptrs.values()]; this.pinch = { qp, q0, d0: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)) };
+  }
+  eqEnd(e) { this.ptrs.delete(e.pointerId); if (this.ptrs.size < 2) this.pinch = null; if (!this.ptrs.size) { this.ed = null; this.selBand = undefined; } }
+  eqWheel(e, s) { const k = this.state.band, qp = `${s.base}/eq/${k}/q`, q0 = this.val(qp), t = this.val(`${s.base}/eq/${k}/type`); if (!k || !fin(q0) || !(t === 2 || t === 3)) return; e.preventDefault(); this.set(qp, 'f', q(q0 + (e.deltaY > 0 ? 1 : -1) / 71, LAW.eqq.n)); }
   eqMove(e) {
+    if (this.ptrs.has(e.pointerId)) this.ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const P = this.pinch;
+    if (P) { if (P.dead || this.ptrs.size < 2) return; const [a, b] = [...this.ptrs.values()], dist = Math.max(20, Math.hypot(a.x - b.x, a.y - b.y));
+      /* fingers apart = a wider bell (lower Q), together = narrower */
+      this.set(P.qp, 'f', q(P.q0 + Math.log2(dist / P.d0) * 0.3, LAW.eqq.n)); return; }
     const d = this.ed; if (!d) return; const dx = e.clientX - d.x, dy = e.clientY - (d.y || 0);
     if (!d.moved && Math.hypot(dx, d.lc ? 0 : dy) > 6) d.moved = true; if (!d.moved) return;
     /* the low cut covers 20–200 Hz, a third of the graph's width */
     if (d.lc) { if (this.set(d.lc, 'f', q(d.f0 + dx / (d.w / 3), LAW.hpf.n)) === false) this.ed = null; return; }
     if (this.set(d.bp + '/f', 'f', q(d.f0 + dx / d.w, LAW.eqf.n)) === false) { this.ed = null; return; }
-    if (!d.cut) this.set(d.bp + '/g', 'f', q(d.g0 - dy / d.h * 36 / 30, LAW.eqg.n));
+    /* the gain follows the finger at the scale on screen (±18, ±12…) */
+    if (!d.cut) this.set(d.bp + '/g', 'f', q(d.g0 - dy / d.h * 2 * (this.eqR || 18) / 30, LAW.eqg.n));
   }
 
   /* ---------- USB stick recorder / player (XR16, XR12) ---------- */
@@ -1488,6 +1605,7 @@ class App extends Component {
             <button class="pill" data-yes="1" style="flex:1;height:50px;background:#e0513f;color:#fff6ee;border-color:#e0513f" onClick=${() => { const a = st.ask; this.setState({ ask: null }); this.set(a.path, 'i', a.value); }}>אישור</button></div>
         </div>`}
       ${st.connPop && this.renderConn(Hd)}
+      ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
 
@@ -1559,6 +1677,7 @@ class App extends Component {
         </div>
       </div>
       ${st.connPop && this.renderConn(Hd)}
+      ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
 

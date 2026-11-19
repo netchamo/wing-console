@@ -47,14 +47,14 @@
   eq('/lr', 6); dyn('/lr');
   for (let k = 1; k < 16; k += 2) store[`/config/chlink/${k}-${k + 1}`] = ['i', k === 7 ? 1 : 0];
   for (let k = 1; k < 6; k += 2) store[`/config/buslink/${k}-${k + 1}`] = ['i', 0];
-  Object.assign(store, { '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
+  Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0], '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
   for (let k = 1; k <= 54; k++) store['/-stat/solosw/' + pad2(k)] = ['i', 0];
   store['/-stat/solo'] = ['i', 0]; store['/-stat/usbmounted'] = ['i', MODEL === 'XR18' ? 0 : 1]; store['/-stat/tape/state'] = ['i', 0]; store['/-prefs/name'] = ['s', 'FAKE-' + MODEL];
 
   const out = []; let fl = 0;
   const push = (addr, args) => { out.push({ type: 'rx', ip: IP, d: b64(enc(addr, args)) }); if (!fl) fl = setTimeout(() => { fl = 0; const l = out.splice(0); if (window.__xairNative) window.__xairNative(l); }, 4); };
   const t0 = Date.now();
-  const fake = (window.fake = { store, sets: [], blocked: [], gets: 0, live: false, silent: false, remote: 0, meters: false, copied: '',
+  const fake = (window.fake = { store, subs: new Set(), sets: [], blocked: [], gets: 0, live: false, silent: false, remote: 0, meters: false, copied: '',
     /* a change made on the mixer by someone else */
     emit(addr, type, val) { store[addr] = [type, val]; push(addr, [[type, val]]); } });
   window.calls = [];
@@ -63,7 +63,7 @@
     const m = dec(u);
     if (m.addr === '/xinfo') { push('/xinfo', [['s', IP], ['s', MODEL + 'W-B2-3E-C9'], ['s', MODEL + 'W'], ['s', '1.19']]); return; }
     if (m.addr === '/xremote') { fake.remote = Date.now(); return; }
-    if (m.addr === '/meters') { fake.meters = true; return; }
+    if (m.addr === '/meters') { fake.meters = true; fake.subs.add(m.args[0]); return; }
     if (!m.args.length) { fake.gets++; const v = store[m.addr]; if (v) push(m.addr, [v]); return; }
     fake.sets.push([m.addr, m.types, m.args[0]]); window.calls.push(['set', m.addr, m.args[0]]);
     if (!fake.live) { fake.blocked.push(m.addr); return; }   /* the native side drops values while live is off */
@@ -72,6 +72,7 @@
     const L = /^\/ch\/(\d+)(\/.+)$/.exec(m.addr);
     if (L && !/\/pan$/.test(m.addr)) { const n = +L[1], lo = n % 2 ? n : n - 1, o = n % 2 ? n + 1 : n - 1, pr = `/ch/${pad2(o)}${L[2]}`; if ((store[`/config/chlink/${lo}-${lo + 1}`] || [])[1] === 1 && store[pr]) store[pr] = [m.types[0], m.args[0]]; }
   }
+  setInterval(() => { if (!fake.subs.has('/meters/4') || fake.silent) return; const b = new Uint8Array(4 + 200), d = new DataView(b.buffer); d.setInt32(0, 100, true); for (let i = 0; i < 100; i++) d.setInt16(4 + 2 * i, Math.round((-30 - i * 0.2 + 6 * Math.random()) * 256), true); push('/meters/4', [['b', b]]); }, 60);
   setInterval(() => { if (!fake.meters || fake.silent) return; const b = new Uint8Array(4 + 80), d = new DataView(b.buffer); d.setInt32(0, 40, true); for (let i = 0; i < 40; i++) d.setInt16(4 + 2 * i, Math.round((-40 + 30 * Math.random()) * 256), true); push('/meters/1', [['b', b]]); }, 100);
   window.XAirNative = { ready() {}, version() { return 'test'; }, wifi() { return true; }, wifiAddress() { return '192.168.1.50/24'; }, netInfo() { return '[]'; },
     setLive(on) { fake.live = !!on; window.calls.push(['setLive', !!on]); },

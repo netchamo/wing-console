@@ -16,7 +16,9 @@ async function hdrag(p, sel, dx, dy = 0) { const el = await p.$(sel); if (!el) r
 const click = async (p, sel) => { await p.mouse.move(3 + Math.random() * 4, 3);   /* a real pointer event: the app only writes shortly after a hand action */
   const ok = await p.evaluate(sel => { const e = document.querySelector(sel); if (e) e.click(); return !!e; }, sel); await p.waitForTimeout(160); return ok; };
 const back = p => click(p, '.backbtn');
-const sets = p => p.evaluate(() => fake.sets.slice());
+/* the analyser's source is a viewing setting the app moves on its own while live (as the WING app does): left out of the general counts */
+const sets = p => p.evaluate(() => fake.sets.filter(x => !x[0].startsWith('/-stat/rta/')));
+const rawSets = p => p.evaluate(() => fake.sets.slice());
 const names = p => p.evaluate(() => [...document.querySelectorAll('.strip .cname')].map(e => e.textContent.trim()));
 const status = p => p.evaluate(() => __app.state.conn.status + '/' + __app.state.conn.model + '/' + __app.state.conn.live);
 const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'Buses', 'FX · DCA', 'In 1–8', 'SENDS']) if (await tap(p, x)) t++;
@@ -82,12 +84,24 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   const gt = await p.evaluate(() => ['hold', 'release', 'thr'].map(k => document.querySelector(`[data-p="/ch/01/gate/${k}"] em`).textContent.trim()));
   ok('gate times read as on the mixer: hold 502 ms, release 983 ms, threshold -62.0 dB', gt[0] === '502 ms' && gt[1] === '983 ms' && gt[2] === '-62.0 dB', JSON.stringify(gt));
   await click(p, '[data-tab="Comp"]'); await hdrag(p, '[data-ratio]', 0, 40); await click(p, '[data-tab="Sends"]'); await click(p, '[data-sp="4"]'); await click(p, '[data-tap="4"]'); await tap(p, 'CLOSE');
-  await back(p); ok('read only: the channel screen sends nothing', (await sets(p)).length === 0, JSON.stringify(await sets(p)));
+  await click(p, '[data-tab="EQ"]'); await p.waitForTimeout(1300);
+  ok('read only: the mixer analyses another strip – a note, no spectrum, nothing sent', await p.evaluate(() => !!document.querySelector('[data-rtanote]') && !document.querySelector('[data-rta]')) && (await rawSets(p)).length === 0, JSON.stringify(await rawSets(p)));
+  await back(p); ok('read only: the channel screen sends nothing', (await rawSets(p)).length === 0, JSON.stringify(await rawSets(p)));
+  await p.mouse.move(100, 120); const pb = await (await p.$('.strip .panmini')).boundingBox(); await p.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2); await p.mouse.down(); await p.waitForTimeout(700); await p.mouse.up(); await p.waitForTimeout(500);
+  const pp1 = await p.evaluate(() => !!document.querySelector('[data-panpop]')); await click(p, '[data-ppv="L50"]');
+  ok('read only: a long press on a pan opens the fine pan window, which sends nothing', pp1 && (await rawSets(p)).length === 0, JSON.stringify(await rawSets(p))); await tap(p, 'CLOSE');
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
   ok('live on', (await status(p)) === 'connected/XR16W/true' && await p.evaluate(() => fake.live));
   await p.waitForTimeout(6500); ok('live, hands off for 6.5 s (refresh included): nothing sent', (await sets(p)).length === 0, JSON.stringify(await sets(p)));
-  const w2 = await walk(p); await p.waitForTimeout(600); ok(`live: walking every view (${w2} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
+  const w2 = await walk(p); await p.waitForTimeout(1200); const rs = await rawSets(p);
+  ok(`live: walking every view (${w2} taps) sends only the analyser source, and gives it back`, (await sets(p)).length === 0 && rs.every(x => x[0] === '/-stat/rta/source' && x[1] === 'i') && rs.length > 0 && rs[rs.length - 1][2] === 8 && await p.evaluate(() => fake.store['/-stat/rta/source'][1] === 8), JSON.stringify(rs.slice(-4)));
+  let r0 = rs.length; await (await p.$$('.strip .cname'))[0].click(); await p.waitForTimeout(1500);
+  ok('live: HOME points the analyser at the strip and shows it in the EQ tile', await p.evaluate(() => fake.store['/-stat/rta/source'][1] === 0 && !!document.querySelector('[data-rta="mini"]')), JSON.stringify((await rawSets(p)).slice(r0)));
+  await click(p, '[data-tab="EQ"]'); await p.waitForTimeout(600);
+  ok('live: the EQ shows the spectrum', await p.evaluate(() => !!document.querySelector('[data-rta="eq"]') && !document.querySelector('[data-rtanote]')));
+  await click(p, '[data-eqr]'); ok('EQ range button: ±18 → ±12', await p.evaluate(() => __app.state.prefs.eqR === 12 && document.querySelector('[data-eqr]').textContent.trim() === '±12 dB'));
+  await click(p, '[data-eqr]'); await click(p, '[data-eqr]'); await click(p, '[data-eqr]'); await back(p); await p.waitForTimeout(600);
   await drag(p, '/ch/01/mix/fader', -60); let S = await sets(p);
   const g = await p.evaluate(() => ({ app: __app.desk['/ch/01/mix/fader'], fake: fake.store['/ch/01/mix/fader'][1] }));
   ok('live: a fader drag sends only that fader, on the 1024 grid', S.length > 0 && S.every(s => s[0] === '/ch/01/mix/fader' && s[1] === 'f' && Math.abs(s[2] * 1023 - Math.round(s[2] * 1023)) < 1e-3) && g.app === g.fake && g.app > f0, JSON.stringify(S.slice(0, 3)) + JSON.stringify(g));
@@ -126,6 +140,20 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('live: gate shape and the ratio handle send whole numbers', S.length >= c0 + 2 && S[c0][0] === '/ch/01/gate/mode' && S[c0][1] === 'i' && S[c0][2] === 0 && S.slice(c0 + 1).every(s => s[0] === '/ch/01/dyn/ratio' && s[1] === 'i' && Number.isInteger(s[2])), JSON.stringify(S.slice(c0)));
   c0 = S.length; await click(p, '[data-tab="Sends"]'); await click(p, '[data-sp="4"]'); await click(p, '[data-tap="4"]'); await tap(p, 'CLOSE'); S = await sets(p);
   ok('live: the send button changes where that send is taken from', S.length === c0 + 1 && S[c0][0] === '/ch/01/mix/05/tap' && S[c0][1] === 'i' && S[c0][2] === 4, JSON.stringify(S.slice(c0)));
+  await click(p, '[data-tab="EQ"]'); await click(p, '[data-bs="3"]'); c0 = (await sets(p)).length;
+  const sv = await (await p.$('svg.eqg')).boundingBox(), cx = sv.x + sv.width / 2, cy = sv.y + sv.height / 2;
+  await p.mouse.move(cx - 300, cy + 120);
+  await p.evaluate(([cx, cy]) => { const g = document.querySelector('svg.eqg'), ev = (t, id, x) => g.dispatchEvent(new PointerEvent(t, { pointerId: id, clientX: x, clientY: cy, bubbles: true, pointerType: 'touch' }));
+    ev('pointerdown', 11, cx - 50); ev('pointerdown', 12, cx + 50); for (let k = 1; k <= 6; k++) { ev('pointermove', 11, cx - 50 - k * 15); ev('pointermove', 12, cx + 50 + k * 15); } ev('pointerup', 11, cx - 140); ev('pointerup', 12, cx + 140); }, [cx, cy]);
+  await p.waitForTimeout(250); S = await sets(p); const q3 = await p.evaluate(() => fake.store['/ch/01/eq/3/q'][1]);
+  ok('live: a two-finger pinch on the EQ changes only the Q of the selected band (apart = wider), on the 72 grid', S.length > c0 && S.slice(c0).every(x => x[0] === '/ch/01/eq/3/q' && Math.abs(x[2] * 71 - Math.round(x[2] * 71)) < 1e-3) && q3 > 0.47, JSON.stringify(S.slice(c0, c0 + 3)));
+  await p.evaluate(() => fake.emit('/ch/02/preamp/hpf', 'f', 0)); await click(p, '[aria-label="Next strip"]'); await p.waitForTimeout(500);
+  const lcb = await p.evaluate(() => { const r = document.querySelector('[data-band="0"] rect').getBoundingClientRect(), g = document.querySelector('svg.eqg').getBoundingClientRect(); return r.left >= g.left && r.width > 20; });
+  ok('low cut at 20 Hz is drawn fully inside the graph', lcb); await click(p, '[aria-label="Previous strip"]');
+  await back(p); c0 = (await sets(p)).length; await p.mouse.move(100, 120); const pb2 = await (await p.$('.strip .panmini')).boundingBox(); await p.mouse.move(pb2.x + pb2.width / 2, pb2.y + pb2.height / 2); await p.mouse.down(); await p.waitForTimeout(700); await p.mouse.up(); await p.waitForTimeout(500);
+  await click(p, '[data-ppv="L50"]'); await click(p, '[data-pps="1"]'); S = await sets(p);
+  ok('live: the fine pan window sends the pan on its grid (L50, then one step right)', S.length === c0 + 2 && S[c0][0] === '/ch/01/mix/pan' && S[c0][2] === 0.25 && Math.abs(S[c0 + 1][2] - 0.26) < 1e-6, JSON.stringify(S.slice(c0)));
+  await tap(p, 'CLOSE');
   await back(p); c0 = S.length; await drag(p, '/ch/07/mix/fader', -40); await p.waitForTimeout(700); S = await sets(p);
   const pair = await p.evaluate(() => [__app.desk['/ch/07/mix/fader'], __app.desk['/ch/08/mix/fader'], fake.store['/ch/08/mix/fader'][1]]);
   ok('live: a linked pair – only the touched fader is sent, the partner is read back', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/07/mix/fader') && pair[0] === pair[1] && pair[1] === pair[2], JSON.stringify(pair));
@@ -155,7 +183,7 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
       if (R() < 0.03) { v = t === 'f' ? 'oops' : 0.5; fake.emit(k, t === 'f' ? 's' : 'f', v); } else fake.emit(k, t, v); out.push(k); }
     return out.length; }, seed);
   await p.waitForTimeout(700); const w = await walk(p); await p.waitForTimeout(6000);
-  const r = await p.evaluate(() => { const bad = []; for (const k in __app.desk) if (fake.store[k] && fake.store[k][1] !== __app.desk[k]) bad.push(k); return { sets: fake.sets, bad }; });
+  const r = await p.evaluate(() => { const bad = []; for (const k in __app.desk) if (fake.store[k] && fake.store[k][1] !== __app.desk[k]) bad.push(k); return { sets: fake.sets.filter(x => !x[0].startsWith('/-stat/rta/')), bad }; });
   ok(`seed ${seed}: ${sent} odd values, ${w} taps, live: nothing written back`, r.sets.length === 0, JSON.stringify(r.sets.slice(0, 4)));
   ok(`seed ${seed}: the app holds exactly what the mixer said`, r.bad.length === 0, r.bad.slice(0, 5).join(','));
   ok(`seed ${seed}: no page errors, still on screen`, p.errs.length === 0 && (await names(p)).length === 9, p.errs.join(' | ')); await p.close(); }

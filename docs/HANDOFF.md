@@ -234,3 +234,17 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   player/recorder panels after a report with a USB stick mounted. Then FX (big faces). Not done yet: fine window (long press
   on a box), drag pop, key-filter graph, RTA in the EQ, graphic EQ on buses.
 - Tests: 70 checks (`dev/xair-tests/run.mjs`); `node shot2.mjs` = demo screenshots of every strip screen.
+
+## 11. Air Console 0.4.0 – analyser, pinch Q, EQ range, fine pan (19 Nov)
+
+- Analyser (RTA) in the EQ graph and in the HOME EQ tile, drawn like the WING one (area under the curve).
+  Data: `/meters/4`, 100 bins 20 Hz–20 kHz log, 1/256 dB (`onRta`, `rtaSmooth`). Source index `rtaIdx()`:
+  ch 0–15, aux 16, FX returns 17–20, buses 21–26, FX sends 27–30, LR 31 (`VERIFY`; the report prints `rta source` and `meters4`).
+  As in the WING app the mixer's analyser follows the strip only while LIVE (`rtaFollow`, after a hand action) and gets
+  its old source back on leaving; read only shows a note when it analyses another strip. RTA ON/OFF is a view pref;
+  PRE EQ / POST EQ writes `/-stat/rta/pos`. Tests leave `/-stat/rta/*` out of the general send counts and check it apart.
+- Low cut: its handle sits at the bottom of the graph, always inside the frame (20 Hz too), dashed when off.
+- EQ display range ±18 / 12 / 6 / 3 (`prefs.eqR`, button on the graph); a point's gain drag follows the range.
+- Q: two-finger pinch on the graph changes the selected band's Q (apart = wider); mouse wheel too. Not on shelves/cuts.
+- Pan: long press on any pan (main screen, strip column on the strip screens) opens `renderPanPop` (track at half speed,
+  L100…R100 presets, one-step arrows). 78 checks.
