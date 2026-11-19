@@ -95,7 +95,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.6.0';
+const DW = 1180, APP_VER = '0.7.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -209,19 +209,19 @@ function dumpPaths() {
   const dyn = b => add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
   const sends = b => r(10).forEach(k => add(`${b}/mix/${pad2(k)}`, ['level', 'pan', 'tap', 'grpon']));
   const core = b => add(b, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'mix/pan', 'mix/lr', 'grp/dca', 'grp/mute']);
-  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'automix/group', 'automix/weight']);
+  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'insert/sel', 'automix/group', 'automix/weight']);
     add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); dyn(b); eq(b, 4); sends(b); });
   r(18).forEach(n => add('/headamp/' + pad2(n), ['gain', 'phantom']));
   ['/rtn/aux', ...r(4).map(n => '/rtn/' + n)].forEach(b => { core(b); add(b, ['config/rtnsrc', 'preamp/rtnsw', 'preamp/rtntrim']); eq(b, 4); sends(b); });
-  r(6).forEach(n => { const b = '/bus/' + n; core(b); dyn(b); eq(b, 6); add(b, ['eq/mode', 'insert/on', 'insert/fxslot']); });
-  core('/lr'); dyn('/lr'); eq('/lr', 6); add('/lr', ['eq/mode', 'insert/on', 'insert/fxslot']);
+  r(6).forEach(n => { const b = '/bus/' + n; core(b); dyn(b); eq(b, 6); add(b, ['eq/mode', 'insert/on', 'insert/fxslot', 'insert/sel']); });
+  core('/lr'); dyn('/lr'); eq('/lr', 6); add('/lr', ['eq/mode', 'insert/on', 'insert/fxslot', 'insert/sel']);
   r(4).forEach(n => { add('/fxsend/' + n, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'grp/dca', 'grp/mute']); add('/dca/' + n, ['config/name', 'config/color', 'fader', 'on']);
     add('/fx/' + n, ['type', 'insert', ...r(32).map(k => 'par/' + pad2(k))]); add('/config/mute', [String(n)]); });
   add('/config', ['chlink/1-2', 'chlink/3-4', 'chlink/5-6', 'chlink/7-8', 'chlink/9-10', 'chlink/11-12', 'chlink/13-14', 'chlink/15-16', 'buslink/1-2', 'buslink/3-4', 'buslink/5-6', 'linkcfg/preamp', 'linkcfg/eq', 'linkcfg/dyn', 'linkcfg/fdrmute',
-    'solo/level', 'solo/source', 'solo/sourcetrim', 'solo/chmode', 'solo/busmode', 'solo/dim', 'solo/dimatt', 'solo/dimpfl', 'solo/mono', 'solo/mute', 'amixenable/X', 'amixenable/Y']);
+    'solo/level', 'solo/source', 'solo/sourcetrim', 'solo/chmode', 'solo/busmode', 'solo/dim', 'solo/dimatt', 'solo/dimpfl', 'solo/mono', 'solo/mute', 'amixenable/X', 'amixenable/Y', 'amixlock/X', 'amixlock/Y']);
   r(6).forEach(n => add('/routing/aux/' + pad2(n), ['src', 'pos'])); add('/routing/main', ['01', '02']); r(18).forEach(n => add('/routing/usb/' + pad2(n), ['src', 'pos']));
   add('/-stat', ['solo', 'usbmounted', 'tape/state', 'tape/file', 'tape/etime', 'tape/rtime', 'usb/path', 'usb/count', 'usb/001/name', 'usb/001/type', 'usb/002/name', 'usb/002/type', 'rta/source', 'rta/pos', 'autosave', 'keysolo', ...r(54).map(k => 'solosw/' + pad2(k))]);
-  add('/-prefs', ['name', 'clockrate', 'playnext', 'usbifcmode', 'hardmute', 'dcamute', 'ponmute', 'rta/decay', 'rta/det', 'lan/mode']); add('/-snap', ['index', 'name', '01/name']);
+  add('/-prefs', ['name', 'clockrate', 'playnext', 'usbifcmode', 'hardmute', 'dcamute', 'ponmute', 'rta/decay', 'rta/det', 'lan/mode', 'lan/addr', 'lan/mask', 'lan/gateway', 'ap/ssid', 'ap/channel', 'ap/security', 'is/mode', 'is/ssid', 'remote/enable', 'remote/protocol', 'remote/ioenable']); add('/-snap', ['index', 'name', '01/name']);
   return P;
 }
 
@@ -245,7 +245,7 @@ const LAW = {
   eqf: LOG(20, 20000, 201, hzT), eqg: LIN(-15, 15, 121, ' dB', 2, true), eqq: LOG(10, 0.3, 72, v => v.toFixed(v < 1 ? 2 : 1)),
   hpf: LOG(20, 200, 101, v => Math.round(v) + ' Hz'), gain: LIN(-12, 60, 145, ' dB', 1, true), pan: { n: 101, of: x => x * 200 - 100, fmt: x => panText(x) },
   gthr: LIN(-80, 0, 161, ' dB'), grange: LIN(3, 60, 58, ' dB', 0), att: LIN(0, 120, 121, ' ms', 0), hold: LOG(0.02, 2000, 101, msT), rel: LOG(5, 4000, 101, msT),
-  cthr: LIN(-60, 0, 121, ' dB'), knee: LIN(0, 5, 6, '', 0), mgain: LIN(0, 24, 49, ' dB', 1, true), mix: LIN(0, 100, 21, ' %', 0)
+  amxw: LIN(-12, 12, 49, ' dB', 1, true), cthr: LIN(-60, 0, 121, ' dB'), knee: LIN(0, 5, 6, '', 0), mgain: LIN(0, 24, 49, ' dB', 1, true), mix: LIN(0, 100, 21, ' %', 0)
 };
 const EQ_TYPES = ['LCut', 'LShv', 'PEQ', 'VEQ', 'HShv', 'HCut'], RATIOS = ['1.1', '1.3', '1.5', '2', '2.5', '3', '4', '5', '7', '10', '20', '100'];
 const fin = v => typeof v === 'number' && v === v && isFinite(v);
@@ -269,6 +269,8 @@ function chanPaths(s) {
   if (T.includes('EQ')) { for (let k = 1; k <= eqBands(s); k++) add(`${b}/eq/${k}`, ['type', 'f', 'g', 'q']); P.push(b + '/eq/on'); if (eqBands(s) === 6) P.push(b + '/eq/mode'); }
   if (s.kind === 'ch') { add(b + '/preamp', ['hpf', 'hpon', 'invert']); P.push(b + '/config/insrc'); add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); }
   if (T.includes('COMP')) add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
+  if (INS_KINDS.includes(s.kind)) P.push(b + '/insert/on');
+  if (s.kind === 'ch') P.push(b + '/automix/group', b + '/automix/weight');
   if (s.kind !== 'lr' && s.kind !== 'dca' && s.kind !== 'fxs') P.push(b + '/mix/lr');
   if (s.kind !== 'lr' && s.kind !== 'dca') P.push(b + '/grp/dca', b + '/grp/mute');
   return P;
@@ -280,74 +282,234 @@ const RATIO_N = [1.1, 1.3, 1.5, 2, 2.5, 3, 4, 5, 7, 10, 20, 100];
 const KEY_TYPES = ['LC 6', 'LC 12', 'HC 6', 'HC 12', '1.0', '2.0', '3.0', '5.0', '10.0'];
 const TAPS = [['IN', 'כניסה'], ['PRE EQ', 'לפני האיקיו'], ['POST EQ', 'אחרי האיקיו'], ['PRE', 'לפני הפיידר'], ['POST', 'אחרי הפיידר'], ['GRP', 'גרופ']];
 const BAND_COL = ['#e0513f', '#e6c23e', '#62b85c', '#4a8ee8', '#d868d8', '#45c9cc'];
-const TABS = { ch: ['Home', 'Config', 'EQ', 'Gate', 'Comp', 'Sends'], aux: ['Home', 'Config', 'EQ', 'Sends'], rtn: ['Home', 'Config', 'EQ', 'Sends'], bus: ['Home', 'Config', 'EQ', 'Comp'], lr: ['Home', 'Config', 'EQ', 'Comp'], fxs: ['Config'], dca: ['Config'] };
+const TABS = { ch: ['Home', 'Config', 'Insert', 'EQ', 'Gate', 'Comp', 'Sends'], aux: ['Home', 'Config', 'EQ', 'Sends'], rtn: ['Home', 'Config', 'EQ', 'Sends'], bus: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], lr: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], fxs: ['Config'], dca: ['Config'] };
 const tabsOf = s => TABS[s.kind];
-const SCREEN_OF = { Home: 'home', Config: 'config', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
+const SCREEN_OF = { Home: 'home', Config: 'config', Insert: 'insert', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
 /* the analyser: 100 bins from 20 Hz to 20 kHz (meters/4, 1/256 dB). Source index on the mixer (/-stat/rta/source):
    ch 0–15, aux 16, FX returns 17–20, buses 21–26, FX sends 27–30, main LR 31 */
 const RTA_N = 100, rtaHz = k => 20 * Math.pow(1000, k / (RTA_N - 1));
 const rtaIdx = s => s.kind === 'ch' ? s.n - 1 : s.kind === 'aux' ? 16 : s.kind === 'rtn' ? 16 + s.n : s.kind === 'bus' ? 20 + s.n : s.kind === 'fxs' ? 26 + s.n : s.kind === 'lr' ? 31 : -1;
 const EQ_R = [18, 12, 6, 3], EQ_STEP = { 18: 6, 12: 3, 6: 2, 3: 1 };
-/* ---------- effects: the 61 types of an X-Air slot (the X32 FX1–4 list – the user's mixer reports matching
-   parameter counts and types for PLAT, P1A2, 3TAP and LEC2) and the parameters of the common ones ---------- */
+/* parameters of every effect type – facts: label | l (linear) or g (log) | low | high | steps | unit, or label | e | names, or label | t (OFF/ON).
+   Ranges and steps cross-checked with the user's X-Air Edit screenshots and the community X32 effect schema; the values the user's mixer
+   reported (PLAT, P1A2, 3TAP, LEC2) fit them. */
+const FXD_SRC = {
+  'HALL': 'Pre Delay|l|0|200|101|ms;Decay|g|0.2|5|51|s;Size|l|2|100|50|;Damping|g|1000|20000|25|Hz;Diffuse|l|1|30|30|;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Bass Multi|g|0.5|2|51|;Spread|l|0|50|51|;Shape|l|0|250|51|;Mod Speed|l|0|100|21|',
+  'AMBI': 'Pre Delay|l|0|200|101|ms;Decay|g|0.2|7.3|51|s;Size|l|2|100|50|;Damping|g|1000|20000|25|Hz;Diffuse|l|1|30|30|;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Modulate|l|0|100|51|%;Tail Gain|l|0|100|51|%',
+  'RPLT': 'Pre Delay|l|0|200|101|ms;Decay|g|0.3|29|51|s;Size|l|4|39|36|m;Damping|g|1000|20000|25|Hz;Diffuse|l|0|100|26|%;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Bass Multi|g|0.25|4|53|;Spread|l|0|50|51|;Attack|l|0|100|51|;Spin|l|0|100|21|%;Echo L|l|0|1200|241|ms;Echo R|l|0|1200|241|ms;Echo Feed L|l|-100|100|101|%;Echo Feed R|l|-100|100|101|%',
+  'ROOM': 'Pre Delay|l|0|200|101|ms;Decay|g|0.3|29|51|s;Size|l|4|76|37|m;Damping|g|1000|20000|25|Hz;Diffuse|l|0|100|26|%;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Bass Multi|g|0.25|4|53|;Spread|l|0|50|51|;Shape|l|0|250|51|;Spin|l|0|100|21|%;Echo L|l|0|1200|241|ms;Echo R|l|0|1200|241|ms;Echo Feed L|l|-100|100|101|%;Echo Feed R|l|-100|100|101|%',
+  'CHAM': 'Pre Delay|l|0|200|101|ms;Decay|g|0.3|29|51|s;Size|l|4|76|37|m;Damping|g|1000|20000|25|Hz;Diffuse|l|0|100|26|%;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Bass Multi|g|0.25|4|53|;Spread|l|0|50|51|;Shape|l|0|250|51|;Spin|l|0|100|21|%;Reflection L|l|0|500|101|ms;Reflection R|l|0|500|101|ms;Reflection Gain L|l|0|100|51|%;Reflection Gain R|l|0|100|51|%',
+  'PLAT': 'Pre Delay|l|0|200|101|ms;Decay|g|0.5|10|51|s;Size|l|2|100|50|;Damping|g|1000|20000|25|Hz;Diffuse|l|1|30|30|;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Bass Multi|g|0.5|2|51|;Xover|g|10|500|51|Hz;Mod Depth|l|1|50|50|;Mod Speed|l|0|100|21|',
+  'VREV': 'Pre Delay|l|0|120|61|ms;Decay|l|0.4|4.5|42|s;Modulate|l|0|100|51|%;Vintage|t;Position|e|FRONT,REAR;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Cut|g|10000|20000|51|Hz;Lo Multiply|g|0.5|2|51|;Hi Multiply|g|0.25|1|51|',
+  'VRM': 'Reverb Delay|l|0|200|101|ms;Decay|g|0.1|20|51|s;Size|l|2|100|50|;Density|l|1|30|30|;ER Level|l|0|100|51|%;Level|l|-12|12|49|dB;Lo Multiply|g|0.1|10|51|;Hi Multiply|g|0.1|10|51|;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;ER Left|l|0|200|101|ms;ER Right|l|0|200|101|ms;Freeze|t',
+  'GATE': 'Pre Delay|l|0|200|101|ms;Decay|l|140|1000|51|ms;Attack|l|0|30|31|;Density|l|1|50|50|;Spread|l|0|100|51|;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Shv Freq|g|200|20000|51|Hz;Hi Shv Gain|l|-30|0|61|dB;Diffuse|l|1|30|30|',
+  'RVRS': 'Pre Delay|l|0|200|101|ms;Decay|g|140|1000|51|ms;Rise|l|0|50|51|;Diffuse|l|1|30|30|;Spread|l|0|100|51|;Level|l|-12|12|49|dB;Lo Cut|g|10|500|51|Hz;Hi Shv Freq|g|200|20000|51|Hz;Hi Shv Gain|l|-30|0|61|dB',
+  'DLY': 'Mix|l|0|100|51|%;Time|l|1|3000|3000|ms;Mode|e|ST,X,M;Factor L|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Factor R|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Offset L/R|l|-100|100|201|ms;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Feed Lo Cut|g|10|500|51|Hz;Feed Left|l|0|100|51|%;Feed Right|l|0|100|51|%;Feed Hi Cut|g|200|20000|51|Hz',
+  '3TAP': 'Time|l|1|3000|3000|ms;Gain Base|l|0|100|51|%;Pan Base|l|-100|100|41|%;Feedback|l|0|100|51|%;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Factor A|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Gain A|l|0|100|51|%;Pan A|l|-100|100|41|%;Factor B|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Gain B|l|0|100|51|%;Pan B|l|-100|100|41|%;Cross Feed|t;Mono|t;Dry|t',
+  '4TAP': 'Time|l|1|3000|3000|ms;Gain Base|l|0|100|51|%;Feedback|l|0|100|51|%;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Spread|l|0|6|7|;Factor A|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Gain A|l|0|100|51|%;Factor B|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Gain B|l|0|100|51|%;Factor C|e|1/4,3/8,1/2,2/3,1,4/3,3/2,2,3;Gain C|l|0|100|51|%;Cross Feed|t;Mono|t;Dry|t',
+  'CRS': 'Speed|g|0.05|5|101|Hz;Depth L|l|0|100|21|%;Depth R|l|0|100|21|%;Delay L|g|0.5|50|51|ms;Delay R|g|0.5|50|51|ms;Mix|l|0|100|51|%;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Phase|l|0|180|37|;Wave|l|0|100|21|%;Spread|l|0|100|21|%',
+  'FLNG': 'Speed|g|0.05|5|101|Hz;Depth L|l|0|100|21|%;Depth R|l|0|100|21|%;Delay L|g|0.5|20|51|ms;Delay R|g|0.5|20|51|ms;Mix|l|0|100|51|%;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Phase|l|0|180|37|;Feed Lo Cut|g|10|500|51|Hz;Feed Hi Cut|g|200|20000|51|Hz;Feed|l|-90|90|37|%',
+  'PHAS': 'Speed|g|0.05|5|101|Hz;Depth|l|0|100|51|%;Resonance|l|0|80|41|%;Base|l|0|50|26|;Stages|l|2|12|11|;Mix|l|0|100|51|%;Wave|l|-50|50|21|;Phase|l|0|180|37|;Env Modulation|l|-100|100|41|%;Attack|g|10|1000|51|ms;Hold|g|1|2000|51|ms;Release|g|10|1000|51|ms',
+  'DIMC': 'Active|t;Mode|e|M,ST;Dry|t;Mode 1|t;Mode 2|t;Mode 3|t;Mode 4|t',
+  'FILT': 'Speed|g|0.05|20|151|Hz;Depth|l|0|100|51|%;Resonance|l|0|100|21|%;Base|g|20|15000|101|Hz;Mode|e|LP,HP,BP,NO;Mix|l|0|100|51|%;Wave|e|TRI,SIN,SAW,SAW-,RMP,SQU,RND;Phase|l|0|180|37|;Env Modulation|l|-100|100|101|%;Attack|g|10|250|51|ms;Release|g|10|500|51|ms;Drive|l|0|100|51|%;4 Pole|e|2POL,4POL;Side Chain|t',
+  'ROTA': 'Lo Speed|g|0.1|4|101|Hz;Hi Speed|g|2|10|101|Hz;Accelerate|l|0|100|51|%;Distance|l|0|100|51|%;Balance|l|-100|100|41|%;Mix|l|0|100|51|%;Stop|e|RUN,STOP;Slow|e|SLOW,FAST',
+  'PAN': 'Speed|g|0.05|5|101|Hz;Phase|l|0|180|37|;Wave|l|-50|50|21|;Depth|l|0|100|21|%;Env Speed|l|0|100|21|%;Env Depth|l|0|100|21|%;Attack|g|10|1000|51|ms;Hold|g|1|2000|51|ms;Release|g|10|1000|51|ms',
+  'SUB': 'Active A|t;Range A|e|LO,MID,HI;Dry A|l|0|100|51|%;Octave -1 A|l|0|100|51|%;Octave -2 A|l|0|100|51|%;Active B|t;Range B|e|LO,MID,HI;Dry B|l|0|100|51|%;Octave -1 B|l|0|100|51|%;Octave -2 B|l|0|100|51|%',
+  'D/RV': 'Time|l|1|3000|3000|ms;Pattern|e|1/4,1/3,3/8,1/2,2/3,3/4,1,1/4X,1/3X,3/8X,1/2X,2/3X,3/4X,1X;Feed Hi Cut|g|1000|20000|51|Hz;Feedback|l|0|100|51|%;Cross Feed|l|0|100|51|%;Balance|l|-100|100|41|;Pre Delay|l|0|200|101|ms;Decay|g|0.1|5|51|s;Size|l|2|100|50|;Damping|g|1000|20000|51|Hz;Lo Cut|g|10|500|51|Hz;Mix|l|0|100|51|%',
+  'CR/R': 'Speed|g|0.05|4|101|Hz;Depth|l|0|100|21|%;Delay|g|0.5|50|51|ms;Phase|l|0|180|37|;Wave|l|0|100|21|%;Balance|l|-100|100|41|;Pre Delay|l|0|200|101|ms;Decay|g|0.1|5|51|s;Size|l|2|100|50|;Damping|g|1000|20000|51|Hz;Lo Cut|g|10|500|51|Hz;Mix|l|0|100|51|%',
+  'FL/R': 'Speed|g|0.05|4|101|Hz;Depth|l|0|100|21|%;Delay|g|0.5|20|51|ms;Phase|l|0|180|37|;Feed|l|-90|90|37|%;Balance|l|-100|100|41|;Pre Delay|l|0|200|101|ms;Decay|g|0.1|5|51|s;Size|l|2|100|50|;Damping|g|1000|20000|51|Hz;Lo Cut|g|10|500|51|Hz;Mix|l|0|100|51|%',
+  'D/CR': 'Time|l|1|3000|3000|ms;Pattern|e|1/4,1/3,3/8,1/2,2/3,3/4,1,1/4X,1/3X,3/8X,1/2X,2/3X,3/4X,1X;Feed Hi Cut|g|1000|20000|51|Hz;Feedback|l|0|100|51|%;Cross Feed|l|0|100|51|%;Balance|l|-100|100|41|;Speed|g|0.05|4|101|Hz;Depth|l|0|100|21|%;Delay|g|0.5|50|51|ms;Phase|l|0|180|37|;Wave|l|0|100|21|%;Mix|l|0|100|51|%',
+  'D/FL': 'Time|l|1|3000|3000|ms;Pattern|e|1/4,1/3,3/8,1/2,2/3,3/4,1,1/4X,1/3X,3/8X,1/2X,2/3X,3/4X,1X;Feed Hi Cut|g|1000|20000|51|Hz;Feedback|l|0|100|51|%;Cross Feed|l|0|100|51|%;Balance|l|-100|100|41|;Speed|g|0.05|4|101|Hz;Depth|l|0|100|21|%;Delay|g|0.5|20|51|ms;Phase|l|0|180|37|;Feed|l|-90|90|37|%;Mix|l|0|100|51|%',
+  'MODD': 'Time|l|1|3000|3000|ms;Delay|e|1,1/2,2/3,3/2;Feedback|l|0|100|51|%;Lo Cut|g|10|500|51|Hz;Hi Cut|g|200|20000|51|Hz;Depth|l|0|100|21|%;Rate|g|0.05|10|101|Hz;Setup|e|PAR,SER;Type|e|AMB,CLUB,HALL;Decay|l|1|10|19|;Damping|g|1000|20000|51|Hz;Balance|l|-100|100|41|;Mix|l|0|100|51|%',
+  'GEQ2': '20 Hz A|l|-15|15|61|dB;25 Hz A|l|-15|15|61|dB;31.5 Hz A|l|-15|15|61|dB;40 Hz A|l|-15|15|61|dB;50 Hz A|l|-15|15|61|dB;63 Hz A|l|-15|15|61|dB;80 Hz A|l|-15|15|61|dB;100 Hz A|l|-15|15|61|dB;125 Hz A|l|-15|15|61|dB;160 Hz A|l|-15|15|61|dB;200 Hz A|l|-15|15|61|dB;250 Hz A|l|-15|15|61|dB;315 Hz A|l|-15|15|61|dB;400 Hz A|l|-15|15|61|dB;500 Hz A|l|-15|15|61|dB;630 Hz A|l|-15|15|61|dB;800 Hz A|l|-15|15|61|dB;1 kHz A|l|-15|15|61|dB;1.25 kHz A|l|-15|15|61|dB;1.6 kHz A|l|-15|15|61|dB;2 kHz A|l|-15|15|61|dB;2.5 kHz A|l|-15|15|61|dB;3.15 kHz A|l|-15|15|61|dB;4 kHz A|l|-15|15|61|dB;5 kHz A|l|-15|15|61|dB;6.3 kHz A|l|-15|15|61|dB;8 kHz A|l|-15|15|61|dB;10 kHz A|l|-15|15|61|dB;12.5 kHz A|l|-15|15|61|dB;16 kHz A|l|-15|15|61|dB;20 kHz A|l|-15|15|61|dB;Master A|l|-15|15|61|dB;20 Hz B|l|-15|15|61|dB;25 Hz B|l|-15|15|61|dB;31.5 Hz B|l|-15|15|61|dB;40 Hz B|l|-15|15|61|dB;50 Hz B|l|-15|15|61|dB;63 Hz B|l|-15|15|61|dB;80 Hz B|l|-15|15|61|dB;100 Hz B|l|-15|15|61|dB;125 Hz B|l|-15|15|61|dB;160 Hz B|l|-15|15|61|dB;200 Hz B|l|-15|15|61|dB;250 Hz B|l|-15|15|61|dB;315 Hz B|l|-15|15|61|dB;400 Hz B|l|-15|15|61|dB;500 Hz B|l|-15|15|61|dB;630 Hz B|l|-15|15|61|dB;800 Hz B|l|-15|15|61|dB;1 kHz B|l|-15|15|61|dB;1.25 kHz B|l|-15|15|61|dB;1.6 kHz B|l|-15|15|61|dB;2 kHz B|l|-15|15|61|dB;2.5 kHz B|l|-15|15|61|dB;3.15 kHz B|l|-15|15|61|dB;4 kHz B|l|-15|15|61|dB;5 kHz B|l|-15|15|61|dB;6.3 kHz B|l|-15|15|61|dB;8 kHz B|l|-15|15|61|dB;10 kHz B|l|-15|15|61|dB;12.5 kHz B|l|-15|15|61|dB;16 kHz B|l|-15|15|61|dB;20 kHz B|l|-15|15|61|dB;Master B|l|-15|15|61|dB',
+  'GEQ': '20 Hz|l|-15|15|61|dB;25 Hz|l|-15|15|61|dB;31.5 Hz|l|-15|15|61|dB;40 Hz|l|-15|15|61|dB;50 Hz|l|-15|15|61|dB;63 Hz|l|-15|15|61|dB;80 Hz|l|-15|15|61|dB;100 Hz|l|-15|15|61|dB;125 Hz|l|-15|15|61|dB;160 Hz|l|-15|15|61|dB;200 Hz|l|-15|15|61|dB;250 Hz|l|-15|15|61|dB;315 Hz|l|-15|15|61|dB;400 Hz|l|-15|15|61|dB;500 Hz|l|-15|15|61|dB;630 Hz|l|-15|15|61|dB;800 Hz|l|-15|15|61|dB;1 kHz|l|-15|15|61|dB;1.25 kHz|l|-15|15|61|dB;1.6 kHz|l|-15|15|61|dB;2 kHz|l|-15|15|61|dB;2.5 kHz|l|-15|15|61|dB;3.15 kHz|l|-15|15|61|dB;4 kHz|l|-15|15|61|dB;5 kHz|l|-15|15|61|dB;6.3 kHz|l|-15|15|61|dB;8 kHz|l|-15|15|61|dB;10 kHz|l|-15|15|61|dB;12.5 kHz|l|-15|15|61|dB;16 kHz|l|-15|15|61|dB;20 kHz|l|-15|15|61|dB;Master|l|-15|15|61|dB',
+  'TEQ2': '20 Hz A|l|-15|15|61|dB;25 Hz A|l|-15|15|61|dB;31.5 Hz A|l|-15|15|61|dB;40 Hz A|l|-15|15|61|dB;50 Hz A|l|-15|15|61|dB;63 Hz A|l|-15|15|61|dB;80 Hz A|l|-15|15|61|dB;100 Hz A|l|-15|15|61|dB;125 Hz A|l|-15|15|61|dB;160 Hz A|l|-15|15|61|dB;200 Hz A|l|-15|15|61|dB;250 Hz A|l|-15|15|61|dB;315 Hz A|l|-15|15|61|dB;400 Hz A|l|-15|15|61|dB;500 Hz A|l|-15|15|61|dB;630 Hz A|l|-15|15|61|dB;800 Hz A|l|-15|15|61|dB;1 kHz A|l|-15|15|61|dB;1.25 kHz A|l|-15|15|61|dB;1.6 kHz A|l|-15|15|61|dB;2 kHz A|l|-15|15|61|dB;2.5 kHz A|l|-15|15|61|dB;3.15 kHz A|l|-15|15|61|dB;4 kHz A|l|-15|15|61|dB;5 kHz A|l|-15|15|61|dB;6.3 kHz A|l|-15|15|61|dB;8 kHz A|l|-15|15|61|dB;10 kHz A|l|-15|15|61|dB;12.5 kHz A|l|-15|15|61|dB;16 kHz A|l|-15|15|61|dB;20 kHz A|l|-15|15|61|dB;Master A|l|-15|15|61|dB;20 Hz B|l|-15|15|61|dB;25 Hz B|l|-15|15|61|dB;31.5 Hz B|l|-15|15|61|dB;40 Hz B|l|-15|15|61|dB;50 Hz B|l|-15|15|61|dB;63 Hz B|l|-15|15|61|dB;80 Hz B|l|-15|15|61|dB;100 Hz B|l|-15|15|61|dB;125 Hz B|l|-15|15|61|dB;160 Hz B|l|-15|15|61|dB;200 Hz B|l|-15|15|61|dB;250 Hz B|l|-15|15|61|dB;315 Hz B|l|-15|15|61|dB;400 Hz B|l|-15|15|61|dB;500 Hz B|l|-15|15|61|dB;630 Hz B|l|-15|15|61|dB;800 Hz B|l|-15|15|61|dB;1 kHz B|l|-15|15|61|dB;1.25 kHz B|l|-15|15|61|dB;1.6 kHz B|l|-15|15|61|dB;2 kHz B|l|-15|15|61|dB;2.5 kHz B|l|-15|15|61|dB;3.15 kHz B|l|-15|15|61|dB;4 kHz B|l|-15|15|61|dB;5 kHz B|l|-15|15|61|dB;6.3 kHz B|l|-15|15|61|dB;8 kHz B|l|-15|15|61|dB;10 kHz B|l|-15|15|61|dB;12.5 kHz B|l|-15|15|61|dB;16 kHz B|l|-15|15|61|dB;20 kHz B|l|-15|15|61|dB;Master B|l|-15|15|61|dB',
+  'TEQ': '20 Hz|l|-15|15|61|dB;25 Hz|l|-15|15|61|dB;31.5 Hz|l|-15|15|61|dB;40 Hz|l|-15|15|61|dB;50 Hz|l|-15|15|61|dB;63 Hz|l|-15|15|61|dB;80 Hz|l|-15|15|61|dB;100 Hz|l|-15|15|61|dB;125 Hz|l|-15|15|61|dB;160 Hz|l|-15|15|61|dB;200 Hz|l|-15|15|61|dB;250 Hz|l|-15|15|61|dB;315 Hz|l|-15|15|61|dB;400 Hz|l|-15|15|61|dB;500 Hz|l|-15|15|61|dB;630 Hz|l|-15|15|61|dB;800 Hz|l|-15|15|61|dB;1 kHz|l|-15|15|61|dB;1.25 kHz|l|-15|15|61|dB;1.6 kHz|l|-15|15|61|dB;2 kHz|l|-15|15|61|dB;2.5 kHz|l|-15|15|61|dB;3.15 kHz|l|-15|15|61|dB;4 kHz|l|-15|15|61|dB;5 kHz|l|-15|15|61|dB;6.3 kHz|l|-15|15|61|dB;8 kHz|l|-15|15|61|dB;10 kHz|l|-15|15|61|dB;12.5 kHz|l|-15|15|61|dB;16 kHz|l|-15|15|61|dB;20 kHz|l|-15|15|61|dB;Master|l|-15|15|61|dB',
+  'DES2': 'Lo Band A|l|0|50|51|;Hi Band A|l|0|50|51|;Lo Band B|l|0|50|51|;Hi Band B|l|0|50|51|;Voice A|e|FEM,MALE;Voice B|e|FEM,MALE',
+  'DES': 'Lo Band L|l|0|50|51|;Hi Band L|l|0|50|51|;Lo Band R|l|0|50|51|;Hi Band R|l|0|50|51|;Voice|e|FEM,MALE;Mode|e|ST,MS',
+  'P1A': 'Active|t;Gain|l|-12|12|49|dB;Lo Boost|l|0|10|101|;Lo Freq|e|20,30,60,100;Lo Atten|l|0|10|101|;Hi Width|l|0|10|101|;Hi Boost|l|0|10|101|;Hi Freq|e|3k,4k,5k,8k,10k,12k,16k;Hi Atten|l|0|10|101|;Hi Atten Freq|e|5k,10k,20k;Transformer|t',
+  'P1A2': 'Active A|t;Gain A|l|-12|12|49|dB;Lo Boost A|l|0|10|101|;Lo Freq A|e|20,30,60,100;Lo Atten A|l|0|10|101|;Hi Width A|l|0|10|101|;Hi Boost A|l|0|10|101|;Hi Freq A|e|3k,4k,5k,8k,10k,12k,16k;Hi Atten A|l|0|10|101|;Hi Atten Freq A|e|5k,10k,20k;Transformer A|t;Active B|t;Gain B|l|-12|12|49|dB;Lo Boost B|l|0|10|101|;Lo Freq B|e|20,30,60,100;Lo Atten B|l|0|10|101|;Hi Width B|l|0|10|101|;Hi Boost B|l|0|10|101|;Hi Freq B|e|3k,4k,5k,8k,10k,12k,16k;Hi Atten B|l|0|10|101|;Hi Atten Freq B|e|5k,10k,20k;Transformer B|t',
+  'PQ5': 'Active|t;Gain|l|-12|12|49|dB;Lo Freq|e|200,300,500,700,1000;Lo Boost|l|0|10|101|;Mid Freq|e|200,300,500,700,1k,1k5,2k,3k,4k,5k,7k;Mid Cut|l|0|10|101|;Hi Freq|e|1k5,2k,3k,4k,5k;Hi Boost|l|0|10|101|;Transformer|t',
+  'PQ5S': 'Active A|t;Gain A|l|-12|12|49|dB;Lo Freq A|e|200,300,500,700,1000;Lo Boost A|l|0|10|101|;Mid Freq A|e|200,300,500,700,1k,1k5,2k,3k,4k,5k,7k;Mid Cut A|l|0|10|101|;Hi Freq A|e|1k5,2k,3k,4k,5k;Hi Boost A|l|0|10|101|;Transformer A|t;Active B|t;Gain B|l|-12|12|49|dB;Lo Freq B|e|200,300,500,700,1000;Lo Boost B|l|0|10|101|;Mid Freq B|e|200,300,500,700,1k,1k5,2k,3k,4k,5k,7k;Mid Cut B|l|0|10|101|;Hi Freq B|e|1k5,2k,3k,4k,5k;Hi Boost B|l|0|10|101|;Transformer B|t',
+  'WAVD': 'Attack A|l|-100|100|101|%;Sustain A|l|-100|100|101|%;Gain A|l|-24|24|97|dB;Attack B|l|-100|100|101|%;Sustain B|l|-100|100|101|%;Gain B|l|-24|24|97|dB',
+  'LIM': 'Input Gain|l|0|18|37|dB;Out Gain|l|-18|0|37|dB;Squeeze|l|0|100|51|%;Knee|l|0|10|11|dB;Attack|g|0.05|1|51|ms;Release|g|20|2000|51|ms;Stereo Link|t;Auto Gain|t',
+  'CMB': 'Active|t;Band Solo|e|OFF,Bd1,Bd2,Bd3,Bd4,Bd5;Mix|l|0|100|51|%;Attack|l|0|19|20|;Release|g|20|3000|51|ms;Auto Release|t;SBC Speed|l|1|10|10|;SBC On|t;Xover|l|-50|50|51|;Xover Slope|e|12,48;Ratio|e|1.1,1.2,1.3,1.5,1.7,2,2.5,3,3.5,4,5,7,10,LIM;Threshold|l|-40|0|81|dB;Gain|l|-10|10|41|dB;Band 1 Threshold|l|-10|10|41|dB;Band 1 Gain|l|-10|10|41|dB;Band 1 Lock|e|0,1;Band 2 Threshold|l|-10|10|41|dB;Band 2 Gain|l|-10|10|41|dB;Band 2 Lock|e|0,1;Band 3 Threshold|l|-10|10|41|dB;Band 3 Gain|l|-10|10|41|dB;Band 3 Lock|e|0,1;Band 4 Threshold|l|-10|10|41|dB;Band 4 Gain|l|-10|10|41|dB;Band 4 Lock|e|0,1;Band 5 Threshold|l|-10|10|41|dB;Band 5 Gain|l|-10|10|41|dB;Band 5 Lock|e|0,1;Meter Mode|e|GR,PEAK,SBC',
+  'CMB2': 'Active A|t;Band Solo A|e|OFF,Bd1,Bd2,Bd3,Bd4,Bd5;Mix A|l|0|100|51|%;Attack A|l|0|19|20|;Release A|g|20|3000|51|ms;Auto Release A|t;SBC Speed A|l|1|10|10|;SBC On A|t;Xover A|l|-50|50|51|;Xover Slope A|e|12,48;Ratio A|e|1.1,1.2,1.3,1.5,1.7,2,2.5,3,3.5,4,5,7,10,LIM;Threshold A|l|-40|0|81|dB;Gain A|l|-10|10|41|dB;Band 1 Threshold A|l|-10|10|41|dB;Band 1 Gain A|l|-10|10|41|dB;Band 1 Lock A|e|0,1;Band 2 Threshold A|l|-10|10|41|dB;Band 2 Gain A|l|-10|10|41|dB;Band 2 Lock A|e|0,1;Band 3 Threshold A|l|-10|10|41|dB;Band 3 Gain A|l|-10|10|41|dB;Band 3 Lock A|e|0,1;Band 4 Threshold A|l|-10|10|41|dB;Band 4 Gain A|l|-10|10|41|dB;Band 4 Lock A|e|0,1;Band 5 Threshold A|l|-10|10|41|dB;Band 5 Gain A|l|-10|10|41|dB;Band 5 Lock A|e|0,1;Meter Mode A|e|GR,PEAK,SBC;Active B|t;Band Solo B|e|OFF,Bd1,Bd2,Bd3,Bd4,Bd5;Mix B|l|0|100|51|%;Attack B|l|0|19|20|;Release B|g|20|3000|51|ms;Auto Release B|t;SBC Speed B|l|1|10|10|;SBC On B|t;Xover B|l|-50|50|51|;Xover Slope B|e|12,48;Ratio B|e|1.1,1.2,1.3,1.5,1.7,2,2.5,3,3.5,4,5,7,10,LIM;Threshold B|l|-40|0|81|dB;Gain B|l|-10|10|41|dB;Band 1 Threshold B|l|-10|10|41|dB;Band 1 Gain B|l|-10|10|41|dB;Band 1 Lock B|e|0,1;Band 2 Threshold B|l|-10|10|41|dB;Band 2 Gain B|l|-10|10|41|dB;Band 2 Lock B|e|0,1;Band 3 Threshold B|l|-10|10|41|dB;Band 3 Gain B|l|-10|10|41|dB;Band 3 Lock B|e|0,1;Band 4 Threshold B|l|-10|10|41|dB;Band 4 Gain B|l|-10|10|41|dB;Band 4 Lock B|e|0,1;Band 5 Threshold B|l|-10|10|41|dB;Band 5 Gain B|l|-10|10|41|dB;Band 5 Lock B|e|0,1;Meter Mode B|e|GR,PEAK,SBC',
+  'FAC': 'Active|t;Input Gain|l|-20|0|41|dB;Threshold|l|0|10|101|;Time|l|1|6|6|;Bias|l|0|100|51|%;Gain|l|-18|6|49|dB;Balance|l|-100|100|41|%',
+  'FAC1M': 'Active|t;Input Gain M|l|-20|0|41|dB;Threshold M|l|0|10|101|;Time M|l|1|6|6|;Bias M|l|0|100|51|%;Gain M|l|-18|6|49|dB;Balance M|l|-100|100|41|%;Input Gain S|l|-20|0|41|dB;Threshold S|l|0|10|101|;Time S|l|1|6|6|;Bias S|l|0|100|51|%;Gain S|l|-18|6|49|dB;Balance S|l|-100|100|41|%',
+  'FAC2': 'Active A|t;Input Gain A|l|-20|0|41|dB;Threshold A|l|0|10|101|;Time A|l|1|6|6|;Bias A|l|0|100|51|%;Gain A|l|-18|6|49|dB;Balance A|l|-100|100|41|%;Active B|t;Input Gain B|l|-20|0|41|dB;Threshold B|l|0|10|101|;Time B|l|1|6|6|;Bias B|l|0|100|51|%;Gain B|l|-18|6|49|dB;Balance B|l|-100|100|41|%',
+  'LEC': 'Active|t;Gain|l|0|100|51|;Peak|l|0|100|51|;Mode|e|COMP,LIM;Out Gain|l|-18|6|49|dB',
+  'LEC2': 'Active A|t;Gain A|l|0|100|51|;Peak A|l|0|100|51|;Mode A|e|COMP,LIM;Out Gain A|l|-18|6|49|dB;Active B|t;Gain B|l|0|100|51|;Peak B|l|0|100|51|;Mode B|e|COMP,LIM;Out Gain B|l|-18|6|49|dB',
+  'ULC': 'Active|t;Input Gain|l|-48|0|49|dB;Out Gain|l|-48|0|49|dB;Attack|l|1|7|61|;Release|l|1|7|61|;Ratio|e|4,8,12,20,ALL',
+  'ULC2': 'Active A|t;Input Gain A|l|-48|0|49|dB;Out Gain A|l|-48|0|49|dB;Attack A|l|1|7|61|;Release A|l|1|7|61|;Ratio A|e|4,8,12,20,ALL;Active B|t;Input Gain B|l|-48|0|49|dB;Out Gain B|l|-48|0|49|dB;Attack B|l|1|7|61|;Release B|l|1|7|61|;Ratio B|e|4,8,12,20,ALL',
+  'ENH2': 'Out Gain A|l|-12|12|49|dB;Bass Gain A|l|0|100|51|%;Bass Freq A|l|1|50|50|;Mid Gain A|l|0|100|51|%;Mid Q A|l|1|50|50|;Hi Gain A|l|0|100|51|%;Hi Freq A|l|1|50|50|;Solo A|t;Out Gain B|l|-12|12|49|dB;Bass Gain B|l|0|100|51|%;Bass Freq B|l|1|50|50|;Mid Gain B|l|0|100|51|%;Mid Q B|l|1|50|50|;Hi Gain B|l|0|100|51|%;Hi Freq B|l|1|50|50|;Solo B|t',
+  'ENH': 'Out Gain|l|-12|12|49|dB;Spread|l|0|100|51|%;Bass Gain|l|0|100|51|%;Bass Freq|l|1|50|50|;Mid Gain|l|0|100|51|%;Mid Q|l|1|50|50|;Hi Gain|l|0|100|51|%;Hi Freq|l|1|50|50|;Solo|t',
+  'EXC2': 'Tune A|g|1000|10000|51|Hz;Peak A|l|0|100|51|%;Zero Fill A|l|0|100|51|%;Timbre A|l|-50|50|51|;Harmonics A|l|0|100|51|%;Mix A|l|0|100|51|%;Solo A|t;Tune B|g|1000|10000|51|Hz;Peak B|l|0|100|51|%;Zero Fill B|l|0|100|51|%;Timbre B|l|-50|50|51|;Harmonics B|l|0|100|51|%;Mix B|l|0|100|51|%;Solo B|t',
+  'EXC': 'Tune|g|1000|10000|51|Hz;Peak|l|0|100|51|%;Zero Fill|l|0|100|51|%;Timbre|l|-50|50|51|;Harmonics|l|0|100|51|%;Mix|l|0|100|51|%;Solo|t',
+  'IMG': 'Balance|l|-100|100|101|%;Mono Pan|l|-100|100|101|%;Stereo Pan|l|-100|100|101|%;Shv Gain|l|0|12|25|dB;Shv Freq|g|100|1000|25|Hz;Shv Q|g|1|10|25|;Out Gain|l|-12|12|49|dB',
+  'EDI': 'Active|t;Stereo Input|e|ST,M/S;Stereo Output|e|ST,M/S;ST Spread|l|-50|50|51|;LMF Spread|l|-50|50|51|;Balance|l|-50|50|51|;Center Distance|l|-50|50|51|;Out Gain|l|-12|12|49|dB',
+  'SON': 'Active A|t;Lo Contour A|l|0|10|51|;Process A|l|0|10|51|;Out Gain A|l|-12|12|49|dB;Active B|t;Lo Contour B|l|0|10|51|;Process B|l|0|10|51|;Out Gain B|l|-12|12|49|dB',
+  'AMP2': 'Preamp A|l|0|10|41|;Buzz A|l|0|10|41|;Punch A|l|0|10|41|;Crunch A|l|0|10|41|;Drive A|l|0|10|41|;Level A|l|0|10|41|;Low A|l|0|10|41|;High A|l|0|10|41|;Cabinet A|t;Preamp B|l|0|10|41|;Buzz B|l|0|10|41|;Punch B|l|0|10|41|;Crunch B|l|0|10|41|;Drive B|l|0|10|41|;Level B|l|0|10|41|;Low B|l|0|10|41|;High B|l|0|10|41|;Cabinet B|t',
+  'AMP': 'Preamp|l|0|10|41|;Buzz|l|0|10|41|;Punch|l|0|10|41|;Crunch|l|0|10|41|;Drive|l|0|10|41|;Level|l|0|10|41|;Low|l|0|10|41|;High|l|0|10|41|;Cabinet|t',
+  'DRV2': 'Drive A|l|0|100|21|%;Even Har A|l|0|50|26|%;Odd Har A|l|0|50|26|%;Gain A|l|-12|12|49|dB;Lo Cut A|g|20|200|51|Hz;Hi Cut A|g|4000|20000|51|Hz;Lo Gain A|l|-12|12|49|dB;Lo Freq A|g|50|400|51|Hz;Hi Gain A|l|-12|12|49|dB;Hi Freq A|g|1000|10000|51|Hz;Drive B|l|0|100|21|%;Even Har B|l|0|50|26|%;Odd Har B|l|0|50|26|%;Gain B|l|-12|12|49|dB;Lo Cut B|g|20|200|51|Hz;Hi Cut B|g|4000|20000|51|Hz;Lo Gain B|l|-12|12|49|dB;Lo Freq B|g|50|400|51|Hz;Hi Gain B|l|-12|12|49|dB;Hi Freq B|g|1000|10000|51|Hz',
+  'DRV': 'Drive|l|0|100|21|%;Even Har|l|0|50|26|%;Odd Har|l|0|50|26|%;Gain|l|-12|12|49|dB;Lo Cut|g|20|200|51|Hz;Hi Cut|g|4000|20000|51|Hz;Lo Gain|l|-12|12|49|dB;Lo Freq|g|50|400|51|Hz;Hi Gain|l|-12|12|49|dB;Hi Freq|g|1000|10000|51|Hz',
+  'PIT2': 'Semitone 1|l|-12|12|25|;Cent 1|l|-50|50|101|;Delay 1|g|1|500|101|ms;Gain 1|l|0|100|51|%;Pan 1|l|-100|100|41|%;Mix|l|0|100|51|%;Semitone 2|l|-12|12|25|;Cent 2|l|-50|50|101|;Delay 2|g|1|500|101|ms;Gain 2|l|0|100|51|%;Pan 2|l|-100|100|41|%;Hi Cut|g|2000|20000|51|Hz',
+  'PIT': 'Semitone|l|-12|12|25|;Cent|l|-50|50|101|;Delay|g|1|500|101|ms;Lo Cut|g|10|500|51|Hz;Hi Cut|g|2000|20000|51|Hz;Mix|l|0|100|51|%',
+};
+
+/* ---------- effects: the 61 types of an X-Air FX slot, in the mixer's own order ---------- */
 const FX_KEYS = ['HALL', 'AMBI', 'RPLT', 'ROOM', 'CHAM', 'PLAT', 'VREV', 'VRM', 'GATE', 'RVRS', 'DLY', '3TAP', '4TAP', 'CRS', 'FLNG', 'PHAS', 'DIMC', 'FILT', 'ROTA', 'PAN',
   'SUB', 'D/RV', 'CR/R', 'FL/R', 'D/CR', 'D/FL', 'MODD', 'GEQ2', 'GEQ', 'TEQ2', 'TEQ', 'DES2', 'DES', 'P1A', 'P1A2', 'PQ5', 'PQ5S', 'WAVD', 'LIM', 'CMB', 'CMB2',
   'FAC', 'FAC1M', 'FAC2', 'LEC', 'LEC2', 'ULC', 'ULC2', 'ENH2', 'ENH', 'EXC2', 'EXC', 'IMG', 'EDI', 'SON', 'AMP2', 'AMP', 'DRV2', 'DRV', 'PIT2', 'PIT'];
-const FX_NAMES = ['Hall Reverb', 'Ambience', 'Rich Plate', 'Room Reverb', 'Chamber', 'Plate Reverb', 'Vintage Reverb', 'Vintage Room', 'Gated Reverb', 'Reverse Reverb',
-  'Stereo Delay', '3-Tap Delay', '4-Tap Delay', 'Stereo Chorus', 'Stereo Flanger', 'Stereo Phaser', 'Dimension Chorus', 'Mood Filter', 'Rotary Speaker', 'Tremolo / Panner',
-  'Sub Octaver', 'Delay + Chamber', 'Chorus + Chamber', 'Flanger + Chamber', 'Delay + Chorus', 'Delay + Flanger', 'Modulation Delay', 'Dual Graphic EQ', 'Graphic EQ',
-  'Dual TruEQ', 'TruEQ', 'Dual De-esser', 'De-esser', 'Program EQ', 'Dual Program EQ', 'Mid EQ', 'Dual Mid EQ', 'Wave Designer', 'Precision Limiter', 'Combinator',
-  'Dual Combinator', 'Fair Comp', 'Fair Comp M/S', 'Dual Fair Comp', 'Leisure Comp', 'Dual Leisure Comp', 'Ultimo Comp', 'Dual Ultimo Comp', 'Dual Enhancer', 'Enhancer',
-  'Dual Exciter', 'Exciter', 'Stereo Imager', 'Edison EX1', 'Sound Maxer', 'Dual Guitar Amp', 'Guitar Amp', 'Dual Tube Stage', 'Tube Stage', 'Dual Pitch', 'Stereo Pitch'];
-const FX_FAM = k => k <= 9 || k === 21 || k === 22 || k === 23 ? 'REVERB' : k <= 12 || k === 24 || k === 25 || k === 26 ? 'DELAY' : k <= 20 ? 'MOD' : k <= 37 ? 'EQ' : k <= 47 ? 'DYN' : 'TONE';
+/* the names as X-Air Edit shows them (the user's list) */
+const FX_NAMES = ['Hall Reverb', 'Ambience', 'Rich Plate Reverb', 'Room Reverb', 'Chamber Reverb', 'Plate Reverb', 'Vintage Reverb', 'Vintage Room', 'Gated Reverb', 'Reverse Reverb',
+  'Stereo Delay', '3-Tap Delay', 'Rhythm Delay', 'Stereo Chorus', 'Stereo Flanger', 'Stereo Phaser', 'Dimensional Chorus', 'Mood Filter', 'Rotary Speaker', 'Tremolo / Panner',
+  'Suboctaver', 'Delay + Chamber', 'Chorus + Chamber', 'Flanger + Chamber', 'Delay + Chorus', 'Delay + Flanger', 'Modulation Delay', 'Dual Graphic EQ', 'Stereo Graphic EQ',
+  'Dual TruEQ', 'Stereo TruEQ', 'Dual DeEsser', 'Stereo DeEsser', 'Stereo Xtec EQ1', 'Dual Xtec EQ1', 'Stereo Xtec EQ5', 'Dual Xtec EQ5', 'Wave Designer', 'Precision Limiter',
+  'Stereo Combinator', 'Dual Combinator', 'Stereo Fair Compressor', 'M/S Fair Compressor', 'Dual Fair Compressor', 'Stereo Leisure Compressor', 'Dual Leisure Compressor',
+  'Stereo Ultimo Compressor', 'Dual Ultimo Compressor', 'Dual Enhancer', 'Stereo Enhancer', 'Dual Exciter', 'Stereo Exciter', 'Stereo Imager', 'Edison EX1', 'Sound Maxer',
+  'Dual Guitar Amp', 'Stereo Guitar Amp', 'Dual Tube Stage', 'Stereo Tube Stage', 'Dual Pitch Shifter', 'Stereo Pitch Shifter'];
+const FX_FACE = k => /^(HALL|AMBI|RPLT|ROOM|CHAM|PLAT|VREV|VRM|GATE|RVRS)$/.test(k) ? 'rev' : /^(DLY|3TAP|4TAP)$/.test(k) ? 'dly' : /^(D\/RV|CR\/R|FL\/R|D\/CR|D\/FL|MODD)$/.test(k) ? 'combo'
+  : /^(CRS|FLNG|PHAS|DIMC|FILT|ROTA|PAN|SUB)$/.test(k) ? 'mod' : /^(GEQ|GEQ2|TEQ|TEQ2)$/.test(k) ? 'geq' : /^(P1A|P1A2|PQ5|PQ5S)$/.test(k) ? 'peq' : /^DES/.test(k) ? 'des'
+  : k === 'WAVD' ? 'wavd' : /^(LIM|CMB|CMB2|FAC|FAC1M|FAC2|LEC|LEC2|ULC|ULC2)$/.test(k) ? 'comp' : 'tone';
+const FX_FAM = k => ({ rev: 'REVERB', dly: 'DELAY', combo: 'DELAY', mod: 'MOD', geq: 'EQ', peq: 'EQ', des: 'EQ', wavd: 'DYN', comp: 'DYN', tone: 'TONE' })[FX_FACE(FX_KEYS[k] || '')] || 'REVERB';
 const FX_COL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
-/* a parameter: [label, kind, lo, hi, steps, unit, decimals] – kind 'l' linear, 'g' log; or [label, 'e', [names]] / [label, 't'] */
-const fmtK = (v, dp) => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + 'k' : v.toFixed(dp);
-const P_ = {
-  pre: ['Pre Delay', 'l', 0, 200, 101, 'ms', 0], lvl: ['Level', 'l', -12, 12, 49, 'dB', 1], damp: ['Damping', 'g', 1000, 20000, 25, 'Hz', 1],
-  loc: ['Lo Cut', 'g', 10, 500, 51, 'Hz', 0], hic: ['Hi Cut', 'g', 200, 20000, 51, 'Hz', 0], bass4: ['Bass Multi', 'g', 0.25, 4, 53, '', 2],
-  size: ['Size', 'l', 2, 100, 50, '', 0], dif: ['Diffuse', 'l', 1, 30, 30, '', 0], spread: ['Spread', 'l', 0, 50, 51, '', 0], shape: ['Shape', 'l', 0, 250, 51, '', 0],
-  spin: ['Spin', 'l', 0, 100, 21, '%', 0], time: ['Time', 'l', 1, 3000, 3000, 'ms', 0], fb: ['Feedback', 'l', 0, 100, 51, '%', 1], mix: ['Mix', 'l', 0, 100, 51, '%', 0],
-  onoff: n => [n, 't'], pct: n => [n, 'l', 0, 100, 51, '%', 0], tpan: n => [n, 'l', -100, 100, 41, '%', 0], fac: n => [n, 'e', ['1/4', '3/8', '1/2', '2/3', '1', '4/3', '3/2', '2', '3']]
-};
-const decay = (lo, hi) => ['Decay', 'g', lo, hi, 51, 's', 2], echo = n => [n, 'l', 0, 1200, 241, 'ms', 0], knob = n => [n, 'l', 0, 10, 101, '', 1];
-const p1a = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', -12, 12, 49, 'dB', 1], knob('Lo Boost' + c), ['Lo Freq' + c, 'e', ['20', '30', '60', '100']], knob('Lo Atten' + c), knob('Hi Width' + c), knob('Hi Boost' + c),
-  ['Hi Freq' + c, 'e', ['3k', '4k', '5k', '8k', '10k', '12k', '16k']], knob('Hi Atten' + c), ['Hi Atten Freq' + c, 'e', ['5k', '10k', '20k']], P_.onoff('Transformer' + c)];
-const pq5 = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', -12, 12, 49, 'dB', 1], ['Lo Freq' + c, 'e', ['200', '300', '500', '700', '1000']], knob('Lo Boost' + c),
-  ['Mid Freq' + c, 'e', ['200', '300', '500', '700', '1k', '1k5', '2k', '3k', '4k', '5k', '7k']], knob('Mid Cut' + c), ['Hi Freq' + c, 'e', ['1k5', '2k', '3k', '4k', '5k']], knob('Hi Boost' + c), P_.onoff('Transformer' + c)];
-const lec = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', 0, 100, 51, '', 0], ['Peak' + c, 'l', 0, 100, 51, '', 0], ['Mode' + c, 'e', ['COMP', 'LIM']], ['Out Gain' + c, 'l', -18, 6, 49, 'dB', 1]];
-const FXP = {
-  HALL: [P_.pre, decay(0.2, 5), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, ['Bass Multi', 'g', 0.5, 2, 51, '', 2], P_.spread, P_.shape, ['Mod Speed', 'l', 0, 100, 21, '', 0]],
-  AMBI: [P_.pre, decay(0.2, 7.3), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, P_.pct('Modulate'), P_.pct('Tail Gain')],
-  RPLT: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 39, 36, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, ['Attack', 'l', 0, 100, 51, '', 0], P_.spin, echo('Echo L'), echo('Echo R'), ['Echo Feed L', 'l', -100, 100, 101, '%', 0], ['Echo Feed R', 'l', -100, 100, 101, '%', 0]],
-  ROOM: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 76, 37, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, P_.shape, P_.spin, echo('Echo L'), echo('Echo R'), ['Echo Feed L', 'l', -100, 100, 101, '%', 0], ['Echo Feed R', 'l', -100, 100, 101, '%', 0]],
-  CHAM: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 76, 37, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, P_.shape, P_.spin, ['Reflection L', 'l', 0, 500, 101, 'ms', 0], ['Reflection R', 'l', 0, 500, 101, 'ms', 0], P_.pct('Refl Gain L'), P_.pct('Refl Gain R')],
-  PLAT: [P_.pre, decay(0.5, 10), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, ['Bass Multi', 'g', 0.5, 2, 51, '', 2], ['Xover', 'g', 10, 500, 51, 'Hz', 0], ['Mod Depth', 'l', 1, 50, 50, '', 0], ['Mod Speed', 'l', 0, 100, 21, '', 0]],
-  VREV: [['Pre Delay', 'l', 0, 120, 61, 'ms', 0], ['Decay', 'l', 0.4, 4.5, 42, 's', 1], P_.pct('Modulate'), P_.onoff('Vintage'), ['Position', 'e', ['FRONT', 'REAR']], P_.lvl, P_.loc, ['Hi Cut', 'g', 10000, 20000, 51, 'Hz', 0], ['Lo Multiply', 'g', 0.5, 2, 51, '', 2], ['Hi Multiply', 'g', 0.25, 1, 51, '', 2]],
-  VRM: [['Reverb Delay', 'l', 0, 200, 101, 'ms', 0], decay(0.1, 20), P_.size, ['Density', 'l', 1, 30, 30, '', 0], P_.pct('ER Level'), P_.lvl, ['Lo Multiply', 'g', 0.1, 10, 51, '', 2], ['Hi Multiply', 'g', 0.1, 10, 51, '', 2], P_.loc, P_.hic, ['ER Left', 'l', 0, 200, 101, 'ms', 0], ['ER Right', 'l', 0, 200, 101, 'ms', 0], P_.onoff('Freeze')],
-  GATE: [P_.pre, ['Decay', 'l', 140, 1000, 51, 'ms', 0], ['Attack', 'l', 0, 30, 31, '', 0], ['Density', 'l', 1, 50, 50, '', 0], ['Spread', 'l', 0, 100, 51, '', 0], P_.lvl, P_.loc, ['Hi Shv Freq', 'g', 200, 20000, 51, 'Hz', 0], ['Hi Shv Gain', 'l', -30, 0, 61, 'dB', 1], P_.dif],
-  RVRS: [P_.pre, ['Decay', 'g', 140, 1000, 51, 'ms', 0], ['Rise', 'l', 0, 50, 51, '', 0], P_.dif, ['Spread', 'l', 0, 100, 51, '', 0], P_.lvl, P_.loc, ['Hi Shv Freq', 'g', 200, 20000, 51, 'Hz', 0], ['Hi Shv Gain', 'l', -30, 0, 61, 'dB', 1]],
-  DLY: [P_.mix, P_.time, ['Mode', 'e', ['ST', 'X', 'M']], P_.fac('Factor L'), P_.fac('Factor R'), ['Offset L/R', 'l', -100, 100, 201, 'ms', 0], P_.loc, P_.hic, ['Feed Lo Cut', 'g', 10, 500, 51, 'Hz', 0], P_.pct('Feed Left'), P_.pct('Feed Right'), ['Feed Hi Cut', 'g', 200, 20000, 51, 'Hz', 0]],
-  '3TAP': [P_.time, P_.pct('Gain Base'), P_.tpan('Pan Base'), P_.fb, P_.loc, P_.hic, P_.fac('Factor A'), P_.pct('Gain A'), P_.tpan('Pan A'), P_.fac('Factor B'), P_.pct('Gain B'), P_.tpan('Pan B'), P_.onoff('Cross Feed'), P_.onoff('Mono'), P_.onoff('Dry')],
-  '4TAP': [P_.time, P_.pct('Gain Base'), P_.fb, P_.loc, P_.hic, ['Spread', 'l', 0, 6, 7, '', 0], P_.fac('Factor A'), P_.pct('Gain A'), P_.fac('Factor B'), P_.pct('Gain B'), P_.fac('Factor C'), P_.pct('Gain C'), P_.onoff('Cross Feed'), P_.onoff('Mono'), P_.onoff('Dry')],
-  CRS: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], ['Depth L', 'l', 0, 100, 21, '%', 0], ['Depth R', 'l', 0, 100, 21, '%', 0], ['Delay L', 'g', 0.5, 50, 51, 'ms', 1], ['Delay R', 'g', 0.5, 50, 51, 'ms', 1], P_.mix, P_.loc, P_.hic, ['Phase', 'l', 0, 180, 37, '°', 0], ['Wave', 'l', 0, 100, 21, '%', 0], ['Spread', 'l', 0, 100, 21, '%', 0]],
-  FLNG: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], ['Depth L', 'l', 0, 100, 21, '%', 0], ['Depth R', 'l', 0, 100, 21, '%', 0], ['Delay L', 'g', 0.5, 20, 51, 'ms', 1], ['Delay R', 'g', 0.5, 20, 51, 'ms', 1], P_.mix, P_.loc, P_.hic, ['Phase', 'l', 0, 180, 37, '°', 0], ['Feed Lo Cut', 'g', 10, 500, 51, 'Hz', 0], ['Feed Hi Cut', 'g', 200, 20000, 51, 'Hz', 0], ['Feed', 'l', -90, 90, 37, '%', 0]],
-  PHAS: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], P_.pct('Depth'), ['Resonance', 'l', 0, 80, 41, '%', 0], ['Base', 'l', 0, 50, 26, '', 0], ['Stages', 'l', 2, 12, 11, '', 0], P_.mix, ['Wave', 'l', -50, 50, 21, '', 0], ['Phase', 'l', 0, 180, 37, '°', 0], ['Env Mod', 'l', -100, 100, 41, '%', 0], ['Attack', 'g', 10, 1000, 51, 'ms', 0], ['Hold', 'g', 1, 2000, 51, 'ms', 0], ['Release', 'g', 10, 1000, 51, 'ms', 0]],
-  P1A: p1a(''), P1A2: [...p1a(' A'), ...p1a(' B')], PQ5: pq5(''), PQ5S: [...pq5(' A'), ...pq5(' B')],
-  LIM: [['Input Gain', 'l', 0, 18, 37, 'dB', 1], ['Out Gain', 'l', -18, 0, 37, 'dB', 1], P_.pct('Squeeze'), ['Knee', 'l', 0, 10, 11, 'dB', 0], ['Attack', 'g', 0.05, 1, 51, 'ms', 2], ['Release', 'g', 20, 2000, 51, 'ms', 0], P_.onoff('Stereo Link'), P_.onoff('Auto Gain')],
-  LEC: lec(''), LEC2: [...lec(' A'), ...lec(' B')]
-};
-/* a parameter as a law the controls understand */
-function fxLaw(p) {
-  if (p[1] === 'e' || p[1] === 't') return null;
-  const [, k, lo, hi, n, unit, dp] = p, of = x => k === 'g' ? lo * Math.pow(hi / lo, x) : lo + (hi - lo) * x;
-  return { n, of, fmt: x => { const v = of(x); return unit === 'Hz' ? hzT(v) : v.toFixed(dp) + (unit ? ' ' + unit : ''); } };
+const FXD = {};
+for (const k in FXD_SRC) FXD[k] = FXD_SRC[k].split(';').map((t, i) => { const p = t.split('|'), lab = p[0], sm = / (A|B)$/.exec(lab);
+  const o = { i, label: lab, kind: p[1], side: sm ? sm[1] : '', base: sm ? lab.slice(0, -2) : lab };
+  if (p[1] === 'e') o.names = p[2].split(','); else if (p[1] !== 't') { o.lo = +p[2]; o.hi = +p[3]; o.n = +p[4] || 101; o.unit = p[5] || ''; }
+  return o; });
+const fxDual = k => (FXD[k] || []).some(p => p.side === 'B');
+/* a number on a parameter's own scale */
+const fxNum = (p, x) => p.kind === 'g' ? p.lo * Math.pow(p.hi / p.lo, x) : p.lo + (p.hi - p.lo) * x;
+const fxNorm = (p, v) => clamp(p.kind === 'g' ? Math.log(v / p.lo) / Math.log(p.hi / p.lo) : (v - p.lo) / (p.hi - p.lo), 0, 1);
+function fxFmt(p, x) {
+  if (p.kind === 'e') return p.names[x] !== undefined ? p.names[x] : '?';
+  if (p.kind === 't') return x === 1 ? 'ON' : 'OFF';
+  const v = fxNum(p, clamp(x, 0, 1)), u = p.unit, step = (p.hi - p.lo) / Math.max(1, p.n - 1);
+  if (u === 'Hz') return hzT(v);
+  if (u === 'ms' && v >= 1000) return (v / 1000).toFixed(2) + ' s';
+  const dp = p.kind === 'g' ? (v < 10 ? 2 : v < 100 ? 1 : 0) : step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
+  return (u === 'dB' && v > 0.04 ? '+' : '') + v.toFixed(dp) + (u ? ' ' + u : '');
 }
+const TAP_KEYS = /^(DLY|3TAP|4TAP|D\/RV|D\/CR|D\/FL|MODD)$/;
+const fracOf = s => { const [a, b] = String(s).split('/').map(Number); return b ? a / b : a || 1; };
+
+/* Hebrew help: what each effect is for */
+const FX_INFO = {
+  HALL: 'ריוורב של אולם גדול: זנב ארוך ורך שמוסיף עומק ומרחב. מתאים לשירה, לבלדות, לפסנתר ולמיתרים.',
+  AMBI: 'אמביינס: חדר קצר מאוד בלי זנב בולט. נותן תחושת "אוויר" וחיבור בין כלים בלי שיישמע ריוורב. מצוין לתופים ולדיבור.',
+  RPLT: 'פלייט עשיר: פלייט מתכתי צפוף עם הדים מובנים ושליטה מפורטת. נשמע מבריק ומודרני, טוב לשירה ולסנר.',
+  ROOM: 'חדר: מרחב של חדר אמיתי עם החזרות ברורות. טוב לתופים, לגיטרות ולכלים אקוסטיים שצריכים להישמע "בחדר".',
+  CHAM: 'צ׳מבר: מדמה חדר הד מבטון כמו באולפנים הישנים. צבע חם וצפוף, מצוין לשירה ולתופים.',
+  PLAT: 'פלייט: ריוורב של לוח מתכת מתנודד. צפוף, חלק ומבריק בלי החזרות מוקדמות. קלאסי לשירה ולסנר.',
+  VREV: 'ריוורב וינטג׳: מדמה מכשיר ריוורב דיגיטלי מוקדם, עם אופי מעט מלוכלך וחם.',
+  VRM: 'חדר וינטג׳: חדר מכשיר וינטג׳ עם החזרות מוקדמות נפרדות לשמאל ולימין ואפשרות להקפיא את הזנב.',
+  GATE: 'ריוורב גייטד: ריוורב שנחתך בבת אחת. הסאונד של שנות השמונים לסנר ולתופים.',
+  RVRS: 'ריוורב הפוך: הזנב עולה לפני הצליל במקום אחריו. אפקט מיוחד למעברים ולשירה.',
+  DLY: 'דיליי סטריאו: חזרות של הצליל בזמן שנקבע, עם פקטור נפרד לכל צד. TAP לחיצה בקצב השיר קובעת את הזמן.',
+  '3TAP': 'דיליי שלוש חזרות: חזרה בסיסית ועוד שתיים בפקטורים של הזמן, לכל אחת עוצמה ופאן משלה. יוצר קצב מעניין.',
+  '4TAP': 'דיליי ריתמי: ארבע חזרות לפי פקטורים ופיזור, ליצירת תבנית קצבית.',
+  CRS: 'כורוס: מכפיל את הצליל עם עיכוב קצר שמשתנה לאט, וכך הצליל נשמע רחב וכמו כמה נגנים. לגיטרות, קלידים ושירה ברקע.',
+  FLNG: 'פלנג׳ר: עיכוב קצר מאוד עם משוב שיוצר "שאיבה" מתכתית שזזה. אפקט בולט לגיטרות ולתופים.',
+  PHAS: 'פייזר: מסננים שזזים ויוצרים תנועה סיבובית בצליל. קלאסי לקלידים ולגיטרות.',
+  DIMC: 'כורוס דימנשן: כורוס עדין מאוד שמרחיב בלי תחושת תנודה. ארבעה מצבים בעוצמות שונות.',
+  FILT: 'מוד פילטר: מסנן שזז לפי מתנד או לפי עוצמת הצליל (אוטו־וואה). לגיטרות, לבס ולקלידים.',
+  ROTA: 'רמקול מסתובב (לסלי): הדמיה של רמקול עם צופר ותוף מסתובבים. הקלאסי לאורגן.',
+  PAN: 'טרמולו ופאנר: משנה עוצמה או מיקום שמאל־ימין בקצב קבוע או לפי עוצמת הנגינה.',
+  SUB: 'סאב־אוקטבר: מוסיף צליל אוקטבה אחת או שתיים מתחת. מעבה בס ובס־דראם.',
+  'D/RV': 'דיליי ואחריו צ׳מבר: שני אפקטים ביחידה אחת, חוסך סלוט.',
+  'CR/R': 'כורוס ואחריו צ׳מבר.',
+  'FL/R': 'פלנג׳ר ואחריו צ׳מבר.',
+  'D/CR': 'דיליי ואחריו כורוס.',
+  'D/FL': 'דיליי ואחריו פלנג׳ר.',
+  MODD: 'דיליי עם מודולציה וריוורב קטן, במקביל או בטור. נשמע "חי" ולא מכני.',
+  GEQ2: 'אקולייזר גרפי כפול: 31 פסים לכל צד בנפרד (A ו־B), כל צד לערוץ מונו אחר. פסים סמוכים משפיעים זה על זה כמו במכשיר אנלוגי.',
+  GEQ: 'אקולייזר גרפי סטריאו: 31 פסים שמשפיעים על שני הצדדים יחד. פסים סמוכים משפיעים זה על זה כמו במכשיר אנלוגי.',
+  TEQ2: 'TruEQ כפול: כמו האקולייזר הגרפי, אבל הוא מתקן את ההשפעה ההדדית בין הפסים, כך שהתגובה בפועל תואמת למה שרואים בפיידרים. מדויק יותר לתיקון מוניטורים.',
+  TEQ: 'TruEQ סטריאו: אקולייזר גרפי מדויק, התגובה בפועל תואמת למיקום הפיידרים.',
+  DES2: 'דה־אסר כפול: מנמיך "ססס" ו"ששש" חדים בשירה, לכל צד בנפרד. פס נמוך ופס גבוה, ובחירת קול גברי או נשי.',
+  DES: 'דה־אסר סטריאו: מנמיך שריקות חדות בשירה ובפליז, לשני הצדדים יחד או במצב מיד־סייד.',
+  P1A: 'אקולייזר תוכניות בסגנון פולטק: הגברה והנמכה רכות שאפשר לעשות יחד באותו תדר. מוסיף חום ונוכחות, אהוב על בס ושירה.',
+  P1A2: 'אקולייזר פולטק כפול: כל צד לערוץ מונו אחר.',
+  PQ5: 'אקולייזר אמצעים בסגנון פולטק: עיצוב רך של אמצעי התדרים.',
+  PQ5S: 'אקולייזר אמצעים כפול: כל צד לערוץ מונו אחר.',
+  WAVD: 'מעצב גלים (טרנזיינט דיזיינר): מחזק או מרכך את מכת הפתיחה של הצליל ואת הזנב, בלי תלות בעוצמה. מעולה לתופים ולגיטרות אקוסטיות. יש שני צדדים, A ו־B.',
+  LIM: 'לימיטר מדויק: מונע מהאות לעבור את התקרה. למיין ולהגנה.',
+  CMB: 'קומבינטור: קומפרסור חמישה פסים שדוחס כל תחום תדרים בנפרד. בעיקר למיין.',
+  CMB2: 'קומבינטור כפול: כל צד לערוץ אחר.',
+  FAC: 'פייר קומפרסור (בסגנון פיירצ׳יילד): קומפרסור שפופרות איטי וחם עם מד VU. נותן דחיסה מוזיקלית לשירה, לבס ולמיין.',
+  FAC1M: 'פייר קומפרסור מיד־סייד: דוחס בנפרד את מרכז התמונה ואת הצדדים.',
+  FAC2: 'פייר קומפרסור כפול: כל צד לערוץ מונו אחר.',
+  LEC: 'לייז׳ר קומפרסור (בסגנון LA-2A): קומפרסור אופטי רך וחלק. שני כפתורים בלבד, מצוין לשירה ולבס.',
+  LEC2: 'לייז׳ר קומפרסור כפול: כל צד לערוץ מונו אחר.',
+  ULC: 'אולטימו קומפרסור (בסגנון 1176): קומפרסור מהיר ואגרסיבי. מצוין לשירה ולתופים. ALL הוא מצב "כל הכפתורים לחוצים" המפורסם.',
+  ULC2: 'אולטימו כפול: כל צד לערוץ מונו אחר.',
+  ENH2: 'אנהנסר כפול: מחזק בס, אמצעים וגבוהים בצורה "חכמה" כדי שהצליל יבלוט.',
+  ENH: 'אנהנסר סטריאו: מבליט את הצליל ומרחיב אותו.',
+  EXC2: 'אקסייטר כפול: מוסיף הרמוניות עליונות שמוסיפות בהירות ונוכחות.',
+  EXC: 'אקסייטר סטריאו: מוסיף ברק ונוכחות בתדרים הגבוהים.',
+  IMG: 'סטריאו אימג׳ר: שולט ברוחב ובמיקום של התמונה הסטריאופונית.',
+  EDI: 'אדיסון EX1: מרחיב ומצר את התמונה בכל תחום תדרים.',
+  SON: 'סאונד מקסר: מחדד את הצליל ומחזק את הבס בצורה מבוקרת.',
+  AMP2: 'מגבר גיטרה כפול: הדמיה של מגבר וקבינט, לגיטרה או בס שמחוברים ישירות.',
+  AMP: 'מגבר גיטרה סטריאו.',
+  DRV2: 'טיוב סטייג׳ כפול: חימום וסטורציה של מנורה עם אקולייזר.',
+  DRV: 'טיוב סטייג׳ סטריאו: מוסיף חום והרמוניות של מנורה.',
+  PIT2: 'פיץ׳ שיפטר כפול: שני קולות בגבהים שונים, למשל להכפלה או להרמוניה.',
+  PIT: 'פיץ׳ שיפטר: משנה את גובה הצליל בחצאי טונים ובסנטים.'
+};
+/* Hebrew help: one line per parameter, by its name without A/B or L/R */
+const PI = {
+  'Pre Delay': 'השהייה לפני תחילת הריוורב. מפריד בין הצליל הישיר להד ושומר על בהירות.', 'Reverb Delay': 'השהייה לפני תחילת הריוורב.',
+  Decay: 'אורך הזנב: כמה זמן ההד ממשיך עד שהוא נעלם.', Size: 'גודל החלל המדומה.', Damping: 'מעל התדר הזה הגבוהים נעלמים מהר יותר, כמו בחדר עם וילונות.',
+  Diffuse: 'צפיפות ההחזרות: גבוה = זנב חלק, נמוך = החזרות נפרדות.', Density: 'צפיפות ההחזרות.', Level: 'עוצמת היציאה של האפקט.',
+  'Lo Cut': 'חותך את הנמוכים שנכנסים לאפקט, כדי שלא ייצא בוץ.', 'Hi Cut': 'חותך את הגבוהים של האפקט, כדי שיהיה רך יותר.',
+  'Bass Multi': 'כמה הנמוכים נשארים ארוכים יותר (מעל 1) או קצרים יותר מהזנב.', 'Lo Multiply': 'אורך הזנב בנמוכים ביחס לזנב.', 'Hi Multiply': 'אורך הזנב בגבוהים ביחס לזנב.',
+  Spread: 'רוחב הסטריאו של האפקט.', Shape: 'צורת הבנייה של הזנב: כמה מהר הוא מגיע לשיא.', 'Mod Speed': 'מהירות התנודה בתוך הזנב, שמונעת צליל מתכתי.',
+  Modulate: 'כמות התנודה בזנב.', 'Tail Gain': 'עוצמת הזנב לעומת ההחזרות הראשונות.', Attack: 'מהירות התגובה בתחילת הצליל.', Spin: 'תנועה בתוך הזנב.',
+  'Echo L': 'הד נוסף בצד שמאל.', 'Echo R': 'הד נוסף בצד ימין.', 'Echo Feed L': 'כמה ההד חוזר על עצמו.', 'Echo Feed R': 'כמה ההד חוזר על עצמו.',
+  'Reflection L': 'זמן ההחזרה הראשונה משמאל.', 'Reflection R': 'זמן ההחזרה הראשונה מימין.', 'Reflection Gain L': 'עוצמת ההחזרה הראשונה.', 'Reflection Gain R': 'עוצמת ההחזרה הראשונה.',
+  Xover: 'תדר ההפרדה בין התחומים.', 'Mod Depth': 'עומק התנודה.', Vintage: 'אופי מכשיר ישן ומלוכלך יותר.', Position: 'מיקום ההאזנה: קדימה או אחורה.',
+  'ER Level': 'עוצמת ההחזרות המוקדמות.', 'ER Left': 'זמן ההחזרה המוקדמת משמאל.', 'ER Right': 'זמן ההחזרה המוקדמת מימין.', Freeze: 'מקפיא את הזנב כך שהוא נמשך לנצח.',
+  Rise: 'כמה מהר הזנב ההפוך עולה.', 'Hi Shv Freq': 'תדר המדף של הגבוהים.', 'Hi Shv Gain': 'כמה להנמיך את הגבוהים.',
+  Mix: 'היחס בין הצליל המקורי לאפקט. בסלוט שנשלח בסנד בדרך כלל 100%.', Time: 'זמן הדיליי הבסיסי. אפשר ללחוץ TAP בקצב השיר.',
+  Mode: 'מצב העבודה.', 'Factor L': 'כפולה של הזמן לצד שמאל, למשל 3/4 לדיליי מנוקד.', 'Factor R': 'כפולה של הזמן לצד ימין.', 'Offset L/R': 'הזזה קטנה בין הצדדים לתחושת רוחב.',
+  'Feed Lo Cut': 'חיתוך נמוכים בכל חזרה.', 'Feed Hi Cut': 'חיתוך גבוהים בכל חזרה, כך שהחזרות נעשות כהות כמו בדיליי טייפ.', 'Feed Left': 'כמה חזרות בשמאל.', 'Feed Right': 'כמה חזרות בימין.',
+  'Gain Base': 'עוצמת החזרה הבסיסית.', 'Pan Base': 'מיקום החזרה הבסיסית.', Feedback: 'כמה חזרות: יותר = הד ממושך.', 'Factor A': 'כפולה של הזמן לחזרה A.', 'Gain A': 'עוצמת חזרה A.',
+  'Pan A': 'מיקום חזרה A.', 'Factor B': 'כפולה של הזמן לחזרה B.', 'Gain B': 'עוצמת חזרה B.', 'Pan B': 'מיקום חזרה B.', 'Factor C': 'כפולה של הזמן לחזרה C.', 'Gain C': 'עוצמת חזרה C.',
+  'Cross Feed': 'החזרות עוברות מצד לצד.', Mono: 'מכניס את שני הצדדים כמונו.', Dry: 'מעביר גם את הצליל המקורי.', Speed: 'מהירות התנודה.', Rate: 'מהירות התנודה.',
+  'Depth L': 'עומק התנודה בשמאל.', 'Depth R': 'עומק התנודה בימין.', Depth: 'עומק האפקט.', 'Delay L': 'העיכוב הבסיסי בשמאל.', 'Delay R': 'העיכוב הבסיסי בימין.', Delay: 'העיכוב הבסיסי.',
+  Phase: 'הפרש הזמן בתנודה בין שמאל לימין, ליצירת רוחב.', Wave: 'צורת התנודה.', Resonance: 'הדגשה בנקודת המסנן, צליל חד יותר.', Base: 'נקודת הבסיס של המסנן.',
+  Stages: 'מספר שלבי הפייזר: יותר = אפקט עמוק יותר.', 'Env Modulation': 'כמה עוצמת הנגינה מזיזה את האפקט.', 'Env Mod': 'כמה עוצמת הנגינה מזיזה את האפקט.', Hold: 'זמן החזקה.', Release: 'מהירות החזרה.',
+  Active: 'הפעלה וכיבוי של המכשיר.', 'Lo Speed': 'מהירות איטית של הרמקול.', 'Hi Speed': 'מהירות מהירה של הרמקול.', Accelerate: 'כמה זמן לוקח לעבור בין המהירויות.',
+  Distance: 'מרחק המיקרופון מהרמקול.', Balance: 'האיזון בין החלקים.', Stop: 'עוצר את הסיבוב.', Slow: 'בחירה בין מהירות איטית למהירה.', Range: 'תחום התדרים שמהם נבנית האוקטבה.',
+  'Octave -1': 'עוצמת האוקטבה הראשונה מתחת.', 'Octave -2': 'עוצמת האוקטבה השנייה מתחת.', Pattern: 'תבנית החזרות.', Setup: 'במקביל או בטור.', Type: 'סוג החלל.',
+  'Env Speed': 'כמה עוצמת הנגינה משנה את המהירות.', 'Env Depth': 'כמה עוצמת הנגינה משנה את העומק.', '4 Pole': 'שיפוע המסנן: 4 קטבים חד יותר.', 'Side Chain': 'המסנן מגיב לאות אחר.', Drive: 'כמות הסטורציה.',
+  'Lo Band': 'כמה להנמיך שריקות בתחום הנמוך יותר.', 'Hi Band': 'כמה להנמיך שריקות בתחום הגבוה.', Voice: 'קול נשי (FEM) או גברי (MALE): מזיז את תחום החיפוש.',
+  Gain: 'הגבר כללי.', 'Lo Boost': 'כמה להגביר בנמוכים.', 'Lo Freq': 'תדר הנמוכים.', 'Lo Atten': 'כמה להנמיך בנמוכים, יחד עם ההגברה זה יוצר את הטריק של פולטק.',
+  'Hi Width': 'רוחב ההגברה בגבוהים.', 'Hi Boost': 'כמה להגביר בגבוהים.', 'Hi Freq': 'תדר הגבוהים.', 'Hi Atten': 'כמה להנמיך בגבוהים העליונים.', 'Hi Atten Freq': 'תדר ההנמכה העליונה.',
+  Transformer: 'צבע של שנאי, חם ומעט רווי.', 'Mid Freq': 'תדר האמצעים.', 'Mid Cut': 'כמה להנמיך באמצעים.', Sustain: 'מחזק או מקצר את הזנב של כל צליל.',
+  'Input Gain': 'כמה אות נכנס: יותר = יותר דחיסה.', 'Out Gain': 'עוצמת היציאה, לפיצוי על הדחיסה.', Squeeze: 'דחיסה נוספת עם אופי.', Knee: 'כמה רכה הכניסה לדחיסה.',
+  'Stereo Link': 'שני הצדדים נדחסים יחד.', 'Auto Gain': 'פיצוי עוצמה אוטומטי.', 'Band Solo': 'האזנה לפס אחד בלבד.', 'Auto Release': 'זמן שחרור אוטומטי לפי המוזיקה.',
+  'SBC Speed': 'מהירות האיזון הספקטרלי.', 'SBC On': 'איזון ספקטרלי אוטומטי בין הפסים.', 'Xover Slope': 'שיפוע ההפרדה בין הפסים.', Ratio: 'יחס הדחיסה: גבוה יותר = דחיסה חזקה.', Threshold: 'מעל הסף הזה מתחילה הדחיסה.',
+  'Meter Mode': 'מה המדים מראים.', Bias: 'אופי המנורה: מעט יותר "לכלוך".', Peak: 'כמות הדחיסה.', 'Bass Gain': 'חיזוק הבס.', 'Bass Freq': 'תדר הבס.', 'Mid Gain': 'חיזוק האמצעים.',
+  'Mid Q': 'רוחב האמצעים.', 'Hi Gain': 'חיזוק הגבוהים.', Solo: 'האזנה רק למה שהמכשיר מוסיף.', Tune: 'מאיזה תדר מתחילים להוסיף הרמוניות.', 'Zero Fill': 'ממלא את הצליל בתדרים שמתחת.',
+  Timbre: 'צבע ההרמוניות.', Harmonics: 'כמות ההרמוניות.', 'Mono Pan': 'מיקום החלק המונו.', 'Stereo Pan': 'מיקום החלק הסטריאו.', 'Shv Gain': 'חיזוק במדף.', 'Shv Freq': 'תדר המדף.',
+  'Shv Q': 'רוחב המדף.', 'Stereo Input': 'סוג האות שנכנס.', 'Stereo Output': 'סוג האות שיוצא.', 'ST Spread': 'רוחב התמונה.', 'LMF Spread': 'רוחב בנמוכים ובאמצעים.',
+  'Center Distance': 'כמה המרכז קרוב או רחוק.', 'Lo Contour': 'חיזוק הבס.', Process: 'כמות העיבוד.', Preamp: 'הגבר הכניסה של המגבר.', Buzz: 'צבע הדיסטורשן.', Punch: 'מכה.',
+  Crunch: 'כמות הקראנץ׳.', Low: 'בס.', High: 'גבוהים.', Cabinet: 'הדמיית קבינט רמקולים.', 'Even Har': 'הרמוניות זוגיות: חום.', 'Odd Har': 'הרמוניות אי־זוגיות: חספוס.',
+  'Lo Gain': 'חיזוק בנמוכים.', 'Hi Gain ': 'חיזוק בגבוהים.', Semitone: 'שינוי גובה בחצאי טונים.', Cent: 'כיוון עדין במאיות של חצי טון.', 'Mode 1': 'עוצמת הכורוס 1.', 'Mode 2': 'עוצמת הכורוס 2.', 'Mode 3': 'עוצמת הכורוס 3.', 'Mode 4': 'עוצמת הכורוס 4.'
+};
+const piOf = lab => { const b = lab.replace(/ (A|B|L|R|M|S|1|2)$/, ''); return PI[lab] || PI[b] || PI[b.replace(/^Band \d /, '')] || (/Hz/.test(lab) ? 'הגברה או הנמכה של הפס בתדר הזה.' : ''); };
 
 /* routing: sources of an output (/routing/aux|usb/NN/src) and where it is taken from (…/pos) */
 const ROUT_POS = ['AIN', 'AIN+M', 'IN', 'IN+M', 'PRE EQ', 'PRE EQ+M', 'POST EQ', 'POST EQ+M', 'PRE', 'PRE+M', 'POST'];
 const AUX_OUTS = { XR18: 6, XR16: 4, XR12: 2 };
 const LINK_ASK = 'לקשר את שני הערוצים לסטריאו? המיקסר מעתיק את ההגדרות מהערוץ האי־זוגי לזוגי.';
+/* inserts: strips that have one, and the candidate addresses of the slot choice (0 OFF, 1 FX1A, 2 FX1B … 8 FX4B) */
+const INS_KINDS = ['ch', 'bus', 'lr'], INS_SEL = ['fxslot', 'sel'];
+const FX_INS_ASK = n => `להעביר את FX${n} למצב אינסרט? הסלוט יפסיק לעבוד כשליחה, והאפקט ישמע רק בערוצים שבהם הוא משובץ.`;
 const FX_ASK = n => `להחליף את האפקט בסלוט ${n}? ההגדרות של האפקט הנוכחי יוחלפו בברירת המחדל של החדש.`;
 const PH_ASK = 'להפעיל מתח פנטום 48V בכניסה הזו? אל תפעיל על מיקרופון סרט או על ציוד שלא מיועד לזה.';
 const TAPE = ['STOP', 'PAUSE', 'PLAY', 'REC PAUSE', 'REC', 'FF', 'REW'];
@@ -362,11 +524,11 @@ class App extends Component {
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
       prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', eqR: 18, rta: true, sendMeters: true, ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
     this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
-    this.gr = new Float32Array(39); this.grAt = 0; this.rtaR = new Float32Array(RTA_N).fill(-90); this.rtaS = new Float32Array(RTA_N).fill(-90); this.rtaAt = 0; this.rtaDemo = ''; this.ptrs = new Map(); this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
+    this.fxm = new Float32Array(56).fill(-90); this.fxmAt = 0; this.amx = new Float32Array(16); this.amxAt = 0; this.gr = new Float32Array(39); this.grAt = 0; this.rtaR = new Float32Array(RTA_N).fill(-90); this.rtaS = new Float32Array(RTA_N).fill(-90); this.rtaAt = 0; this.rtaDemo = ''; this.ptrs = new Map(); this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
     this.sim = new Float32Array(40).fill(-60);
     this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
     this.demoInit(this.state.prefs.demoModel);
-    window.__app = this; window.__xm = { FX_KEYS, FX_NAMES, FXP, fxLaw, cleanName, nameSuffix, TABS, LAW, bandDb, chanPaths, q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
+    window.__app = this; window.__xm = { FX_KEYS, FX_NAMES, FXD, fxNum, fxFmt, fxDual, FX_FACE, FX_INFO, piOf, cleanName, nameSuffix, TABS, LAW, bandDb, chanPaths, q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
   }
 
   /* ---------- stores ---------- */
@@ -409,7 +571,12 @@ class App extends Component {
     for (let k = 1; k <= 6; k++) { D[`/routing/aux/${pad2(k)}/src`] = 25 + k; D[`/routing/aux/${pad2(k)}/pos`] = 10; }
     for (let k = 1; k <= 18; k++) { D[`/routing/usb/${pad2(k)}/src`] = k <= 2 ? 35 + k : k - 1; D[`/routing/usb/${pad2(k)}/pos`] = k <= 2 ? 4 : 0; }
     L.ch.forEach(c => { D[c.base + '/preamp/rtnsw'] = 0; D[c.base + '/config/rtnsrc'] = c.n - 1; });
-    [0, 5, 10, 13].forEach((t, i) => { D[`/fx/${i + 1}/type`] = t; D[`/fx/${i + 1}/insert`] = 0; (FXP[FX_KEYS[t]] || []).forEach((p, k) => { D[`/fx/${i + 1}/par/${pad2(k + 1)}`] = p[1] === 'e' || p[1] === 't' ? 0 : 0.5; }); });
+    [0, 5, 10, 37].forEach((t, i) => { D[`/fx/${i + 1}/type`] = t; D[`/fx/${i + 1}/insert`] = i === 3 ? 1 : 0; this.fxDefaults(D, i + 1, t); });
+    /* inserts: the Wave Designer in slot 4 is split – side A on the kick (ch 1), side B on the snare (ch 2) */
+    [...L.ch, ...L.bus, L.lr].forEach(x => { D[x.base + '/insert/on'] = x.kind === 'ch' && x.n <= 2 ? 1 : 0; D[x.base + '/insert/fxslot'] = x.kind === 'ch' && x.n <= 2 ? 6 + x.n : 0; });
+    /* automix: the speech mics 9–12 in group X */
+    L.ch.forEach(c => { D[c.base + '/automix/group'] = c.n >= 9 && c.n <= 12 ? 1 : 0; D[c.base + '/automix/weight'] = c.n === 9 ? q(0.625, 49) : 0.5; });
+    Object.assign(D, { '/config/amixenable/X': 1, '/config/amixenable/Y': 0, '/config/amixlock/X': 0, '/config/amixlock/Y': 0 });
     Object.assign(D, { '/-stat/usbmounted': 1, '/-stat/tape/state': 0, '/-stat/tape/file': 'REC_0007.WAV', '/-stat/tape/etime': 0, '/-stat/tape/rtime': 5400, '/-stat/usb/path': '/', '/-stat/usb/count': 3,
       '/-stat/usb/001/name': 'PLAYBACK', '/-stat/usb/001/type': 1, '/-stat/usb/002/name': 'REC_0006.WAV', '/-stat/usb/002/type': 0, '/-stat/usb/003/name': 'REC_0007.WAV', '/-stat/usb/003/type': 0 });
     [...L.ch, L.aux, ...L.rtn].forEach((s, i) => L.dests.forEach((d, j) => { D[sendPath(s, d)] = q(d.k > 6 ? (i >= 12 && i < 15 ? 0.5 : 0) : ((i * 7 + j * 13) % 10) / 14, 161); const b = s.base + '/mix/' + pad2(d.k); D[b + '/tap'] = d.k > 6 ? 4 : d.k > 4 ? 5 : 3; D[b + '/grpon'] = d.k === 5 && i < 8 ? 1 : 0; if (d.k < 6 && d.k % 2) D[b + '/pan'] = 0.5; }));
@@ -418,7 +585,7 @@ class App extends Component {
   /* ---------- the only write path ---------- */
   set(path, type, value) {
     const fm = /^\/fx\/(\d)\/type$/.exec(path);
-    if (fm) { if (!this.linked()) { const ps = FXP[FX_KEYS[value]] || []; ps.forEach((p, k) => { this.demo[`/fx/${fm[1]}/par/${pad2(k + 1)}`] = p[1] === 'e' || p[1] === 't' ? 0 : 0.5; }); } else this.fxReread(+fm[1]); }
+    if (fm) { if (!this.linked()) this.fxDefaults(this.demo, +fm[1], value); else this.fxReread(+fm[1]); }
     if (!this.linked()) { this.demo[path] = value; this.bump(); return true; }
     const c = this.state.conn;
     if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
@@ -481,11 +648,18 @@ class App extends Component {
     if (sh && grpd(sh)) L.dca.forEach(d => P.push(d.name, d.color));
     if (st.mgPop) { L.all.filter(grpd).forEach(x => P.push(x.name, x.base + '/grp/dca', x.base + '/grp/mute')); L.dca.forEach(d => P.push(d.name, d.color, d.fader, d.on)); for (let k = 1; k <= 4; k++) P.push('/config/mute/' + k); }
     if (st.screen === 'routing') { L.ch.forEach(c => P.push(c.name, c.color, c.base + '/config/insrc')); L.bus.forEach(b => P.push(b.name)); L.fxs.forEach(f => P.push(f.name));
-      if (L.M.key === 'XR18') L.ch.forEach(c => P.push(c.base + '/preamp/rtnsw', c.base + '/config/rtnsrc'));
+      L.ch.forEach(c => P.push(c.base + '/preamp/rtnsw', c.base + '/config/rtnsrc'));
       for (let k = 1; k <= AUX_OUTS[L.M.key]; k++) P.push(`/routing/aux/${pad2(k)}/src`, `/routing/aux/${pad2(k)}/pos`);
       for (let k = 1; k <= (L.M.key === 'XR18' ? 18 : 2); k++) P.push(`/routing/usb/${pad2(k)}/src`, `/routing/usb/${pad2(k)}/pos`); }
     if (st.screen === 'fx') { for (let n = 1; n <= 4; n++) { P.push(`/fx/${n}/type`, `/fx/${n}/insert`); const a = L.fxs[n - 1], r = L.rtn[n - 1]; P.push(a.name, a.color, a.fader, a.on, r.name, r.fader, r.on); }
-      const t = this.val(`/fx/${st.fxSlot}/type`), ps = fin(t) && FXP[FX_KEYS[t]]; if (ps) ps.forEach((_, k) => P.push(`/fx/${st.fxSlot}/par/${pad2(k + 1)}`)); }
+      this.fxParamPaths(st.fxSlot).forEach(p => P.push(p)); }
+    if (st.screen === 'insert' && sh) { INS_SEL.forEach(c => P.push(sh.base + '/insert/' + c)); for (let n = 1; n <= 4; n++) P.push(`/fx/${n}/type`, `/fx/${n}/insert`);
+      const sp = this.insSel(sh), v = sp ? this.val(sp) : 0; if (fin(v) && v > 0) this.fxParamPaths(Math.ceil(v / 2)).forEach(p => P.push(p)); }
+    if (st.screen === 'fx') { [...L.ch, ...L.bus, L.lr].forEach(x => { P.push(x.name, x.base + '/insert/on'); INS_SEL.forEach(c => P.push(x.base + '/insert/' + c)); }); }
+    if (st.screen === 'automix') { L.ch.forEach(c => P.push(c.name, c.color, c.base + '/automix/group', c.base + '/automix/weight')); ['X', 'Y'].forEach(g => P.push('/config/amixenable/' + g, '/config/amixlock/' + g)); }
+    if (st.srcPick || (st.screen === 'config' && sh && sh.kind === 'ch')) { const c = L.byId[st.srcPick] || sh; if (c && c.kind === 'ch') P.push(c.base + '/preamp/rtnsw', c.base + '/config/rtnsrc', c.base + '/config/insrc'); }
+    if (st.screen === 'settings') P.push('/-prefs/name', '/-prefs/clockrate', '/-prefs/lan/mode', '/-prefs/lan/addr', '/-prefs/lan/mask', '/-prefs/lan/gateway', '/-prefs/ap/ssid', '/-prefs/ap/channel', '/-prefs/is/mode', '/-prefs/is/ssid', '/-prefs/usbifcmode', '/-stat/autosave');
+    if (st.screen === 'home' && sh && sh.kind === 'ch') { const lo = sh.n % 2 ? sh.n : sh.n - 1; P.push(`/config/chlink/${lo}-${lo + 1}`); }
     if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
   }
@@ -512,7 +686,7 @@ class App extends Component {
     const c = this.state.conn;
     if (!this.linked() || ip !== c.ip) return;
     this.lastRx = Date.now();
-    if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); else if (m.addr === '/meters/6' && m.args[0] instanceof Uint8Array) this.onGr(m.args[0]); else if (m.addr === '/meters/4' && m.args[0] instanceof Uint8Array) this.onRta(m.args[0]); return; }
+    if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); else if (m.addr === '/meters/6' && m.args[0] instanceof Uint8Array) this.onGr(m.args[0]); else if (m.addr === '/meters/4' && m.args[0] instanceof Uint8Array) this.onRta(m.args[0]); else if (m.addr === '/meters/3' && m.args[0] instanceof Uint8Array) this.onFxm(m.args[0]); else if (m.addr === '/meters/7' && m.args[0] instanceof Uint8Array) this.onAmx(m.args[0]); return; }
     if (!m.args.length) return;
     const v = m.args[0];
     this.pend.delete(m.addr); this.missing.delete(m.addr); this.dtype[m.addr] = m.types[0];
@@ -561,6 +735,7 @@ class App extends Component {
     if (!this.linked()) return;
     this.tx('/xremote'); this.tx('/meters', [['s', '/meters/1'], ['i', 0]]); this.tx('/meters', [['s', '/meters/6'], ['i', 0]]); this.tx('/xinfo');
     if (this.rtaWant() >= 0) this.tx('/meters', [['s', '/meters/4'], ['i', 0]]);
+    const sc = this.state.screen; if (sc === 'fx' || sc === 'insert') this.tx('/meters', [['s', '/meters/3'], ['i', 0]]); if (sc === 'automix') this.tx('/meters', [['s', '/meters/7'], ['i', 0]]);
   }
   /* once a second: link health, retries, searching */
   watch() {
@@ -719,7 +894,7 @@ class App extends Component {
     const ua = e => { if (e.isTrusted !== false) this.uAct = Date.now(); };
     ['pointerdown', 'pointermove', 'click', 'keydown', 'input'].forEach(t => document.addEventListener(t, ua, true));
     this.dv = setInterval(() => this.demoTick(), 90);
-    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} try { this.rtaDemoTick(); } catch (e) {} }, 50);
+    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} try { this.rtaDemoTick(); } catch (e) {} try { this.fxTick(); } catch (e) {} }, 50);
     if (NATIVE) {
       window.__xairNative = list => this.onNative(list);
       try { NATIVE.ready(); } catch (e) {}
@@ -733,7 +908,7 @@ class App extends Component {
   componentDidUpdate(pp, ps) {
     const st = this.state;
     if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin || st.mgPop !== ps.mgPop || st.fxSlot !== ps.fxSlot || st.rtab !== ps.rtab) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
-    if (CH_SCREENS.includes(st.screen) || st.screen === 'tape' || st.screen === 'fx' || st.screen === 'routing' || st.mgPop) this.readView();
+    if (CH_SCREENS.includes(st.screen) || ['tape', 'fx', 'routing', 'automix', 'settings'].includes(st.screen) || st.mgPop || st.srcPick) this.readView();
     if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
@@ -910,11 +1085,8 @@ class App extends Component {
             return html`<div class="sec" style="padding:8px;gap:6px;min-height:0">
               <span class="tag" style=${nameLook(col) + ';height:28px;font-size:14px;justify-content:center;overflow:hidden;white-space:nowrap'}>${this.nm(c) || c.def}</span>
               <span style="font-family:var(--mono);font-size:11px;color:#8c8272;text-align:center">${c.def}</span>
-              <button class="box" data-insrc=${c.n} style="cursor:pointer;justify-content:center;gap:6px" onClick=${() => this.setState({ keyPick: { path: c.base + '/config/insrc', title: (this.nm(c) || c.def) + ' · INPUT', labels: ins, cols: 8 } })}>
-                <em style="font-size:17px;color:var(--brass-hi)">${fin(v) && ins[v] ? ins[v] : '···'}</em><span style="color:#b8a78a">▾</span></button>
-              ${xr18 && html`<div style="display:flex;gap:4px">
-                <button class="pill" data-t=${c.base + '/preamp/rtnsw'} aria-pressed=${String(sw === 1)} onClick=${() => this.tog(c.base + '/preamp/rtnsw')} style=${`flex:1;height:36px;padding:0;font-size:12px;${sw === 1 ? 'background:#16252a;color:#8fd0e0;border-color:#8fd0e0' : ''}`}>${sw === 1 ? 'USB' : 'ANALOG'}</button>
-                <button class="pill" style="flex:1;height:36px;padding:0;font-size:12px" onClick=${() => this.setState({ keyPick: { path: c.base + '/config/rtnsrc', title: (this.nm(c) || c.def) + ' · USB RETURN', labels: usb, cols: 6 } })}>${fin(us) ? 'U' + pad2(us + 1) : '···'}</button></div>`}
+              <button class="box" data-insrc=${c.n} style="cursor:pointer;justify-content:center;gap:6px" onClick=${() => this.setState({ srcPick: c.id })}>
+                <em style=${`font-size:17px;color:${this.val(c.base + '/preamp/rtnsw') === 1 ? '#8fd0e0' : 'var(--brass-hi)'}`}>${this.srcText(c)}</em><span style="color:#b8a78a">▾</span></button>
             </div>`; })}
         </div>
         <div class="sec" style="flex:none;padding:10px 12px;gap:8px">
@@ -954,6 +1126,7 @@ class App extends Component {
     const st = this.state, kp = st.keyPick;
     return html`
       ${kp && this.keyPickPop(Hd)}
+      ${st.srcPick && this.renderSrcPick(Hd)}
       ${st.ask && html`
         <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
         <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:9;left:340px;top:${Math.round((Hd - 220) / 2)}px;width:500px;padding:22px;gap:16px;border-color:#e0513f;${HEB}`}>
@@ -974,42 +1147,642 @@ class App extends Component {
             onClick=${() => { if (kp.ask) { this.setState({ keyPick: null, ask: { text: kp.ask, path: kp.path, value: k } }); return; } this.pick(kp.path, k); this.setState({ keyPick: null }); }}>${l}</button>`)}</div>
         </div>`;
   }
-  /* the effects: four slots, the chosen one's parameters */
+  /* ---------- effects: values, controls, faces ---------- */
+  fxT(n) { const t = this.val(`/fx/${n}/type`); return Number.isInteger(t) && t >= 0 && t < FX_KEYS.length ? t : -1; }
+  fxK(n) { const t = this.fxT(n); return t < 0 ? '' : FX_KEYS[t]; }
+  fxPath(n, p) { return `/fx/${n}/par/${pad2(p.i + 1)}`; }
+  fxParamsOf(n, side) { const ps = FXD[this.fxK(n)] || []; return side ? ps.filter(p => p.side === side || !p.side) : ps; }
+  /* a parameter by its name; on a dual effect the side's own one */
+  fxP(n, label, side) { const ps = FXD[this.fxK(n)] || []; return ps.find(p => p.base === label && p.side === (side || 'A')) || ps.find(p => p.label === label) || ps.find(p => p.base === label); }
+  /* the shown value: a number on the parameter's scale, a name, or 0/1 */
+  fxV(n, label, def, side) {
+    const p = this.fxP(n, label, side); if (!p) return def; const r = this.val(this.fxPath(n, p)); if (r === undefined || (typeof r === 'number' && r !== r)) return def;
+    if (p.kind === 'e') return p.names[r] !== undefined ? p.names[r] : def; if (p.kind === 't') return r === 1 ? 1 : 0; return fin(r) ? fxNum(p, clamp(r, 0, 1)) : def;
+  }
+  fxHas(n, label, side) { return !!this.fxP(n, label, side); }
+  /* dragging a control on a face: up or right = more. A list steps one entry every 28 px. */
+  fxDrag(n, p) {
+    const path = this.fxPath(n, p), end = () => { this.kd = null; if (this.state.fxHot) this.setState({ fxHot: null }); };
+    return {
+      onPointerDown: e => { e.stopPropagation(); capture(e); const r = this.val(path); if (r === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; }
+        if (p.kind === 't') { this.tog(path); return; }
+        this.kd = { path, x: e.clientX, y: e.clientY, r0: r, moved: false }; this.setState({ fxHot: p.label }); },
+      onPointerMove: e => { const d = this.kd; if (!d || d.path !== path) return; const dd = (d.y - e.clientY) + (e.clientX - d.x);
+        if (!d.moved && Math.abs(dd) > 4) d.moved = true; if (!d.moved) return;
+        if (p.kind === 'e') { const i = clamp(Math.round(d.r0 + dd / 28), 0, p.names.length - 1); if (i !== this.val(path)) this.set(path, 'i', i); }
+        else this.set(path, 'f', q(d.r0 + dd / 230, p.n)); },
+      onPointerUp: end, onPointerCancel: end };
+  }
+  /* a knob: plate ticks, a cap and a pointer; label and value under it */
+  fknob(n, p, D, st = {}) {
+    if (!p) return null; const r = this.val(this.fxPath(n, p)), ok = r !== undefined && !(typeof r === 'number' && r !== r);
+    const t = !ok ? 0.5 : p.kind === 'e' ? r / Math.max(1, p.names.length - 1) : clamp(r, 0, 1), ang = (-135 + 270 * t) * Math.PI / 180, R = D / 2, S = D + 18, c = S / 2;
+    const ink = st.ink || '#cbbd9f', hot = this.state.fxHot === p.label, nT = p.kind === 'e' ? p.names.length : 11;
+    const ticks = Array.from({ length: nT }, (_, k) => { const a = (-135 + 270 * (nT > 1 ? k / (nT - 1) : 0)) * Math.PI / 180;
+      return html`<line x1=${(c + (R + 3) * Math.sin(a)).toFixed(1)} y1=${(c - (R + 3) * Math.cos(a)).toFixed(1)} x2=${(c + (R + 7) * Math.sin(a)).toFixed(1)} y2=${(c - (R + 7) * Math.cos(a)).toFixed(1)} stroke=${ink} stroke-width="1.2" opacity=".6"/>`; });
+    const cap = st.cap || ['#5a5d61', '#2a2c2e', '#101112'], ind = st.ind || '#f3efe6', id = 'kg' + (st.id || 'd');
+    return html`<button data-fk=${this.fxPath(n, p)} aria-label=${p.label + ' ' + (ok ? fxFmt(p, r) : '')} ...${this.fxDrag(n, p)}
+      style=${`flex:none;width:${Math.max(S, st.w || 0)}px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none;display:flex;flex-direction:column;align-items:center;gap:1px;opacity:${ok ? 1 : 0.45}`}>
+      <svg width=${S} height=${S} viewBox=${`0 0 ${S} ${S}`} aria-hidden="true">
+        <defs><radialGradient id=${id} cx="38%" cy="32%" r="75%"><stop offset="0" stop-color=${cap[0]}/><stop offset=".55" stop-color=${cap[1]}/><stop offset="1" stop-color=${cap[2]}/></radialGradient></defs>
+        ${ticks}${hot && html`<circle cx=${c} cy=${c} r=${R + 9} fill="none" stroke="#f3c27a" stroke-width="2.5"/>`}
+        <circle cx=${c} cy=${c + 2} r=${R} fill="rgba(0,0,0,.45)"/><circle cx=${c} cy=${c} r=${R} fill=${`url(#${id})`} stroke="rgba(0,0,0,.7)" stroke-width="1.5"/>
+        <line x1=${(c + R * 0.25 * Math.sin(ang)).toFixed(1)} y1=${(c - R * 0.25 * Math.cos(ang)).toFixed(1)} x2=${(c + R * 0.86 * Math.sin(ang)).toFixed(1)} y2=${(c - R * 0.86 * Math.cos(ang)).toFixed(1)} stroke=${ind} stroke-width=${Math.max(2.2, R / 7)} stroke-linecap="round"/>
+      </svg>
+      <span style=${`font-size:${(st.fs || 11) * ((st.label || p.base).length > 10 && S < 60 ? 0.82 : 1)}px;font-weight:800;letter-spacing:${(st.label || p.base).length > 10 ? 0 : 0.06}em;color:${st.lab || ink};white-space:nowrap;text-transform:uppercase`}>${st.label || p.base}</span>
+      <span style=${`font-family:var(--mono);font-size:${st.vfs || 12}px;color:${st.val || '#f3e6cc'};white-space:nowrap`}>${ok ? fxFmt(p, r) : '···'}</span>
+    </button>`;
+  }
+  /* a vertical fader on a face (studio reverb, graphic EQ) */
+  ffader(n, p, h, st = {}) {
+    if (!p) return null; const r = this.val(this.fxPath(n, p)), ok = fin(r), t = ok ? clamp(r, 0, 1) : 0.5, hot = this.state.fxHot === p.label, w = st.w || 44;
+    return html`<button data-fk=${this.fxPath(n, p)} aria-label=${p.label + ' ' + (ok ? fxFmt(p, r) : '')} ...${this.fxDrag(n, p)}
+      style=${`flex:none;position:relative;width:${w}px;height:${h}px;padding:0;border:none;background:transparent;cursor:ns-resize;touch-action:none;opacity:${ok ? 1 : 0.45}`}>
+      ${Array.from({ length: 9 }, (_, k) => html`<span style=${`position:absolute;left:3px;right:3px;top:${10 + k * (h - 20) / 8}px;height:1px;background:${st.tick || 'rgba(0,0,0,.28)'}`}></span>`)}
+      ${st.mid && html`<span style=${`position:absolute;left:0;right:0;top:${h / 2}px;height:1px;background:${st.midc || '#aaa'}`}></span>`}
+      <span style=${`position:absolute;left:${w / 2 - 3}px;width:6px;top:4px;bottom:4px;border-radius:3px;background:${st.slot || '#1a1816'};box-shadow:inset 0 1px 2px rgba(0,0,0,.7)`}></span>
+      <span style=${`position:absolute;left:${w / 2 - 15}px;width:30px;height:16px;top:${(1 - t) * (h - 16)}px;border-radius:3px;background:${st.cap || 'linear-gradient(180deg,#f4f0e6,#cfc8b6 45%,#9a9384 55%,#e6e0d0)'};box-shadow:0 2px 4px rgba(0,0,0,.55)${hot ? ',0 0 0 2px #f3c27a' : ''}`}><i style=${`position:absolute;left:3px;right:3px;top:7px;height:2px;background:${st.line || '#1a1816'}`}></i></span>
+    </button>`;
+  }
+  /* an on/off switch and a short list of named positions */
+  fsw(n, p, st = {}) {
+    if (!p) return null; const path = this.fxPath(n, p), v = this.val(path), on = v === 1, col = st.col || '#62b85c';
+    return html`<button data-t=${path} aria-pressed=${String(on)} onClick=${() => this.tog(path)}
+      style=${`flex:none;min-width:${st.w || 64}px;height:${st.h || 38}px;padding:0 10px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.08em;${on ? `background:${col};color:#10100e;border:1px solid ${col};box-shadow:0 0 10px ${col}88` : 'background:rgba(0,0,0,.35);color:#cbbd9f;border:1px solid rgba(255,255,255,.18)'}${v === undefined ? ';opacity:.45' : ''}`}>${st.label || p.base}${st.noState ? '' : ' ' + (on ? 'ON' : 'OFF')}</button>`;
+  }
+  fsel(n, p, st = {}) {
+    if (!p) return null; const path = this.fxPath(n, p), v = this.val(path), col = st.col || '#f3c27a';
+    return html`<div style="display:flex;flex-direction:column;gap:3px;align-items:flex-start">
+      <span style=${`font-size:10px;font-weight:800;letter-spacing:.1em;color:${st.lab || '#cbbd9f'};text-transform:uppercase`}>${st.label || p.base}</span>
+      <div style="display:flex;gap:3px">${p.names.map((nm, k) => html`<button data-e=${path + '=' + k} onClick=${() => this.pick(path, k)}
+        style=${`min-width:${st.bw || 44}px;height:${st.h || 32}px;padding:0 6px;border-radius:5px;cursor:pointer;font-size:12px;font-weight:800;${v === k ? `background:${col};color:#10100e;border:1px solid ${col}` : 'background:rgba(0,0,0,.35);color:#cbbd9f;border:1px solid rgba(255,255,255,.15)'}`}>${nm}</button>`)}</div></div>`;
+  }
+  fctl(n, p, D, st = {}) { if (!p) return null; if (p.kind === 't') return this.fsw(n, p, st); if (p.kind === 'e' && p.names.length <= 4 && !st.knob) return this.fsel(n, p, st); return this.fknob(n, p, D, st); }
+  /* the effect's level going in and out, from the mixer (meters/3), as on the X-Air Edit faces */
+  onFxm(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(56, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.fxm[i] = d.getInt16(4 + 2 * i, true) / 256; this.fxmAt = Date.now(); }
+  fxLv(n, side, what) { const b = (n - 1) * 14 + (what === 'out' ? 12 : 0), a = this.fxm[b], c = this.fxm[b + 1]; return side === 'A' ? a : side === 'B' ? c : Math.max(a, c); }
+  fxMeter(n, side, H) {
+    const lv = what => clamp((this.fxLv(n, side, what) + 60) / 60, 0, 1), bar = (v, lab) => html`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+      <span style="flex:1;width:12px;position:relative;border-radius:2px;background:#0c0b0a;box-shadow:0 0 0 1px #2c2721;overflow:hidden">
+        <span style=${`position:absolute;left:0;right:0;bottom:0;height:${(v * 100).toFixed(1)}%;background:linear-gradient(0deg,#62b85c,#62b85c 70%,#e8a33d 88%,#e0513f)`}></span>
+        <span style="position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,#0c0b0a 3px 4px)"></span></span>
+      <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:#9b927f">${lab}</span></div>`;
+    return html`<div data-fxmeter=${n} style=${`width:62px;height:${H}px;flex:none;display:flex;gap:2px;padding:6px 4px;border-radius:8px;background:#0e0d0b;border:1px solid #2c2721;position:relative`}>
+      ${[-5, -10, -20, -30, -40, -50].map(d => html`<span style=${`position:absolute;left:2px;top:${6 + (-d / 60) * (H - 30)}px;font-family:var(--mono);font-size:9px;color:#6f675a`}>${d}</span>`)}
+      <span style="width:22px;flex:none"></span>${bar(lv('in'), 'IN')}${bar(lv('out'), 'OUT')}</div>`;
+  }
+  /* TAP: the time between taps in the song's tempo becomes the delay time */
+  fxTap(n) {
+    const p = this.fxP(n, 'Time'); if (!p) return; const now = Date.now(), T = (this.tapT = (this.tapT || []).filter(t => now - t < 2600));
+    T.push(now); this.setState({ tapFlash: now });
+    if (T.length < 2) return; const gaps = T.slice(1).map((t, i) => t - T[i]), ms = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+    this.set(this.fxPath(n, p), 'f', q((clamp(ms, 1, 3000) - 1) / 2999, p.n));
+  }
+  tapBtn(n) {
+    if (!TAP_KEYS.test(this.fxK(n))) return null; const fl = Date.now() - (this.state.tapFlash || 0) < 160, tm = this.fxV(n, 'Time');
+    return html`<button data-tap="1" aria-label="Tap tempo" onPointerDown=${e => { e.preventDefault(); this.fxTap(n); }}
+      style=${`height:44px;min-width:110px;padding:0 14px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;font-weight:900;letter-spacing:.12em;
+        ${fl ? 'background:#f3c27a;color:#1a1405;border:1px solid #f3c27a;box-shadow:0 0 18px rgba(243,194,122,.7)' : 'background:#2a1d10;color:#ffc98f;border:1px solid #8a5a2a'}`}>
+      TAP<span style="font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:0">${fin(tm) ? Math.round(tm) + ' ms · ' + Math.round(60000 / tm) + ' BPM' : ''}</span></button>`;
+  }
+
+  /* ---------- pictures ---------- */
+  /* reverb: the direct sound, the early reflections and the tail, with pre delay, decay, size, damping and the cuts (from the WING app) */
+  revPic(n, W, H) {
+    const v = (k, d) => { const x = this.fxV(n, k, d === undefined ? 0 : d); return typeof x === 'number' && !fin(x) ? (d || 0) : x; }, has = k => this.fxHas(n, k), K = this.fxK(n), hot = this.state.fxHot, now = Date.now() / 1000;
+    const msDecay = K === 'GATE' || K === 'RVRS', pd = (v('Pre Delay', v('Reverb Delay', 20))) / 1000, dc = msDecay ? v('Decay', 400) / 1000 : +v('Decay', 1.5), size = +v('Size', 30);
+    const diff = +v('Diffuse', v('Density', 15)), mult = +v('Bass Multi', v('Lo Multiply', 1)), damp = v('Damping', v('Hi Shv Freq', 8000)), lc = +v('Lo Cut', 20), hc = +v('Hi Cut', 20000);
+    const shp = has('Shape') ? v('Shape') / 250 : has('Attack') ? v('Attack') / 100 : has('Rise') ? v('Rise') / 50 : 0.25, mod = +v('Mod Speed', v('Modulate', v('Spin', 20)));
+    const gain = Math.pow(10, +v('Level', 0) / 20), tailG = has('Tail Gain') ? clamp(v('Tail Gain', 100) / 100, 0.05, 1) : 1, frz = v('Freeze', 0) === 1, rev = K === 'RVRS', gate = K === 'GATE';
+    const ecl = has('Echo L') ? v('Echo L') / 1000 : has('Reflection L') ? v('Reflection L') / 1000 : has('ER Left') ? v('ER Left') / 1000 : null;
+    const ecr = has('Echo R') ? v('Echo R') / 1000 : has('Reflection R') ? v('Reflection R') / 1000 : has('ER Right') ? v('ER Right') / 1000 : null;
+    const efl = has('Echo Feed L') ? Math.abs(v('Echo Feed L')) / 100 : 0, efr = has('Echo Feed R') ? Math.abs(v('Echo Feed R')) / 100 : 0;
+    const el0 = has('Reflection Gain L') ? v('Reflection Gain L') / 125 : has('ER Level') ? v('ER Level') / 125 : 0.6, er0 = has('Reflection Gain R') ? v('Reflection Gain R') / 125 : el0;
+    const dampN = typeof damp === 'number' && damp > 100 ? clamp(Math.log(damp / 1000) / Math.log(20), 0.05, 1) : 0.6;
+    const T = Math.max(0.5, pd + Math.max(dc, dc * mult) * 1.2), pl = 10, pr = 10, pt = 10, fb = 26, ph = H - pt - fb, x = t => pl + Math.min(1, t / T) * (W - pl - pr), yv = a => pt + ph - a * ph * 0.9;
+    const wob = t => 1 + Math.sin((t * 9 + now * (0.5 + mod / 25)) * 2) * 0.05 * clamp(mod / 50, 0, 1);
+    const erN = 4 + Math.round(clamp(size / 50, 0, 1) * 8), erSpan = Math.min(0.12, 0.02 + size / 900), t0 = pd + erSpan, build = clamp(shp, 0, 1) * Math.min(0.4, dc * 0.3);
+    const tail = (len, amp, col, op) => { let d = `M ${x(t0).toFixed(1)} ${yv(0)}`;
+      for (let k = 0; k <= 90; k++) { const t = t0 + (T - t0) * k / 90, u = t - t0, rise = build > 0 ? Math.min(1, u / build) : 1;
+        let a = frz ? 0.85 : Math.pow(10, -3 * u / Math.max(0.05, len));
+        if (rev) a = u < len ? Math.pow(u / Math.max(0.05, len), 1.6) : 0; if (gate) a = u < len ? 0.8 : 0;
+        a *= gain * amp * (rev || gate ? 1 : rise) * wob(t) * (0.9 + 0.1 * Math.sin(k * (1.3 + diff / 10)));
+        d += ` L ${x(t).toFixed(1)} ${yv(Math.max(0, Math.min(1.05, a))).toFixed(1)}`; }
+      return html`<path d=${d + ` L ${x(T).toFixed(1)} ${yv(0)} Z`} fill=${col} fill-opacity=${op} stroke=${col} stroke-width="1.4"/>`; };
+    const er = rev ? [] : Array.from({ length: erN }, (_, k) => { const t = pd + erSpan * (k + 1) / erN * (1 + 0.25 * Math.sin(k * 7.1)), a = (0.85 - k * 0.05) * gain * 0.9, fz = clamp(diff / 30, 0, 1);
+      return html`<line x1=${x(t).toFixed(1)} x2=${x(t).toFixed(1)} y1=${yv(0)} y2=${yv(a).toFixed(1)} stroke="#f3e6cc" stroke-width=${(1.5 + fz * 3).toFixed(1)} opacity=${(0.9 - fz * 0.45).toFixed(2)}/>`; });
+    const echoes = []; [[ecl, efl, '#9fd0ff', el0], [ecr, efr, '#ffb38a', er0]].forEach(([t, f, c, a0]) => { if (t == null || t <= 0) return; let a = clamp(a0, 0.1, 0.9);
+      for (let k = 1; k < 8 && pd + t * k < T && a > 0.05; k++, a *= Math.max(0.05, f)) echoes.push(html`<line x1=${x(pd + t * k)} x2=${x(pd + t * k)} y1=${yv(0)} y2=${yv(a)} stroke=${c} stroke-width="2.5" stroke-dasharray="3 2"/>`); });
+    const fx = f => pl + Math.log10(clamp(f, 20, 20000) / 20) / 3 * (W - pl - pr), lab = (t, X, Y, k) => html`<text x=${X} y=${Y} font-size="11" font-weight="700" fill=${hot === k ? '#f3c27a' : '#cbbd9f'} style="font-family:var(--mono)">${t}</text>`;
+    /* a ball travels the room: where the sound is now in its life */
+    const life = ((now * 1000) % ((T + 0.6) * 1000)) / 1000, bx = x(Math.min(life, T)), live = life < T ? Math.pow(10, -3 * Math.max(0, life - t0) / Math.max(0.05, dc)) : 0;
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
+      <rect width=${W} height=${H} fill="#140a0a"/>
+      ${[0.25, 0.5, 0.75].map(k => html`<line x1=${pl} x2=${W - pr} y1=${pt + ph * k} y2=${pt + ph * k} stroke="#2a1616"/>`)}
+      <g opacity=".55" transform="translate(0,-4)">${tail(dc * Math.min(1, dampN + 0.15), 0.62, '#ff8a6a', 0.10)}</g>
+      <g transform="translate(0,4)">${tail(dc * mult, 0.66, '#ffcf6a', 0.16)}</g>
+      ${tail(dc, 0.7 * tailG, '#ff5a3a', 0.22)}${er}${echoes}
+      ${frz && html`<text x=${W / 2} y=${pt + 40} text-anchor="middle" font-size="13" font-weight="800" fill="#9fd0ff" letter-spacing="3">FREEZE</text>`}
+      <line x1=${x(0)} x2=${x(0)} y1=${yv(0)} y2=${yv(1)} stroke="#f3e6cc" stroke-width="3"/>
+      <circle cx=${bx.toFixed(1)} cy=${yv(Math.max(0.05, 0.7 * live * gain)).toFixed(1)} r="5" fill="#fff4d8" opacity=${live > 0.02 ? 0.9 : 0}/>
+      <path d=${`M ${x(0)} ${pt + 4} H ${x(pd)}`} stroke="#f3c27a" stroke-width=${hot === 'Pre Delay' ? 3 : 1.5} stroke-dasharray="3 3"/>
+      ${lab('PRE ' + Math.round(pd * 1000) + ' ms', x(0) + 6, pt + 16, 'Pre Delay')}
+      <line x1=${x(t0 + dc)} x2=${x(t0 + dc)} y1=${pt} y2=${yv(0)} stroke="#cbbd9f" stroke-dasharray="2 4" opacity=".55"/>
+      ${lab('DECAY ' + (dc < 1 ? Math.round(dc * 1000) + ' ms' : dc.toFixed(2) + ' s'), Math.min(W - 130, x(t0 + dc) + 6), pt + 16, 'Decay')}
+      <rect x=${pl} y=${H - 15} width=${W - pl - pr} height="7" rx="3.5" fill="none" stroke="#3a2020"/>
+      <rect x=${fx(lc)} y=${H - 15} width=${Math.max(2, fx(hc) - fx(lc))} height="7" rx="3.5" fill="#ff5a3a" opacity=${hot === 'Lo Cut' || hot === 'Hi Cut' ? 0.95 : 0.55}/>
+      ${typeof damp === 'number' && damp > 100 && html`<line x1=${fx(damp)} x2=${fx(damp)} y1=${H - 19} y2=${H - 4} stroke="#ff8a6a" stroke-width=${hot === 'Damping' ? 3 : 1.5}/>`}
+      <text x=${W - pr} y=${H - 18} text-anchor="end" font-size="10" fill="#9b927f" style="font-family:var(--mono)">${hzT(lc)} – ${hzT(hc)}</text>
+    </svg>`;
+  }
+  /* delay: the repeats left and right, each one darker with the feedback cuts; a light blinks in tempo */
+  dlyPic(n, W, H, look = {}) {
+    const v = (k, d) => this.fxV(n, k, d), K = this.fxK(n), hot = this.state.fxHot, now = Date.now(), base = +v('Time', 400), mode = String(v('Mode', 'ST'));
+    const lc = +v('Lo Cut', 20), hc = +v('Hi Cut', v('Feed Hi Cut', 20000)), fhc = +v('Feed Hi Cut', hc), loss = clamp(Math.log(20000 / fhc) / Math.log(100), 0, 1) * 0.5;
+    let rows;
+    if (K === 'DLY') { const fl = clamp(v('Feed Left', 40) / 100, 0, 0.97), fr = clamp(v('Feed Right', 40) / 100, 0, 0.97), off = +v('Offset L/R', 0);
+      rows = mode === 'M' ? [['M', [[base * fracOf(v('Factor L', '1')), 0.95, fl]]]] : [['L', [[base * fracOf(v('Factor L', '1')), 0.95, fl]]], ['R', [[base * fracOf(v('Factor R', '1')) + off, 0.95, fr]]]]; }
+    else if (K === '3TAP' || K === '4TAP') { const fb = clamp(v('Feedback', 30) / 100, 0, 0.97), g0 = v('Gain Base', 100) / 100, taps = [[base, g0, fb]];
+      ['A', 'B', 'C'].forEach(s => { if (this.fxHas(n, 'Factor ' + s)) taps.push([base * fracOf(v('Factor ' + s, '1')), v('Gain ' + s, 50) / 100, fb]); }); rows = [['TAPS', taps]]; }
+    else { const fb = clamp(v('Feedback', 30) / 100, 0, 0.97), pat = String(v('Pattern', v('Delay', '1'))), f = /X$/.test(pat) ? fracOf(pat.slice(0, -1)) * 1.5 : fracOf(pat);
+      rows = [['L', [[base, 0.95, fb]]], ['R', [[base * f, 0.9, fb]]]]; }
+    const tmax = Math.max(...rows.flatMap(r => r[1].map(t => t[0]))), T = Math.max(300, tmax * 6.2), pl = 52, pr = 14, x = t => pl + t / T * (W - pl - pr), rh = (H - 38) / rows.length;
+    const blink = ((now % Math.max(60, base)) / Math.max(60, base)) < 0.12;
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
+      <rect width=${W} height=${H} rx="6" fill=${look.bg || '#0f1a0c'}/>
+      ${rows.map(([lab, taps], r) => { const y0 = 10 + rh * r, out = [];
+        taps.forEach(([t, g, fb], ti) => { let a = clamp(g, 0.05, 1) * 0.95, k = 1; while (k < 30 && x(t * k) < W - pr && a > 0.03) { const dark = Math.pow(1 - loss, k - 1), w = Math.max(1.5, 7 * dark);
+          out.push(html`<rect x=${(x(t * k) - w / 2).toFixed(1)} y=${(y0 + rh * (1 - a) * 0.86).toFixed(1)} width=${w.toFixed(1)} height=${(rh * a * 0.86).toFixed(1)} rx="2" fill=${ti ? (look.x || '#ffd36a') : (look.tap || '#9ff06a')} opacity=${(0.35 + 0.65 * dark).toFixed(2)}/>`);
+          a *= fb; k++; if (fb <= 0.01) break; } });
+        return html`<line x1=${pl} x2=${W - pr} y1=${y0 + rh - 2} y2=${y0 + rh - 2} stroke="rgba(255,255,255,.12)"/>
+          <rect x=${pl - 5} y=${y0 + 4} width="5" height=${rh * 0.86} rx="2" fill="#f3e6cc"/>
+          <text x="8" y=${y0 + rh / 2 + 5} font-size="13" font-weight="800" fill=${look.lab || '#cfe8b0'}>${lab}</text>${out}
+          <text x=${Math.min(W - 80, x(taps[0][0]) + 6)} y=${y0 + 14} font-size="11" fill=${hot === 'Time' ? '#f3c27a' : '#cfe8b0'} style="font-family:var(--mono)">${Math.round(taps[0][0])} ms</text>`; })}
+      <circle cx=${W - 22} cy=${H - 14} r="6" fill=${blink ? '#ff4a3a' : '#4a1a14'}/>
+      <text x=${pl} y=${H - 9} font-size="11" fill="#cfe8b0" style="font-family:var(--mono)">${mode === 'X' ? 'CROSS · ' : mode === 'M' ? 'MONO · ' : ''}CUT ${hzT(lc)}–${hzT(hc)}</text>
+    </svg>`;
+  }
+  /* modulation: the movement itself – a wave for chorus / flanger / phaser, a turning horn, a ball for the panner, a moving filter, octaves */
+  modPic(n, W, H) {
+    const K = this.fxK(n), v = (k, d) => this.fxV(n, k, d), now = Date.now() / 1000, hot = this.state.fxHot, col = '#c6b0ff';
+    const sp = +v('Speed', v('Rate', v('Lo Speed', 1))), dep = clamp(v('Depth', v('Depth L', 50)) / 100, 0, 1), ph = +v('Phase', 90) * Math.PI / 180;
+    const bg = html`<rect width=${W} height=${H} rx="6" fill="#120f1c"/>`;
+    if (K === 'ROTA') { const fast = v('Slow', 'SLOW') === 'FAST', stop = v('Stop', 'RUN') === 'STOP', s = stop ? 0 : fast ? +v('Hi Speed', 5) : +v('Lo Speed', 0.7), a = (now * s * 360) % 360, cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.36;
+      return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">${bg}
+        <circle cx=${cx} cy=${cy} r=${R} fill="#1d1730" stroke="#3a2f5a" stroke-width="2"/>
+        <g transform=${`rotate(${a} ${cx} ${cy})`}><path d=${`M ${cx} ${cy} L ${cx + R * 0.95} ${cy - R * 0.25} L ${cx + R * 0.95} ${cy + R * 0.25} Z`} fill=${col} opacity=".85"/><path d=${`M ${cx} ${cy} L ${cx - R * 0.95} ${cy - R * 0.25} L ${cx - R * 0.95} ${cy + R * 0.25} Z`} fill=${col} opacity=".35"/></g>
+        <circle cx=${cx} cy=${cy} r="8" fill="#f3e6cc"/>
+        <text x="12" y="22" font-size="13" font-weight="800" fill=${col}>${stop ? 'STOP' : fast ? 'FAST' : 'SLOW'} · ${s.toFixed(2)} Hz</text></svg>`; }
+    if (K === 'PAN') { const d = clamp(v('Depth', 100) / 100, 0, 1), p = Math.sin(now * 2 * Math.PI * sp), xx = W / 2 + p * d * (W / 2 - 40);
+      return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">${bg}
+        <line x1="30" x2=${W - 30} y1=${H / 2} y2=${H / 2} stroke="#3a2f5a" stroke-width="4" stroke-linecap="round"/>
+        <text x="10" y=${H / 2 + 5} font-size="14" font-weight="800" fill="#9b8fc0">L</text><text x=${W - 22} y=${H / 2 + 5} font-size="14" font-weight="800" fill="#9b8fc0">R</text>
+        <circle cx=${xx.toFixed(1)} cy=${H / 2} r="16" fill=${col}/><text x="12" y="22" font-size="13" font-weight="800" fill=${col}>${sp.toFixed(2)} Hz · ${Math.round(d * 100)}%</text></svg>`; }
+    if (K === 'SUB') { const bars = [['DRY', v('Dry', v('Dry A', 100))], ['−1 OCT', v('Octave -1', v('Octave -1 A', 30))], ['−2 OCT', v('Octave -2', v('Octave -2 A', 0))]], bw = (W - 80) / 3;
+      return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">${bg}
+        ${bars.map(([l, g], i) => { const h = (H - 50) * clamp(g / 100, 0, 1) * (0.8 + 0.2 * Math.abs(Math.sin(now * (2 - i * 0.6)))); return html`<rect x=${30 + i * (bw + 10)} y=${H - 30 - h} width=${bw} height=${h} rx="5" fill=${col} opacity=${0.4 + i * 0.2}/>
+          <text x=${30 + i * (bw + 10) + bw / 2} y=${H - 10} text-anchor="middle" font-size="12" font-weight="800" fill="#cbbd9f">${l}</text>`; })}</svg>`; }
+    if (K === 'FILT') { const base = +v('Base', 500), mode = String(v('Mode', 'LP')), res = clamp(v('Resonance', 50) / 100, 0, 1), f = base * Math.pow(2, Math.sin(now * 2 * Math.PI * sp) * dep * 3);
+      const X = fr => 10 + Math.log10(clamp(fr, 20, 20000) / 20) / 3 * (W - 20), Y = d => H / 2 - d * (H / 2 - 16) / 24; let d = '';
+      for (let k = 0; k <= 120; k++) { const fr = 20 * Math.pow(1000, k / 120), r = fr / f, peak = 18 * res * Math.exp(-Math.pow(Math.log2(r) * 3, 2));
+        const g = mode === 'LP' ? (r < 1 ? 0 : -24 * Math.log2(r)) : mode === 'HP' ? (r > 1 ? 0 : 24 * Math.log2(r)) : mode === 'BP' ? -12 * Math.abs(Math.log2(r)) : -30 * Math.exp(-Math.pow(Math.log2(r) * 3, 2));
+        d += (k ? 'L' : 'M') + X(fr).toFixed(1) + ' ' + clamp(Y(g + (mode === 'NO' ? 0 : peak)), 4, H - 4).toFixed(1); }
+      return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">${bg}<line x1="0" x2=${W} y1=${Y(0)} y2=${Y(0)} stroke="#3a2f5a"/>
+        <path d=${d} fill="none" stroke=${col} stroke-width="3"/><line x1=${X(f)} x2=${X(f)} y1="8" y2=${H - 8} stroke="#f3e6cc" stroke-dasharray="3 4" opacity=".6"/>
+        <text x="12" y="22" font-size="13" font-weight="800" fill=${col}>${mode} · ${hzT(f)}</text></svg>`; }
+    /* chorus, flanger, phaser, dimension: the delay moving left and right */
+    const lines = [0, 1].map(s => { let d = ''; for (let k = 0; k <= 100; k++) { const t = k / 100, y = H / 2 + Math.sin((t * 3 - now * sp) * 2 * Math.PI + s * ph) * dep * (H / 2 - 24); d += (k ? 'L' : 'M') + (16 + t * (W - 32)).toFixed(1) + ' ' + y.toFixed(1); }
+      return html`<path d=${d} fill="none" stroke=${s ? '#ffb38a' : '#9fd0ff'} stroke-width="2.6" opacity=".9"/>`; });
+    const dim = K === 'DIMC' ? [1, 2, 3, 4].map(k => v('Mode ' + k, 0)) : null;
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">${bg}<line x1="16" x2=${W - 16} y1=${H / 2} y2=${H / 2} stroke="#3a2f5a"/>${dim ? null : lines}
+      ${dim && dim.map((on, k) => html`<rect x=${30 + k * (W - 60) / 4} y=${H / 2 - 30} width=${(W - 60) / 4 - 12} height="60" rx="8" fill=${on ? col : '#1d1730'} opacity=${on ? 0.85 : 1}/><text x=${30 + k * (W - 60) / 4 + ((W - 60) / 4 - 12) / 2} y=${H / 2 + 6} text-anchor="middle" font-size="16" font-weight="900" fill=${on ? '#120f1c' : '#6f6590'}>${k + 1}</text>`)}
+      <text x="12" y="22" font-size="13" font-weight="800" fill=${col}>${dim ? 'DIMENSION' : sp.toFixed(2) + ' Hz · ' + Math.round(dep * 100) + '%'}</text>
+      ${!dim && html`<text x=${W - 12} y="22" text-anchor="end" font-size="11" fill="#9b8fc0" style="font-family:var(--mono)">L ━  R ━</text>`}</svg>`;
+  }
+  /* graphic EQ: 31 faders and the curve they make (the master fader at the end) */
+  geqFace(n, side, W, H) {
+    const ps = this.fxParamsOf(n, side), bands = ps.filter(p => /Hz/.test(p.label)), master = ps.find(p => /^Master/.test(p.label)), FH = H - 60, fw = Math.floor((W - 40) / (bands.length + 2));
+    const pts = bands.map((p, k) => { const r = this.val(this.fxPath(n, p)), g = fin(r) ? fxNum(p, clamp(r, 0, 1)) : 0; return [20 + k * fw + fw / 2, 10 + (1 - (g + 15) / 30) * (FH - 20)]; });
+    return html`<div style=${`position:relative;width:${W}px;height:${H}px;border-radius:8px;background:linear-gradient(180deg,#2a2a2c,#18181a);box-shadow:inset 0 0 0 2px #3a3a3c`}>
+      <span style="position:absolute;left:20px;top:6px;font-size:24px;font-weight:900;font-style:italic;color:#6a6a6c;letter-spacing:1px">${side || ''} ${/TEQ/.test(this.fxK(n)) ? 'TruEQ' : 'GEQ'}</span>
+      <svg width=${W} height=${FH} style="position:absolute;left:0;top:40px;pointer-events:none" aria-hidden="true"><path d=${pts.map((p, k) => (k ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ')} fill="none" stroke="#f3c27a" stroke-width="2" opacity=".55"/></svg>
+      <div style=${`position:absolute;left:20px;top:40px;display:flex`}>${bands.map(p => html`<div style=${`width:${fw}px;display:flex;flex-direction:column;align-items:center`}>${this.ffader(n, p, FH - 20, { w: fw, mid: true, midc: '#6a6a6c', tick: 'rgba(255,255,255,.08)', slot: '#050505', cap: 'linear-gradient(180deg,#dcdcdc,#8a8a8a 50%,#cfcfcf)', line: '#fff' })}
+        <span style="font-size:9px;color:#9a9a9c;font-family:var(--mono);margin-top:2px;white-space:nowrap">${p.base.replace(' Hz', '').replace(' kHz', 'k')}</span></div>`)}
+        ${master && html`<div style=${`width:${fw * 2}px;display:flex;flex-direction:column;align-items:center`}>${this.ffader(n, master, FH - 20, { w: fw + 8, mid: true, midc: '#6a6a6c', slot: '#050505', cap: 'linear-gradient(180deg,#f3c27a,#a07030 50%,#f3c27a)' })}<span style="font-size:9px;color:#f3c27a">MASTER</span></div>`}</div>
+    </div>`;
+  }
+  /* Pultec style EQs: the curve the knobs make (an estimate of the vintage shapes) */
+  peqPic(n, side, W, H) {
+    const K = this.fxK(n), v = (k, d) => this.fxV(n, k, d, side), on = v('Active', 1) === 1, num = s => { const t = String(s); return t.endsWith('k') ? parseFloat(t) * 1000 : t.includes('k') ? parseFloat(t.replace('k', '.')) * 1000 : +t; };
+    const bands = [];
+    if (/P1A/.test(K)) { const lf = num(v('Lo Freq', '60')), hf = num(v('Hi Freq', '8k')), af = num(v('Hi Atten Freq', '10k'));
+      bands.push([1, lf, v('Lo Boost', 0) * 1.35, 0.7], [1, lf * 1.6, -v('Lo Atten', 0) * 1.6, 0.7], [2, hf, v('Hi Boost', 0) * 1.6, 0.4 + (10 - v('Hi Width', 5)) * 0.25], [4, af, -v('Hi Atten', 0) * 1.6, 0.7]); }
+    else { bands.push([2, num(v('Lo Freq', '200')), v('Lo Boost', 0) * 1.0, 1], [2, num(v('Mid Freq', '1k')), -v('Mid Cut', 0) * 1.0, 1.2], [2, num(v('Hi Freq', '3k')), v('Hi Boost', 0) * 1.0, 1]); }
+    const g0 = +v('Gain', 0), X = f => 10 + Math.log10(f / 20) / 3 * (W - 20), Y = d => clamp(H / 2 - d * (H / 2 - 14) / 18, 4, H - 4); let d = '';
+    for (let k = 0; k <= 140; k++) { const f = 20 * Math.pow(1000, k / 140); let db = g0; if (on) bands.forEach(([t, fr, g, qq]) => { if (Math.abs(g) > 0.05) db += bandDb(t, clamp(fr, 20, 20000), g, qq, f); }); d += (k ? 'L' : 'M') + X(f).toFixed(1) + ' ' + Y(db).toFixed(1); }
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true"><rect width=${W} height=${H} rx="6" fill="#0c1612"/>
+      ${[100, 1000, 10000].map(f => html`<line x1=${X(f)} x2=${X(f)} y1="0" y2=${H} stroke="#1c2e26"/><text x=${X(f) + 3} y=${H - 5} font-size="10" fill="#5a7a6a" style="font-family:var(--mono)">${f >= 1000 ? f / 1000 + 'k' : f}</text>`)}
+      <line x1="0" x2=${W} y1=${Y(0)} y2=${Y(0)} stroke="#2e4a3e"/><path d=${d} fill="none" stroke=${on ? '#e6c23e' : '#5a5a4a'} stroke-width="3"/>
+      <text x="10" y="18" font-size="11" fill="#5a7a6a">הדמיה משוערת של העקומה</text></svg>`;
+  }
+  /* de-esser: a voice's spectrum; on each "s" the sibilance band rises and the de-esser pulls exactly that band down */
+  desPic(n, side, W, H) {
+    const K = this.fxK(n), sfx = K === 'DES' ? (side === 'B' ? ' R' : ' L') : '', v = (k, d) => K === 'DES' ? this.fxV(n, k + sfx, d) : this.fxV(n, k, d, side);
+    const lo = clamp(+v('Lo Band', 0) / 50, 0, 1), hi = clamp(+v('Hi Band', 0) / 50, 0, 1), fem = String(K === 'DES' ? this.fxV(n, 'Voice', 'FEM') : v('Voice', 'FEM')) === 'FEM';
+    const bands = fem ? [[4500, 7500], [7500, 12000]] : [[3500, 6000], [6000, 10000]], now = Date.now() / 1000, cyc = now % 1.6, s = cyc < 0.28 ? Math.sin(cyc / 0.28 * Math.PI) : 0;
+    const X = f => 10 + Math.log10(f / 20) / 3 * (W - 20), Y = d => clamp(16 + (-d / 60) * (H - 40), 10, H - 22);
+    const inp = f => { const o = Math.log2(f / 300); let d = -24 - Math.max(0, o) * 4.2 + 6 * Math.exp(-Math.pow(Math.log2(f / (fem ? 900 : 600)), 2) * 2) + 4 * Math.exp(-Math.pow(Math.log2(f / 2500), 2) * 3);
+      if (f < 100) d -= (100 - f) / 4; const sib = (f >= bands[0][0] && f <= bands[1][1]) ? 22 * s * Math.exp(-Math.pow(Math.log2(f / Math.sqrt(bands[0][0] * bands[1][1])), 2) * 1.5) : 0; return d + sib + Math.sin(f * 0.01 + now * 3) * 1.2; };
+    const red = f => { let r = 0; if (f >= bands[0][0] && f < bands[0][1]) r = lo; else if (f >= bands[1][0] && f <= bands[1][1]) r = hi; return r * 16 * s; };
+    let di = '', dout = ''; for (let k = 0; k <= 140; k++) { const f = 20 * Math.pow(1000, k / 140), a = inp(f); di += (k ? 'L' : 'M') + X(f).toFixed(1) + ' ' + Y(a).toFixed(1); dout += (k ? 'L' : 'M') + X(f).toFixed(1) + ' ' + Y(a - red(f)).toFixed(1); }
+    const grLo = lo * 16 * s, grHi = hi * 16 * s;
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true"><rect width=${W} height=${H} rx="6" fill="#0d1014"/>
+      ${bands.map(([a, b], i) => html`<rect x=${X(a)} y="8" width=${X(b) - X(a)} height=${H - 30} fill=${i ? '#e0513f' : '#f0a24a'} opacity=${0.08 + 0.25 * s * (i ? hi : lo)}/>
+        <text x=${(X(a) + X(b)) / 2} y=${H - 8} text-anchor="middle" font-size="11" font-weight="800" fill=${i ? '#ff8a78' : '#f6c27a'}>${i ? 'HI' : 'LO'} −${(i ? grHi : grLo).toFixed(1)} dB</text>`)}
+      <path d=${di} fill="none" stroke="#5a6a7a" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <path d=${dout + ` L ${W - 10} ${H - 22} L 10 ${H - 22} Z`} fill="#7fb6d6" fill-opacity=".18" stroke="#9fd0ff" stroke-width="2"/>
+      <circle cx=${W - 24} cy="20" r="8" fill=${s > 0.2 ? '#ff5a45' : '#3a1a14'}/><text x=${W - 38} y="25" text-anchor="end" font-size="13" font-weight="900" fill=${s > 0.2 ? '#ffb4a8' : '#5a4a44'}>S</text>
+      <text x="12" y="22" font-size="12" font-weight="800" fill="#9fb8c8">${fem ? 'FEMALE' : 'MALE'} · הדמיה: קו מקווקו = הקול, כחול = אחרי הדה־אסר</text></svg>`;
+  }
+  /* transient designer: the hit's envelope before (dashed) and after – attack makes the front taller or softer, sustain the tail longer or shorter */
+  wavdPic(n, side, W, H) {
+    const v = (k, d) => this.fxV(n, k, d, side), at = clamp(v('Attack', 0) / 100, -1, 1), su = clamp(v('Sustain', 0) / 100, -1, 1), g = Math.pow(10, v('Gain', 0) / 20), now = Date.now() / 1000;
+    const X = t => 14 + t * (W - 28), Y = a => H - 18 - clamp(a, 0, 1.25) * (H - 40) / 1.25;
+    const env = (t, a, s) => { if (t < 0.03) return t / 0.03 * (1 + a * 0.7); const peak = 1 + a * 0.7, base = 0.55 * Math.exp(-(t - 0.03) / (0.28 * (1 + s * 0.8))); return Math.max(0, base + (peak - 0.55) * Math.exp(-(t - 0.03) / 0.02)); };
+    let d0 = '', d1 = ''; for (let k = 0; k <= 120; k++) { const t = k / 120; d0 += (k ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(env(t, 0, 0) * 0.8).toFixed(1); d1 += (k ? 'L' : 'M') + X(t).toFixed(1) + ' ' + Y(env(t, at, su) * 0.8 * g).toFixed(1); }
+    const ph = (now % 1.2) / 1.2;
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true"><rect width=${W} height=${H} rx="6" fill="#1a1c1e"/>
+      <line x1="14" x2=${W - 14} y1=${Y(0)} y2=${Y(0)} stroke="#3a3c40"/>
+      <path d=${d0} fill="none" stroke="#7a7e84" stroke-width="1.6" stroke-dasharray="4 3"/>
+      <path d=${d1 + ` L ${X(1)} ${Y(0)} L ${X(0)} ${Y(0)} Z`} fill="#d23a2a" fill-opacity=".22" stroke="#ff5a3a" stroke-width="2.6"/>
+      <line x1=${X(ph)} x2=${X(ph)} y1="10" y2=${Y(0)} stroke="#f3e6cc" opacity=".35"/>
+      <text x="16" y="22" font-size="12" font-weight="800" fill="#ff8a6a">ATTACK ${at > 0 ? '+' : ''}${Math.round(at * 100)}%</text>
+      <text x=${W - 16} y="22" text-anchor="end" font-size="12" font-weight="800" fill="#ffb38a">SUSTAIN ${su > 0 ? '+' : ''}${Math.round(su * 100)}%</text></svg>`;
+  }
+  /* a compressor's reduction: from the mixer's effect meters when they arrive, otherwise worked out from the level going in */
+  compGr(n, side) {
+    const b = (n - 1) * 14 + 2 + (side === 'B' ? 1 : 0), live = this.linked() && Date.now() - (this.fxmAt || 0) < 1500 && Math.abs(this.fxm[b]) > 0.05;
+    if (live) return clamp(Math.abs(this.fxm[b]), 0, 30);
+    const K = this.fxK(n), v = (k, d) => this.fxV(n, k, d, side), lv = this.fxLv(n, side, 'in'), t = Date.now() / 1000, beat = 6 * Math.max(0, Math.sin(t * 4.2)) - 3;
+    let over = 0;
+    if (/FAC/.test(K)) over = (lv + beat + 20 + v('Input Gain', -8)) - (-25 + v('Threshold', 5) * 2.5);
+    else if (/LEC/.test(K)) over = (lv + beat + 20) * 0.4 + v('Peak', 48) / 4 - 10;
+    else if (/ULC/.test(K)) over = (lv + beat + 24 + v('Input Gain', -24)) * 0.8 + 6;
+    else if (K === 'LIM') over = lv + beat + 6 + v('Input Gain', 0);
+    else over = (lv + beat + 10) - v('Threshold', 0);
+    return clamp(over * 0.6, 0, 20) * (v('Active', 1) === 0 ? 0 : 1);
+  }
+  vuPic(n, side, W, H, look = {}) {
+    const gr = this.compGr(n, side), a = (-48 + (1 - clamp(gr / 20, 0, 1)) * 96) * Math.PI / 180, cx = W / 2, cy = H * 0.92, R = H * 0.78;
+    const marks = [[-20, 0], [-10, 0.25], [-7, 0.36], [-5, 0.46], [-3, 0.6], [-2, 0.68], [-1, 0.76], [0, 0.84], [1, 0.9], [2, 0.95], [3, 1]];
+    return html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true">
+      <rect width=${W} height=${H} rx="8" fill=${look.face || 'url(#vuface)'}/><defs><radialGradient id="vuface" cx="50%" cy="100%" r="100%"><stop offset="0" stop-color="#fff2c0"/><stop offset="1" stop-color="#d9a84a"/></radialGradient></defs>
+      ${marks.map(([db, t]) => { const ang = (-48 + t * 96) * Math.PI / 180; return html`<line x1=${cx + (R - 8) * Math.sin(ang)} y1=${cy - (R - 8) * Math.cos(ang)} x2=${cx + R * Math.sin(ang)} y2=${cy - R * Math.cos(ang)} stroke=${db > 0 ? '#c0281a' : '#2a1a0a'} stroke-width="2"/>
+        <text x=${cx + (R + 10) * Math.sin(ang)} y=${cy - (R + 10) * Math.cos(ang) + 4} text-anchor="middle" font-size="10" font-weight="700" fill=${db > 0 ? '#c0281a' : '#2a1a0a'}>${db}</text>`; })}
+      <text x=${cx} y=${cy - R * 0.35} text-anchor="middle" font-size="11" font-weight="900" fill="#2a1a0a" letter-spacing="2">${look.title || 'GAIN REDUCTION'}</text>
+      <line x1=${cx} y1=${cy} x2=${(cx + R * 0.98 * Math.sin(a)).toFixed(1)} y2=${(cy - R * 0.98 * Math.cos(a)).toFixed(1)} stroke="#111" stroke-width="2.4" stroke-linecap="round"/>
+      <circle cx=${cx} cy=${cy} r="7" fill="#222"/>
+      <text x=${W - 10} y="18" text-anchor="end" font-size="12" font-weight="800" fill="#5a2a10" style="font-family:var(--mono)">GR ${gr.toFixed(1)} dB</text></svg>`;
+  }
+  /* tone shapers: what they add – emphasis over the spectrum, the stereo picture, harmonics, pitch */
+  tonePic(n, side, W, H) {
+    const K = this.fxK(n), v = (k, d) => this.fxV(n, k, d, side), now = Date.now() / 1000, X = f => 10 + Math.log10(f / 20) / 3 * (W - 20), Y = d => clamp(H / 2 - d * (H / 2 - 14) / 15, 6, H - 6);
+    const curve = fn => { let d = ''; for (let k = 0; k <= 140; k++) { const f = 20 * Math.pow(1000, k / 140); d += (k ? 'L' : 'M') + X(f).toFixed(1) + ' ' + Y(fn(f)).toFixed(1); } return d; };
+    const svg = (body, label) => html`<svg class="fxpic" width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true"><rect width=${W} height=${H} rx="6" fill="#1a0f0e"/>${body}
+      <text x="12" y="20" font-size="12" font-weight="800" fill="#ffb4a8">${label}</text></svg>`;
+    if (/^ENH/.test(K)) { const bg = v('Bass Gain', 15) / 100 * 9, bf = 40 + v('Bass Freq', 20) * 4, mg = v('Mid Gain', 12) / 100 * 7, hg = v('Hi Gain', 15) / 100 * 9, hf = 2000 + v('Hi Freq', 40) * 200;
+      return svg(html`<line x1="0" x2=${W} y1=${Y(0)} y2=${Y(0)} stroke="#3a2420"/><path d=${curve(f => bandDb(1, bf, bg, 0.7, f) + bandDb(2, 1000, mg, 0.5, f) + bandDb(4, hf, hg, 0.7, f))} fill="none" stroke="#ff7a5a" stroke-width="3"/>`, 'BASS · MID · HI'); }
+    if (/^EXC/.test(K)) { const tf = +v('Tune', 4000), h = v('Harmonics', 30) / 100, mx = v('Mix', 30) / 100;
+      return svg(html`<line x1="0" x2=${W} y1=${Y(0)} y2=${Y(0)} stroke="#3a2420"/><path d=${curve(f => bandDb(4, tf, 4 + 10 * h * mx, 0.7, f))} fill="none" stroke="#ff7a5a" stroke-width="3"/>
+        ${Array.from({ length: 12 }, (_, k) => { const f = tf * (1 + k * 0.35); return f < 20000 ? html`<line x1=${X(f)} x2=${X(f)} y1=${Y(0)} y2=${Y(3 + 8 * h * Math.abs(Math.sin(now * 3 + k)))} stroke="#ffd36a" stroke-width="2" opacity=".7"/>` : null; })}`, 'TUNE ' + hzT(tf)); }
+    if (K === 'IMG' || K === 'EDI') { const w = clamp(1 + (K === 'IMG' ? v('Balance', 0) / 100 : v('ST Spread', 0) / 50), 0.1, 2), cx = W / 2, cy = H / 2, R = Math.min(W, H) * 0.38;
+      const pts = Array.from({ length: 40 }, (_, k) => { const a = Math.sin(now * 3 + k * 1.7) * R, b = Math.cos(now * 2.3 + k * 2.3) * R * 0.5 * w; return [cx + b, cy - a * 0.7]; });
+      return svg(html`<circle cx=${cx} cy=${cy} r=${R} fill="none" stroke="#3a2420"/><line x1=${cx} x2=${cx} y1=${cy - R} y2=${cy + R} stroke="#3a2420"/>
+        ${pts.map(([x, y]) => html`<circle cx=${x.toFixed(1)} cy=${y.toFixed(1)} r="2.5" fill="#ff8a6a" opacity=".7"/>`)}`, 'STEREO WIDTH ×' + w.toFixed(2)); }
+    if (K === 'SON') { const lo = v('Lo Contour', 0.6) * 1.2, pr = v('Process', 0.8) * 1.2;
+      return svg(html`<line x1="0" x2=${W} y1=${Y(0)} y2=${Y(0)} stroke="#3a2420"/><path d=${curve(f => bandDb(1, 120, lo, 0.7, f) + bandDb(4, 5000, pr, 0.7, f))} fill="none" stroke="#ff7a5a" stroke-width="3"/>`, 'LO CONTOUR · PROCESS'); }
+    if (/^PIT/.test(K)) { const voices = this.fxHas(n, 'Semitone 1') ? [v('Semitone 1', 0) + v('Cent 1', 0) / 100, v('Semitone 2', 0) + v('Cent 2', 0) / 100] : [v('Semitone', 0) + v('Cent', 0) / 100];
+      const Yp = st => H / 2 - st * (H / 2 - 20) / 12;
+      return svg(html`<line x1="30" x2=${W - 30} y1=${H / 2} y2=${H / 2} stroke="#5a3a30" stroke-width="2"/><circle cx="60" cy=${H / 2} r="12" fill="#f3e6cc"/>
+        ${voices.map((st, i) => html`<line x1="72" x2=${W * (0.45 + i * 0.25)} y1=${H / 2} y2=${Yp(st)} stroke="#ff8a6a" stroke-dasharray="4 4"/><circle cx=${W * (0.45 + i * 0.25)} cy=${Yp(st)} r="14" fill="#ff7a5a"/>
+          <text x=${W * (0.45 + i * 0.25)} y=${Yp(st) - 20} text-anchor="middle" font-size="13" font-weight="800" fill="#ffb4a8">${st > 0 ? '+' : ''}${st.toFixed(2)}</text>`)}`, 'SEMITONES'); }
+    /* amp and tube stage: how hard the signal is pushed – the curve bends, and the harmonics grow */
+    const drv = /^AMP/.test(K) ? v('Preamp', 5) / 10 : v('Drive', 50) / 100, ev = /^DRV/.test(K) ? v('Even Har', 20) / 50 : 0.4, od = /^DRV/.test(K) ? v('Odd Har', 20) / 50 : 0.5;
+    const hx = Math.min(H + 10, W * 0.55), hw = Math.max(6, (W - hx - 20) / 8);
+    const tr = x => Math.tanh(x * (1 + drv * 6)) / Math.tanh(1 + drv * 6); let d = ''; for (let k = 0; k <= 60; k++) { const x = -1 + k / 30; d += (k ? 'L' : 'M') + (20 + (x + 1) / 2 * Math.max(10, hx - 30)).toFixed(1) + ' ' + (H / 2 - tr(x) * (H / 2 - 20)).toFixed(1); }
+    return svg(html`<rect x="20" y="20" width=${Math.max(10, hx - 30)} height=${H - 40} fill="none" stroke="#3a2420"/><path d=${d} fill="none" stroke="#ff7a5a" stroke-width="3"/>
+      ${Array.from({ length: 8 }, (_, k) => { const amp = k === 0 ? 1 : (k % 2 ? ev : od) * drv * Math.pow(0.7, k) * (0.85 + 0.15 * Math.sin(now * 5 + k)); const h = clamp(amp, 0, 1) * (H - 50);
+        return html`<rect x=${hx + k * hw} y=${H - 20 - h} width=${hw - 6} height=${h} rx="3" fill=${k === 0 ? '#f3e6cc' : k % 2 ? '#ffd36a' : '#ff7a5a'}/>`; })}
+      <text x=${hx} y=${H - 6} font-size="10" fill="#9b7a70">HARMONICS</text>`, 'DRIVE ' + Math.round(drv * 100) + '%');
+  }
+
+  /* ---------- a whole face: panel, picture, controls; side = 'A' / 'B' for one half of a dual effect ---------- */
+  fxFace(n, side, W, H) {
+    const K = this.fxK(n); if (!K) return html`<div style=${`width:${W}px;height:${H}px;display:flex;align-items:center;justify-content:center;color:#9b927f`}>···</div>`;
+    const kind = FX_FACE(K), ps = this.fxParamsOf(n, side), find = l => ps.find(p => p.base === l || p.label === l), ctl = (p, D, st) => this.fctl(n, p, D, st);
+    const panel = (bg, body, extra) => html`<div class="fxface" data-face=${kind} style=${`position:relative;width:${W}px;height:${H}px;border-radius:10px;overflow:hidden;${bg};${extra || ''}`}>${body}</div>`;
+    const screws = col => [[10, 10], [W - 10, 10], [10, H - 10], [W - 10, H - 10]].map(([x, y]) => html`<span style=${`position:absolute;left:${x - 5}px;top:${y - 5}px;width:10px;height:10px;border-radius:50%;background:radial-gradient(circle at 35% 35%,${col || '#d8d4ca'},#4a4640)`}></span>`);
+    const rest = (used, D, st) => ps.filter(p => !used.includes(p.base) && !used.includes(p.label));
+    const row = (list, D, st, wrap) => html`<div style=${`display:flex;gap:10px;align-items:flex-start;justify-content:center;flex-wrap:${wrap ? 'wrap' : 'nowrap'}`}>${list.map(p => ctl(p, D, st))}</div>`;
+    if (kind === 'rev') {
+      const main = ['Pre Delay', 'Reverb Delay', 'Decay', 'Size', 'Damping', 'Diffuse', 'Density', 'Level'].map(find).filter(Boolean).slice(0, 6), gw = Math.round(W * 0.44), lw = W - gw - 70, fh = H - 170;
+      const lcdCol = '#ff3a2a', more = rest(main.map(p => p.base));
+      return panel('background:linear-gradient(180deg,#f4efe2,#ddd6c4);box-shadow:inset 0 0 0 2px #bdb6a4', html`${screws('#f5f2ea')}
+        <div style=${`position:absolute;left:26px;top:16px;width:${lw}px;height:40px;border-radius:5px;background:#120808;box-shadow:inset 0 0 0 2px #3a1010;display:grid;grid-template-columns:repeat(${main.length},1fr);align-items:center;padding:0 6px;font-family:var(--mono);color:${lcdCol};text-shadow:0 0 6px rgba(255,58,42,.6)`}>
+          ${main.map(p => html`<span style="display:flex;flex-direction:column;align-items:center;font-size:10px;line-height:1.3"><b style="letter-spacing:.06em">${p.base.toUpperCase().slice(0, 9)}</b><span style="font-size:12px">${fxFmt(p, this.val(this.fxPath(n, p)))}</span></span>`)}</div>
+        <div style=${`position:absolute;left:26px;top:64px;width:${lw}px;display:flex;justify-content:space-around`}>${main.map(p => this.ffader(n, p, fh, { w: 50 }))}</div>
+        <div style=${`position:absolute;right:22px;top:16px;width:${gw}px;height:${fh + 48}px;border-radius:5px;overflow:hidden;box-shadow:inset 0 0 0 3px #8a2a1a`}>${this.revPic(n, gw, fh + 48)}</div>
+        <div style=${`position:absolute;left:20px;right:20px;bottom:6px;height:88px;display:flex;gap:6px;justify-content:center;align-items:flex-start;overflow:hidden`}>${more.map(p => ctl(p, 34, { ink: '#3a3530', lab: '#3a3530', val: '#5a1a10', cap: ['#f6f6f4', '#b9b9b6', '#6d6d6a'], ind: '#1a1a1a', fs: 9.5, vfs: 11, id: 'rv' }))}</div>`);
+    }
+    if (kind === 'dly' || kind === 'combo') {
+      const gw = Math.round(W * 0.42), main = ['Time', 'Mix', 'Feedback', 'Feed Left', 'Feed Right', 'Factor L', 'Factor R', 'Factor A', 'Factor B', 'Pattern'].map(find).filter(Boolean);
+      const sel = ['Mode', 'Setup', 'Type'].map(find).filter(Boolean), more = rest([...main, ...sel].map(p => p.base)), st = { cap: ['#4a4a4a', '#1a1a1a', '#050505'], ink: '#cfe8b0', lab: '#cfe8b0', val: '#e9ffd0', id: 'dl' };
+      return panel(kind === 'dly' ? 'background:linear-gradient(180deg,#22261f,#121510);box-shadow:inset 0 0 0 2px #2e3a26' : 'background:linear-gradient(180deg,#1f2226,#111316);box-shadow:inset 0 0 0 2px #2a323a', html`${screws('#8a8a8a')}
+        <span style="position:absolute;left:22px;top:14px;font-size:30px;font-weight:900;font-style:italic;color:#e9ffd0;letter-spacing:-1px">${FX_NAMES[this.fxT(n)]}</span>
+        <div style=${`position:absolute;left:20px;top:60px;width:${W - gw - 60}px;display:flex;flex-wrap:wrap;gap:8px 12px;justify-content:flex-start`}>${main.slice(0, 8).map(p => ctl(p, p.base === 'Time' ? 62 : 42, { ...st, knob: true }))}</div>
+        <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 130}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #1a3a10`}>${this.dlyPic(n, gw, H - 130)}</div>
+        <div style=${`position:absolute;right:20px;top:${H - 106}px;display:flex;gap:10px`}>${sel.map(p => this.fsel(n, p, { col: '#c8ff6a', lab: '#cfe8b0' }))}</div>
+        <div style=${`position:absolute;left:20px;right:20px;bottom:8px;height:70px;display:flex;gap:6px;justify-content:center;overflow:hidden`}>${more.map(p => ctl(p, 32, { ...st, fs: 9.5, vfs: 11 }))}</div>`);
+    }
+    if (kind === 'mod') {
+      const gw = Math.round(W * 0.42), st = { cap: ['#6a5a8a', '#3a2f5a', '#1a1530'], ink: '#c6b0ff', lab: '#c6b0ff', val: '#ece2ff', id: 'md' };
+      const sw = ps.filter(p => p.kind === 't' || (p.kind === 'e' && p.names.length <= 4)), kn = ps.filter(p => !sw.includes(p));
+      return panel('background:linear-gradient(180deg,#221c34,#120f1c);box-shadow:inset 0 0 0 2px #3a2f5a', html`${screws('#9a8ac0')}
+        <span style="position:absolute;left:22px;top:12px;font-size:26px;font-weight:900;color:#ece2ff">${FX_NAMES[this.fxT(n)]}</span>
+        <div style=${`position:absolute;left:20px;top:56px;width:${W - gw - 60}px;display:flex;flex-wrap:wrap;gap:8px 10px`}>${kn.map(p => ctl(p, 40, st))}</div>
+        <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 100}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #3a2f5a`}>${this.modPic(n, gw, H - 100)}</div>
+        <div style=${`position:absolute;right:20px;bottom:12px;width:${gw}px;display:flex;gap:8px;flex-wrap:wrap`}>${sw.map(p => this.fctl(n, p, 30, { col: '#c6b0ff', lab: '#c6b0ff' }))}</div>`);
+    }
+    if (kind === 'geq') { const tg = ps.filter(p => !/Hz|Master/.test(p.label));
+      return panel('background:#18181a', html`${this.geqFace(n, side, W, H - (tg.length ? 46 : 0))}${tg.length ? html`<div style="position:absolute;left:12px;bottom:6px;display:flex;gap:8px">${tg.map(p => this.fctl(n, p, 30, {}))}</div>` : null}`); }
+    if (kind === 'peq') {
+      const gw = Math.round(W * 0.4), st = { cap: ['#e8e0c8', '#b8a98a', '#6a5a3a'], ind: '#1a1408', ink: '#e6c23e', lab: '#f3e6cc', val: '#fff4c8', id: 'pq' };
+      const tg = ps.filter(p => p.kind === 't'), kn = ps.filter(p => p.kind !== 't');
+      return panel('background:linear-gradient(180deg,#2c4a42,#1a2e28);box-shadow:inset 0 0 0 2px #3a5a50', html`${screws('#c8c0a8')}
+        <span style="position:absolute;left:22px;top:12px;font-size:24px;font-weight:900;letter-spacing:.04em;color:#f3e6cc">${side ? side + ' · ' : ''}${/P1A/.test(K) ? 'PROGRAM EQ' : 'MID EQ'}</span>
+        <div style=${`position:absolute;left:20px;top:54px;width:${W - gw - 60}px;display:flex;flex-wrap:wrap;gap:8px 12px`}>${kn.map(p => this.fknob(n, p, 46, st))}</div>
+        <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 90}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #1a2e28`}>${this.peqPic(n, side, gw, H - 90)}</div>
+        <div style=${`position:absolute;right:20px;bottom:14px;display:flex;gap:8px`}>${tg.map(p => this.fsw(n, p, { col: '#e6c23e' }))}</div>`);
+    }
+    if (kind === 'des') {
+      const sides = K === 'DES' ? [['L', ' L'], ['R', ' R']] : side ? [[side, ' ' + side]] : [['A', ' A'], ['B', ' B']], gw = Math.round(W * 0.46);
+      const st = { cap: ['#ffffff', '#c8c8c8', '#7a7a7a'], ind: '#1a1a1a', ink: '#e6a050', lab: '#2a2a2a', val: '#1a1a1a', id: 'ds' };
+      return panel('background:linear-gradient(180deg,#e8e8e8,#b8b8b8);box-shadow:inset 0 0 0 2px #8a8a8a', html`${screws('#fafafa')}
+        <span style="position:absolute;left:22px;top:12px;padding:2px 12px;border-radius:6px;background:#1a1a1a;color:#e8e8e8;font-size:22px;font-weight:900;letter-spacing:1px">dss</span>
+        <span style="position:absolute;left:96px;top:16px;font-size:16px;font-weight:900;color:#2a2a2a">DUAL-BAND DE-ESSER</span>
+        <div style=${`position:absolute;left:20px;top:58px;width:${W - gw - 56}px;display:flex;flex-direction:column;gap:10px`}>
+          ${sides.map(([lab, sfx]) => { const pl = ps.find(p => p.label === 'Lo Band' + sfx), ph = ps.find(p => p.label === 'Hi Band' + sfx), vo = ps.find(p => p.label === 'Voice' + sfx) || ps.find(p => p.label === 'Voice');
+            return html`<div style="display:flex;align-items:center;gap:14px;padding:6px 12px;border-radius:40px;background:#1e1e20;box-shadow:inset 0 2px 6px rgba(0,0,0,.8)">
+              <span style="font-size:18px;font-weight:900;color:#e6a050;width:20px">${lab}</span>${this.fknob(n, pl, 46, { ...st, lab: '#e8e8e8', val: '#f6c27a', label: 'LO-BAND' })}${this.fknob(n, ph, 46, { ...st, lab: '#e8e8e8', val: '#f6c27a', label: 'HI-BAND' })}
+              ${vo && this.fsel(n, vo, { col: '#6a8ad8', lab: '#e8e8e8', bw: 50 })}</div>`; })}
+          ${K === 'DES' && this.fsel(n, ps.find(p => p.label === 'Mode'), { lab: '#2a2a2a', col: '#e6a050' })}
+        </div>
+        <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 32}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #5a5a5a`}>${this.desPic(n, side || (this.state.fxSide || 'A'), gw, H - 32)}</div>`);
+    }
+    if (kind === 'wavd') {
+      const sides = side ? [side] : ['A', 'B'], gw = Math.round(W * 0.44), st = { cap: ['#3a3a3a', '#141414', '#000'], ind: '#ff4a2a', ink: '#c8c8c8', lab: '#e8e8e8', val: '#ffb08a', id: 'sp' };
+      return panel('background:linear-gradient(180deg,#5a5e64,#3a3d42);box-shadow:inset 0 0 0 2px #2a2c30', html`${screws('#c8c8c8')}
+        <span style="position:absolute;left:22px;top:12px;font-size:12px;font-weight:900;letter-spacing:.3em;color:#d8d8d8">TRANSIENT</span>
+        <span style="position:absolute;left:22px;top:26px;font-size:26px;font-weight:900;color:#ffffff;letter-spacing:.02em">Wave Designer</span>
+        <div style=${`position:absolute;left:20px;top:70px;width:${W - gw - 56}px;display:flex;flex-direction:column;gap:10px`}>
+          ${sides.map(sd => html`<div style="display:flex;align-items:center;gap:18px;padding:8px 16px;border-radius:10px;background:#26282c;box-shadow:inset 0 0 0 1px #4a4d52">
+            <span style="font-size:30px;font-weight:900;color:#ff5a3a;width:28px">${sd}</span>
+            ${['Attack', 'Sustain', 'Gain'].map(l => this.fknob(n, ps.find(p => p.label === l + ' ' + sd), 54, { ...st, ind: l === 'Gain' ? '#f3e6cc' : '#ff4a2a' }))}</div>`)}
+        </div>
+        <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 32}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #26282c`}>${this.wavdPic(n, side || (this.state.fxSide || 'A'), gw, H - 32)}</div>`);
+    }
+    if (kind === 'comp') {
+      const gw = Math.round(W * 0.36), fac = /FAC/.test(K), lec = /LEC/.test(K), ulc = /ULC/.test(K), cmb = /CMB/.test(K);
+      const look = fac ? ['background:radial-gradient(ellipse at 30% 20%,#3a4e56,#1e2a30 70%);box-shadow:inset 0 0 0 2px #2a3a40', { cap: ['#4a4a4a', '#1a1a1a', '#050505'], ink: '#c8d8e0', lab: '#c8d8e0', val: '#ffe8a8' }]
+        : lec ? ['background:linear-gradient(180deg,#d8d2c2,#b8b0a0);box-shadow:inset 0 0 0 2px #8a8270', { cap: ['#3a3a3a', '#1a1a1a', '#000'], ink: '#2a2620', lab: '#2a2620', val: '#4a1a10' }]
+        : ulc ? ['background:linear-gradient(180deg,#1a1a1a,#0a0a0a);box-shadow:inset 0 0 0 2px #3a3a3a', { cap: ['#cfcfcf', '#8a8a8a', '#3a3a3a'], ind: '#111', ink: '#c8c8c8', lab: '#e8e8e8', val: '#9fd0ff' }]
+        : ['background:linear-gradient(180deg,#2a2622,#171412);box-shadow:inset 0 0 0 2px #3a342c', { cap: ['#5a5d61', '#2a2c2e', '#101112'], ink: '#f0a24a', lab: '#e9dcc2', val: '#ffd8a0' }];
+      if (cmb) { const band = b => ps.filter(p => p.base.startsWith('Band ' + b + ' ')), glob = ps.filter(p => !/^Band \d/.test(p.base)), gs = glob.filter(p => p.kind === 't' || (p.kind === 'e' && p.names.length <= 6)), gk = glob.filter(p => !gs.includes(p));
+        const st2 = { ...look[1], id: 'cb', fs: 9.5, vfs: 10.5 };
+        return panel(look[0], html`${screws()}
+          <span style="position:absolute;left:22px;top:10px;font-size:20px;font-weight:900;color:#e9dcc2">${side ? side + ' · ' : ''}Combinator</span>
+          <div style=${`position:absolute;left:20px;top:44px;width:${gw - 30}px;height:${Math.round((H - 120) * 0.62)}px;border-radius:8px;overflow:hidden;box-shadow:inset 0 0 0 3px #1a1a1a`}>${this.vuPic(n, side, gw - 30, Math.round((H - 120) * 0.62))}</div>
+          <div style=${`position:absolute;left:20px;top:${50 + Math.round((H - 120) * 0.62)}px;width:${gw - 30}px;display:flex;flex-wrap:wrap;gap:4px 6px`}>${gk.map(p => this.fknob(n, p, 26, st2))}</div>
+          <div style=${`position:absolute;left:${gw + 6}px;right:16px;top:12px;bottom:${gs.length ? 64 : 12}px;display:grid;grid-template-columns:repeat(5,1fr);gap:6px`}>
+            ${[1, 2, 3, 4, 5].map(b => { const bp = band(b), lk = bp.find(p => / Lock$/.test(p.base));
+              return html`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;border-radius:8px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08)">
+                <span style="font-size:13px;font-weight:900;color:#f0a24a">BAND ${b}</span>
+                ${bp.filter(p => p !== lk).map(p => this.fknob(n, p, 32, { ...st2, label: p.base.replace('Band ' + b + ' ', '') }))}
+                ${lk && this.fsel(n, lk, { col: '#f0a24a', lab: look[1].lab, bw: 28, h: 26, label: 'LOCK' })}</div>`; })}</div>
+          <div style="position:absolute;left:${gw + 6}px;right:16px;bottom:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">${gs.map(p => this.fctl(n, p, 26, { col: '#f0a24a', lab: look[1].lab, h: 30, bw: 34 }))}</div>`);
+      }
+      const sw = ps.filter(p => p.kind === 't' || (p.kind === 'e' && p.names.length <= 4)), kn = ps.filter(p => !sw.includes(p)), D = kn.length > 6 ? 40 : 54;
+      return panel(look[0], html`${screws()}
+        <span style=${`position:absolute;left:22px;top:12px;font-size:22px;font-weight:900;font-style:${fac ? 'italic' : 'normal'};color:${lec ? '#2a2620' : '#e9dcc2'}`}>${side ? side + ' · ' : ''}${FX_NAMES[this.fxT(n)].replace(/^(Stereo|Dual) /, '')}</span>
+        <div style=${`position:absolute;left:20px;top:52px;width:${gw}px;height:${H - 110}px;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(0,0,0,.6),inset 0 0 0 3px #1a1a1a`}>${this.vuPic(n, side, gw, H - 110, { title: fac ? 'VU · ELECTRONIC' : 'GAIN REDUCTION' })}</div>
+        <div style=${`position:absolute;left:${gw + 40}px;right:20px;top:48px;display:flex;flex-wrap:wrap;gap:6px 12px;align-content:flex-start;max-height:${H - 110}px;overflow:hidden`}>${kn.map(p => this.fknob(n, p, D, { ...look[1], id: 'cp', fs: cmb ? 9 : 11, vfs: cmb ? 10 : 12 }))}</div>
+        <div style="position:absolute;left:20px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap">${sw.map(p => this.fctl(n, p, 30, { col: '#f0a24a', lab: look[1].lab }))}</div>`);
+    }
+    /* enhancers, exciters, imager, amps, tube stage, pitch */
+    const gw = Math.round(W * 0.42), st = { cap: ['#5a3a34', '#2a1a16', '#100806'], ink: '#ffb4a8', lab: '#ffd8d0', val: '#fff0ea', id: 'tn' };
+    const sw = ps.filter(p => p.kind === 't' || (p.kind === 'e' && p.names.length <= 4)), kn = ps.filter(p => !sw.includes(p));
+    return panel('background:linear-gradient(180deg,#2e1c1a,#170e0d);box-shadow:inset 0 0 0 2px #4a2a26', html`${screws('#c8a8a0')}
+      <span style="position:absolute;left:22px;top:12px;font-size:24px;font-weight:900;color:#ffe0d8">${side ? side + ' · ' : ''}${FX_NAMES[this.fxT(n)].replace(/^(Stereo|Dual) /, '')}</span>
+      <div style=${`position:absolute;left:20px;top:54px;width:${W - gw - 60}px;display:flex;flex-wrap:wrap;gap:8px 12px;max-height:${H - 110}px;overflow:hidden`}>${kn.map(p => ctl(p, kn.length > 10 ? 36 : 46, st))}</div>
+      <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 32}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #3a2420`}>${this.tonePic(n, side, gw, H - 32)}</div>
+      <div style="position:absolute;left:20px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap">${sw.map(p => this.fctl(n, p, 30, { col: '#ff8a6a', lab: '#ffd8d0' }))}</div>`);
+  }
+  /* the help window: what the effect is for, and a line for each control */
+  renderFxInfo(Hd) {
+    const fi = this.state.fxInfo, K = this.fxK(fi.n), t = this.fxT(fi.n), close = () => this.setState({ fxInfo: null }); if (!K) return null;
+    const seen = new Set(), ps = (FXD[K] || []).filter(p => { const b = p.base.replace(/ (L|R|M|S|1|2)$/, ''); if (seen.has(b)) return false; seen.add(b); return true; });
+    return html`<button class="scrim" style="z-index:8" aria-label="Close" onClick=${close}></button>
+      <div class="pop" data-fxinfo="1" dir="rtl" style=${`z-index:9;left:140px;top:16px;width:900px;max-height:${Hd - 32}px;padding:18px 22px;gap:10px;${HEB}`}>
+        <div style="display:flex;align-items:center;gap:12px"><span dir="ltr" style="font-size:24px;font-weight:800;color:var(--brass-hi)">${FX_NAMES[t]}</span><span style="flex:1"></span><button class="small" onClick=${close}>סגור</button></div>
+        <span style="font-size:17px;line-height:1.6;color:#f1e7d2">${FX_INFO[K] || ''}</span>
+        <span style="font-size:14px;line-height:1.5;color:#b8a78a">${fxDual(K) ? 'DUAL – מכשיר כפול: שני מכשירי מונו נפרדים, A ו־B, כל אחד עם הפקדים שלו. אפשר לשבץ את A בערוץ אחד ואת B בערוץ אחר (למשל דה־אסר לשני זמרים). באינסרט רואים רק את הצד של הערוץ, ובמסך האפקטים עוברים בין הצדדים.' : 'STEREO – מכשיר אחד לשני ערוצים: אותם פקדים פועלים על שמאל וימין יחד, ומתאים לאות סטריאו או לשליחה. באינסרט על ערוץ מונו הערוץ נכנס לצד אחד שלו.'}</span>
+        <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;align-content:start">
+          ${ps.map(p => html`<div style="display:flex;gap:10px;align-items:baseline;padding:6px 0;border-bottom:1px solid #2c2721">
+            <b dir="ltr" style="flex:none;width:130px;font-size:14px;color:#f3c27a;text-align:left">${p.base.replace(/ (L|R|M|S|1|2)$/, '')}</b><span style="font-size:14px;line-height:1.45;color:#d9cdb3">${piOf(p.label) || '—'}</span></div>`)}
+        </div></div>`;
+  }
+  /* the header of a face: name, family, side switch for dual effects, TAP, help */
+  fxBar(n, side, sideSwitch) {
+    const K = this.fxK(n), t = this.fxT(n), c = FX_COL[FX_FAM(t)], ins = this.val(`/fx/${n}/insert`);
+    return html`<div style="display:flex;align-items:center;gap:10px;flex:none">
+      <span style=${`font-size:13px;font-weight:800;letter-spacing:.16em;color:${c}`}>FX ${n}${side ? ' · ' + side : ''}</span>
+      <span data-fxname="1" style="font-size:24px;font-weight:800;color:#f1e7d2;white-space:nowrap">${t >= 0 ? FX_NAMES[t] : '···'}</span>
+      <span style=${`padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;letter-spacing:.1em;border:1px solid ${c};color:${c}`}>${ins === 1 ? 'INSERT' : 'SEND'}</span>
+      ${K && html`<button class="small" data-info="1" aria-label="What this effect does" style="width:40px;height:40px;padding:0;border-radius:50%;font-size:18px;font-weight:900;font-style:italic;font-family:Georgia,serif" onClick=${() => this.setState({ fxInfo: { n } })}>i</button>`}
+      ${sideSwitch && fxDual(K) && html`<div style="display:flex;gap:3px">${['A', 'B'].map(sd => html`<button class=${'tab' + ((this.state.fxSide || 'A') === sd ? ' on' : '')} data-side=${sd} onClick=${() => this.setState({ fxSide: sd })}>${sd}</button>`)}</div>`}
+      <span style="flex:1"></span>${this.tapBtn(n)}
+    </div>`;
+  }
+  /* the effects: four slots on the left, the chosen one's face on the right */
   renderFx(Hd) {
     const st = this.state, L = this.L(), n = st.fxSlot, LF = { n: STEPS.fader, of: dbOf, fmt: x => dbText(x) + ' dB' };
-    const slot = k => { const t = this.val(`/fx/${k}/type`), ins = this.val(`/fx/${k}/insert`), ok = Number.isInteger(t) && t >= 0 && t < FX_NAMES.length, fam = ok ? FX_FAM(t) : 'REVERB', c = FX_COL[fam], on = k === n;
-      return html`<button data-fxslot=${k} aria-pressed=${String(on)} onClick=${() => this.setState({ fxSlot: k })}
-        style=${`flex:1;min-height:0;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 14px;text-align:left;position:relative;overflow:hidden;
+    const slot = k => { const t = this.fxT(k), ins = this.val(`/fx/${k}/insert`), ok = t >= 0, fam = ok ? FX_FAM(t) : 'REVERB', c = FX_COL[fam], on = k === n;
+      return html`<button data-fxslot=${k} aria-pressed=${String(on)} onClick=${() => this.setState({ fxSlot: k, fxSide: 'A', fxHot: null })}
+        style=${`flex:1;min-height:0;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:3px;padding:0 12px;text-align:left;position:relative;overflow:hidden;
           ${on ? `background:${c}22;border:1.5px solid ${c};box-shadow:0 0 16px ${c}55` : 'background:linear-gradient(180deg,#221f1b,#161412);border:1px solid #3a342c'}`}>
         <i style=${`position:absolute;left:0;top:0;bottom:0;width:5px;background:${c}`}></i>
-        <span style=${`font-size:12px;font-weight:800;letter-spacing:.16em;color:${c}`}>FX ${k} · ${ins === 1 ? 'INSERT' : 'SEND'}</span>
-        <span style="font-size:19px;font-weight:800;color:#f1e7d2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${ok ? FX_NAMES[t] : '···'}</span>
-        <span style="font-size:12px;color:#9b927f">${fam}</span></button>`; };
-    const t = this.val(`/fx/${n}/type`), ok = Number.isInteger(t) && t >= 0 && t < FX_NAMES.length, key = ok ? FX_KEYS[t] : '', ps = ok ? FXP[key] : null, c = FX_COL[ok ? FX_FAM(t) : 'REVERB'], ins = this.val(`/fx/${n}/insert`);
-    const a = L.fxs[n - 1], r = L.rtn[n - 1];
-    const param = (p, k) => { const path = `/fx/${n}/par/${pad2(k + 1)}`;
-      if (p[1] === 't') { const v = this.val(path); return html`<button class="pill" data-t=${path} aria-pressed=${String(v === 1)} onClick=${() => this.tog(path)} style=${`height:44px;font-size:14px;${v === 1 ? `background:${c}33;color:#f1e7d2;border-color:${c}` : ''}${v === undefined ? ';opacity:.45' : ''}`}>${p[0]} ${v === 1 ? 'ON' : 'OFF'}</button>`; }
-      if (p[1] === 'e') return this.ibox(p[0], path, p[2], c);
-      return this.pbox(p[0], path, fxLaw(p), c); };
+        <span style=${`font-size:11px;font-weight:800;letter-spacing:.14em;color:${c}`}>FX ${k} · ${ins === 1 ? 'INSERT' : 'SEND'}</span>
+        <span style="font-size:16px;font-weight:800;color:#f1e7d2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${ok ? FX_NAMES[t] : '···'}</span></button>`; };
+    const t = this.fxT(n), K = this.fxK(n), ins = this.val(`/fx/${n}/insert`), a = L.fxs[n - 1], r = L.rtn[n - 1], dual = fxDual(K), side = dual ? (st.fxSide || 'A') : '';
+    const FW = DW - 28 - 220 - 10 - 62 - 10 - 24, FHh = Math.max(300, Math.round(Hd - 52 - 24 - 56 - 18));
+    const insWho = ins === 1 ? this.insUsers(n) : [];
     return html`${this.toolHeader('EFFECTS')}
-      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:12px 26px">
-        <div style="width:240px;flex:none;display:flex;flex-direction:column;gap:8px">${[1, 2, 3, 4].map(slot)}</div>
-        <section class="sec" style=${`flex:1;min-width:0;gap:10px;padding:12px 14px;border-color:${c}66`}>
-          <div style="display:flex;align-items:center;gap:12px">
-            <span style=${`font-size:13px;font-weight:800;letter-spacing:.16em;color:${c}`}>FX ${n}</span>
-            <span data-fxname="1" style="font-size:26px;font-weight:800;color:#f1e7d2">${ok ? FX_NAMES[t] : '···'}</span>
-            <span style=${`padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;letter-spacing:.1em;border:1px solid ${c};color:${c}`}>${ins === 1 ? 'INSERT' : 'SEND'}</span>
-            <span style="flex:1"></span>
-            <button class="pill" data-fxtype="1" style="height:44px;padding:0 16px" onClick=${() => this.setState({ keyPick: { path: `/fx/${n}/type`, title: 'FX ' + n + ' · EFFECT', labels: FX_NAMES, cols: 5, h: 38, w: 1060, ph: 560, ask: FX_ASK(n) } })}>CHANGE EFFECT</button>
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        <div style="width:220px;flex:none;display:flex;flex-direction:column;gap:6px">${[1, 2, 3, 4].map(slot)}
+          ${ins !== 1 ? html`${this.pbox('SEND ' + (this.nm(a) || n), a.fader, LF, '#4fc9b7')}${this.pbox('RETURN ' + (this.nm(r) || n), r.fader, LF, '#a993d9')}`
+            : html`<div dir="rtl" style=${`${HEB};padding:8px;border-radius:8px;background:#141210;border:1px solid #2c2721;font-size:13px;line-height:1.45;color:#b8a78a`}>${insWho.length ? 'משובץ ב: ' : 'הסלוט באינסרט אבל אף ערוץ לא משתמש בו.'}<b dir="ltr">${insWho.join(', ')}</b></div>`}
+          <button class="pill" data-fxtype="1" style="height:44px;flex:none" onClick=${() => this.setState({ keyPick: { path: `/fx/${n}/type`, title: 'FX ' + n + ' · EFFECT', labels: FX_NAMES, cols: 5, h: 38, w: 1060, ph: 560, ask: FX_ASK(n) } })}>CHANGE EFFECT</button>
+        </div>
+        <section class="sec" style=${`flex:1;min-width:0;gap:8px;padding:10px 12px;border-color:${FX_COL[t >= 0 ? FX_FAM(t) : 'REVERB']}66`}>
+          ${this.fxBar(n, side, true)}
+          <div style="flex:1;min-height:0;display:flex;gap:10px">
+            ${this.fxMeter(n, side, FHh)}
+            <div data-fxface=${K} style="flex:1;min-width:0">${t >= 0 ? this.fxFace(n, side, FW, FHh) : html`<div dir="rtl" style=${`${HEB};font-size:16px;color:#9b927f;padding:20px`}>ממתין לדיווח מהמיקסר…</div>`}</div>
           </div>
-          ${ins !== 1 && html`<div style="display:flex;gap:8px">
-            ${this.pbox('Send master ' + (this.nm(a) || ''), a.fader, LF, '#4fc9b7', 'flex:1;min-width:0')}
-            ${this.pbox('Return ' + (this.nm(r) || ''), r.fader, LF, '#a993d9', 'flex:1;min-width:0')}</div>`}
-          ${ps ? html`<div data-fxparams=${ps.length} style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:min-content;gap:6px 10px;align-content:start">${ps.map(param)}</div>`
-            : html`<div dir="rtl" style=${`${HEB};flex:1;font-size:16px;line-height:1.6;color:#9b927f;padding:20px`}>${ok ? 'עריכת הפרמטרים של האפקט הזה תגיע בשלב עיצוב האפקטים. בינתיים אפשר לראות ולהחליף את סוג האפקט, ולשלוט ברמות.' : 'ממתין לדיווח מהמיקסר…'}</div>`}
         </section>
       </div>
+      ${st.fxInfo && this.renderFxInfo(Hd)}
       ${this.chanPopsLite(Hd)}`;
+  }
+  /* which strips use a slot as an insert (and on which side) */
+  insUsers(n) { const L = this.L(), out = []; [...L.ch, ...L.bus, L.lr].forEach(s => { const p = this.insSel(s); if (!p || this.val(s.base + '/insert/on') !== 1) return; const v = this.val(p);
+    if (fin(v) && v > 0 && Math.ceil(v / 2) === n) out.push((this.nm(s) || s.def) + (fxDual(this.fxK(n)) ? ' ' + (v % 2 ? 'A' : 'B') : '')); }); return out; }
+  /* the address that holds a strip's insert slot: the command list names /insert/fxslot, but the XR16 did not answer it – whichever
+     candidate the mixer answers is used (VERIFY on the report). In the demo it is fxslot. */
+  insSel(s) { if (!INS_KINDS.includes(s.kind)) return null; for (const c of INS_SEL) { const p = s.base + '/insert/' + c; if (this.val(p) !== undefined) return p; } return null; }
+
+  /* ---------- INSERT: put one of the four effects into this strip, and edit it right here ---------- */
+  renderInsert(Hd) {
+    const st = this.state, s = this.L().byId[st.sheet], onP = s.base + '/insert/on', on = this.val(onP), sp = this.insSel(s), v = sp ? this.val(sp) : undefined;
+    const k = fin(v) ? v : 0, n = k > 0 ? Math.ceil(k / 2) : 0, half = k > 0 ? (k % 2 ? 'A' : 'B') : '', K = n ? this.fxK(n) : '', dual = fxDual(K), side = dual ? half : '';
+    const slotIns = n ? this.val(`/fx/${n}/insert`) : undefined, BH = Math.round(Hd - 72);
+    const FW = DW - 28 - 230 - 112 - 62 - 30, FHh = BH - 56;
+    const sbtn = (kk) => { const nn = Math.ceil(kk / 2), sd = kk % 2 ? 'A' : 'B', t = this.fxT(nn), c = FX_COL[t >= 0 ? FX_FAM(t) : 'REVERB'], sel = k === kk, iok = this.val(`/fx/${nn}/insert`) === 1;
+      return html`<button data-ins=${kk} aria-pressed=${String(sel)} onClick=${() => sp ? this.pick(sp, kk) : this.toastRO('המיקסר לא דיווח על בחירת הסלוט באינסרט')}
+        style=${`height:${Math.max(44, Math.min(58, (BH - 210) / 4))}px;min-width:0;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:0 9px;position:relative;overflow:hidden;text-align:left;
+          ${sel ? `background:${c}2a;border:1.5px solid ${c};box-shadow:0 0 12px ${c}66` : 'background:#161412;border:1px solid #302b25'};opacity:${iok || sel ? 1 : 0.55}`}>
+        <i style=${`position:absolute;left:0;top:0;bottom:0;width:4px;background:${c}`}></i>
+        <span style=${`font-size:13px;font-weight:900;letter-spacing:.08em;color:${c}`}>FX${nn} ${sd}</span>
+        <span style="font-size:11px;color:#cbbd9f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${t >= 0 ? FX_NAMES[t].replace(/^(Stereo|Dual) /, '') : '···'}</span></button>`; };
+    return html`
+      ${this.chanHeader('Insert', s)}
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        <section class="sec" style="width:230px;flex:none;padding:8px;gap:8px">
+          <button data-t=${onP} aria-pressed=${String(on === 1)} onClick=${() => this.tog(onP)}
+            style=${`height:54px;flex:none;border-radius:9px;cursor:pointer;font-size:19px;font-weight:900;letter-spacing:.12em;${on === 1 ? 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c;box-shadow:0 0 14px rgba(98,184,92,.4)' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}${on === undefined ? ';opacity:.45' : ''}`}>INSERT ${on === 1 ? 'ON' : 'OFF'}</button>
+          <button data-ins="0" aria-pressed=${String(k === 0)} onClick=${() => sp ? this.pick(sp, 0) : this.toastRO('המיקסר לא דיווח על בחירת הסלוט באינסרט')} class=${'pill' + (k === 0 ? ' on' : '')} style="height:40px;flex:none">NO EFFECT</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">${[1, 2, 3, 4, 5, 6, 7, 8].map(sbtn)}</div>
+          <span dir="rtl" style=${`${HEB};font-size:12.5px;line-height:1.5;color:#8c8272;${sp && Hd < 600 ? 'display:none' : ''}`}>${!sp ? 'המיקסר עוד לא דיווח על בחירת הסלוט באינסרט.' : 'A ו־B הם שני הצדדים של הסלוט: באפקט כפול כל צד הוא מכשיר נפרד, ובאפקט סטריאו הם הצד השמאלי והימני שלו. סלוט עמום מוגדר כרגע כשליחה (SEND) ולא כאינסרט.'}</span>
+        </section>
+        <section class="sec" style="flex:1;min-width:0;gap:8px;padding:8px 10px">
+          ${!n ? html`<div dir="rtl" style=${`${HEB};flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#9b927f;font-size:17px`}>
+              <span style="font-size:46px;opacity:.5">⎘</span><span>אין אפקט באינסרט של הערוץ. בחר סלוט מימין כדי לשבץ אותו.</span></div>`
+            : html`${this.fxBar(n, side, false)}
+              ${slotIns === 0 && html`<div dir="rtl" style=${`${HEB};display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:8px;background:#2a1a10;border:1px solid #8a5a2a;font-size:14px;color:#ffc98f`}>
+                <span style="flex:1">הסלוט FX${n} מוגדר כרגע כשליחה. כדי שיעבוד כאינסרט צריך להעביר אותו למצב INSERT.</span>
+                <button class="small" onClick=${() => this.setState({ ask: { text: FX_INS_ASK(n), path: `/fx/${n}/insert`, value: 1 } })}>העבר לאינסרט</button></div>`}
+              ${!dual && K && html`<span dir="rtl" style=${`${HEB};font-size:12.5px;color:#8c8272`}>אפקט סטריאו: הערוץ נכנס לצד ${half === 'A' ? 'השמאלי' : 'הימני'} של הסלוט, והפקדים משותפים לשני הצדדים.</span>`}
+              <div style="flex:1;min-height:0;display:flex;gap:10px">${this.fxMeter(n, side, FHh - (slotIns === 0 ? 46 : 0) - (!dual ? 20 : 0))}
+                <div style="flex:1;min-width:0">${this.fxFace(n, side, FW, FHh - (slotIns === 0 ? 46 : 0) - (!dual ? 20 : 0))}</div></div>`}
+        </section>
+        ${this.chanStrip(Hd, s)}
+      </div>
+      ${st.fxInfo && this.renderFxInfo(Hd)}
+      ${this.chanPops(Hd, s)}`;
+  }
+
+  /* ---------- the input source of a channel: an analog input, or a USB return (XR18: 1–18 from the computer; XR16/XR12: the stick player L/R) ---------- */
+  srcText(c) { const sw = this.val(c.base + '/preamp/rtnsw'), us = this.val(c.base + '/config/rtnsrc'), v = this.val(c.base + '/config/insrc'), xr18 = this.L().M.key === 'XR18';
+    if (sw === 1) return xr18 ? 'USB ' + pad2((fin(us) ? us : 0) + 1) : 'USB ' + (us === 1 ? 'R' : 'L'); return fin(v) ? 'IN ' + pad2(v + 1) : '···'; }
+  usbLabels() { return this.L().M.key === 'XR18' ? Array.from({ length: 18 }, (_, k) => 'USB ' + pad2(k + 1)) : ['USB L', 'USB R']; }
+  setSrc(c, kind, k) {
+    const sw = c.base + '/preamp/rtnsw', us = c.base + '/config/rtnsrc', ins = c.base + '/config/insrc';
+    if (kind === 'in') { if (this.val(ins) === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(ins, 'i', k); if (this.val(sw) === 1) this.set(sw, 'i', 0); }
+    else { if (this.val(sw) === undefined || this.val(us) === undefined) { this.toastRO('המיקסר עוד לא דיווח על מקור ה־USB של הערוץ'); return; } this.set(us, 'i', k); this.set(sw, 'i', 1); }
+    this.setState({ srcPick: null });
+  }
+  renderSrcPick(Hd) {
+    const c = this.L().byId[this.state.srcPick]; if (!c) return null; const sw = this.val(c.base + '/preamp/rtnsw'), us = this.val(c.base + '/config/rtnsrc'), v = this.val(c.base + '/config/insrc'), xr18 = this.L().M.key === 'XR18', close = () => this.setState({ srcPick: null });
+    const btn = (lab, on, fn, col) => html`<button class=${'pill' + (on ? ' on' : '')} data-src=${lab} onClick=${fn} style=${`height:48px;padding:0;font-family:var(--mono);font-size:15px;letter-spacing:0;${on && col ? `background:${col}33;border-color:${col};color:#f1e7d2` : ''}`}>${lab}</button>`;
+    return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
+      <div class="pop" data-srcpick="1" style=${`z-index:7;left:${(DW - 820) / 2}px;top:${Math.max(8, Math.round((Hd - 430) / 2))}px;width:820px;padding:16px;gap:10px;max-height:${Hd - 16}px;overflow:auto`}>
+        <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brass-hi);flex:1">${this.nm(c) || c.def} · SOURCE</span><button class="small" onClick=${close}>CLOSE</button></div>
+        <span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a">ANALOG INPUTS</span>
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px">${Array.from({ length: 16 }, (_, k) => btn('IN ' + pad2(k + 1), sw !== 1 && v === k, () => this.setSrc(c, 'in', k)))}</div>
+        <span style="font-size:12px;font-weight:700;letter-spacing:.14em;color:#8fd0e0">${xr18 ? 'USB FROM THE COMPUTER' : 'USB PLAYER (STICK)'}</span>
+        <div style=${`display:grid;grid-template-columns:repeat(${xr18 ? 9 : 4},1fr);gap:6px`}>${this.usbLabels().map((l, k) => btn(l, sw === 1 && us === k, () => this.setSrc(c, 'usb', k), '#8fd0e0'))}</div>
+        <span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.5;color:#8c8272`}>${xr18 ? 'בחירת USB מחליפה את הכניסה האנלוגית של הערוץ בערוץ חוזר מהמחשב (למשל השמעה מתוכנת הקלטה).' : 'ב־XR16 וב־XR12 אין ממשק אודיו למחשב. ערוץ שמקורו USB מקבל את נגן הדיסק־און־קי, צד שמאל או ימין, כך שאפשר לנגן מוזיקה בלי לבזבז את ערוץ ה־AUX.'} ${!xr18 ? 'מיפוי L/R לפי rtnsrc 0/1 – לאימות בדוח.' : ''}</span>
+      </div>`;
+  }
+
+  /* ---------- AUTOMIX: gain sharing for speech microphones (X and Y groups) ---------- */
+  renderAutomix(Hd) {
+    const st = this.state, L = this.L(), sm = 'font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a', now = Date.now() / 1000;
+    const grpCol = ['#4a4339', '#4fc9b7', '#f0a24a'], ch = L.ch, rows = 8, RH = Math.max(40, Math.floor((Hd - 52 - 24 - 150) / rows) - 6);
+    const gcard = g => { const p = '/config/amixenable/' + g, v = this.val(p), lk = this.val('/config/amixlock/' + g), n = ch.filter(c => this.val(c.base + '/automix/group') === (g === 'X' ? 1 : 2)).length, col = grpCol[g === 'X' ? 1 : 2];
+      return html`<div class="sec" style=${`flex:1;padding:10px 12px;gap:6px;flex-direction:row;align-items:center;border-color:${v === 1 ? col : 'var(--line)'}`}>
+        <span style=${`width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:${v === 1 ? '#10100e' : col};background:${v === 1 ? col : 'transparent'};border:2px solid ${col}`}>${g}</span>
+        <span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:800;color:#f1e7d2">GROUP ${g}</span><span style="font-family:var(--mono);font-size:12px;color:#9b927f">${n} channels${lk === 1 ? ' · LOCKED' : ''}</span></span>
+        <button class="pill" data-t=${p} aria-pressed=${String(v === 1)} onClick=${() => this.tog(p)} style=${`width:96px;height:46px;${v === 1 ? `background:${col};color:#10100e;border-color:${col}` : ''}${v === undefined ? ';opacity:.45' : ''}`}>${v === 1 ? 'ON' : 'OFF'}</button></div>`; };
+    const row = c => { const gp = c.base + '/automix/group', g = this.val(gp), wp = c.base + '/automix/weight', w = this.val(wp), gain = this.amxGain(c), col = this.val(c.color), en = g > 0 && this.val('/config/amixenable/' + (g === 1 ? 'X' : 'Y')) === 1;
+      return html`<div style=${`height:${RH}px;display:flex;align-items:center;gap:8px;padding:0 8px;border-radius:8px;background:#141210;border:1px solid ${g > 0 ? grpCol[g] + '88' : '#2c2721'}`}>
+        <span class="tag" style=${nameLook(col) + ';height:28px;width:92px;font-size:13px;justify-content:center;overflow:hidden;white-space:nowrap'}>${this.nm(c) || c.def}</span>
+        <div style="display:flex;gap:3px">${['OFF', 'X', 'Y'].map((t, k) => html`<button data-amx=${c.n + ':' + k} aria-pressed=${String(g === k)} onClick=${() => this.pick(gp, k)}
+          style=${`width:40px;height:${Math.min(34, RH - 8)}px;padding:0;border-radius:6px;cursor:pointer;font-size:12px;font-weight:900;${g === k ? `background:${k ? grpCol[k] : '#3a342c'};color:${k ? '#10100e' : '#e9dcc2'};border:1px solid ${grpCol[k]}` : 'background:#1a1714;color:#8a8170;border:1px solid #2c2721'}`}>${t}</button>`)}</div>
+        <div style="flex:1;min-width:0">${this.hbar('WEIGHT', wp, LAW.amxw, grpCol[g > 0 ? g : 0] === '#4a4339' ? '#8a7d66' : grpCol[g], Math.min(34, RH - 8))}</div>
+        <div title="automix gain" style="width:118px;height:14px;border-radius:3px;background:#0c0b0a;position:relative;overflow:hidden;opacity:${en ? 1 : 0.3}">
+          <span style=${`position:absolute;right:0;top:0;bottom:0;width:${clamp(-gain / 40, 0, 1) * 100}%;background:linear-gradient(90deg,#4fc9b7,#2a6a60)`}></span>
+          <span style="position:absolute;left:4px;top:-1px;font-family:var(--mono);font-size:11px;color:#e9dcc2">${en ? (gain > -0.05 ? '0.0' : gain.toFixed(1)) + ' dB' : '—'}</span></div>
+      </div>`; };
+    return html`${this.toolHeader('AUTOMIX', html`<button class="small" data-info="amx" style="margin-left:14px;width:40px;height:40px;padding:0;border-radius:50%;font-size:18px;font-weight:900;font-style:italic;font-family:Georgia,serif" onClick=${() => this.setState({ amxInfo: true })}>i</button>`)}
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:10px 20px">
+        <div style="display:flex;gap:10px">${gcard('X')}${gcard('Y')}
+          <div dir="rtl" class="sec" style=${`flex:1.4;padding:8px 12px;${HEB};font-size:13.5px;line-height:1.5;color:#cbbd9f`}>אוטומיקס מחלק את ההגבר בין המיקרופונים של הקבוצה: מי שמדבר עולה, השאר יורדים, והסכום נשאר קבוע. לפאנלים, כנסים ודיבור – לא למוזיקה.</div></div>
+        <span style=${sm}>CHANNELS · GROUP · WEIGHT · GAIN NOW</span>
+        <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:6px 12px;align-content:start">${ch.map(row)}</div>
+      </div>
+      ${st.amxInfo && this.renderAmxInfo(Hd)}
+      ${this.chanPopsLite(Hd)}`;
+  }
+  /* the gain the automix gives a channel now: from the mixer (meters/7) when connected, otherwise worked out the way gain sharing works */
+  amxGain(c) {
+    if (this.linked()) return Date.now() - (this.amxAt || 0) < 1500 ? clamp(this.amx[c.n - 1], -60, 0) : 0;
+    const g = this.val(c.base + '/automix/group'); if (!(g > 0) || this.val('/config/amixenable/' + (g === 1 ? 'X' : 'Y')) !== 1) return 0;
+    const now = Date.now() / 1000, lvl = cc => { const k = cc.n, t = now * 0.35 + k * 1.7, talk = Math.sin(t) > 0.55 ? 1 : 0.04 + 0.03 * Math.sin(now * 3 + k); const w = this.val(cc.base + '/automix/weight'); return talk * Math.pow(10, ((fin(w) ? w : 0.5) - 0.5) * 24 / 20); };
+    const mem = this.L().ch.filter(cc => this.val(cc.base + '/automix/group') === g), sum = mem.reduce((a, cc) => a + lvl(cc), 0) || 1;
+    return clamp(10 * Math.log10(Math.max(1e-6, lvl(c) / sum)), -40, 0);
+  }
+  onAmx(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(16, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.amx[i] = d.getInt16(4 + 2 * i, true) / 256; this.amxAt = Date.now(); }
+  renderAmxInfo(Hd) {
+    const close = () => this.setState({ amxInfo: false }), p = 'font-size:15.5px;line-height:1.65;color:#e9dcc2';
+    return html`<button class="scrim" style="z-index:8" aria-label="Close" onClick=${close}></button>
+      <div class="pop" dir="rtl" data-amxinfo="1" style=${`z-index:9;left:170px;top:16px;width:840px;max-height:${Hd - 32}px;overflow:auto;padding:20px 24px;gap:10px;${HEB}`}>
+        <div style="display:flex;align-items:center"><span style="font-size:22px;font-weight:800;color:var(--brass-hi);flex:1">מה זה אוטומיקס</span><button class="small" onClick=${close}>סגור</button></div>
+        <span style=${p}>האוטומיקס של X-Air מבוסס על שיטת gain sharing של דן דוגן. כל המיקרופונים בקבוצה חולקים "תקציב" הגבר אחד: המיקרופון שמדבר לתוכו מקבל כמעט את כל ההגבר, והמיקרופונים השקטים יורדים. כשכמה אנשים מדברים יחד ההגבר מתחלק ביניהם, והעוצמה הכוללת נשארת קבועה – בלי קפיצות של רעש, בלי פידבק שמצטבר ובלי חיתוכים של גייט.</span>
+        <span style=${p}><b>קבוצות X ו־Y:</b> שתי קבוצות נפרדות, למשל במה ראשית וקהל. כל קבוצה מופעלת בנפרד, וכל ערוץ משויך לקבוצה אחת לכל היותר.</span>
+        <span style=${p}><b>Weight:</b> העדפה של ערוץ, בין ‎−12 ל־‎+12 dB. ערוץ עם משקל גבוה "מנצח" יותר בקלות – שימושי למנחה, או כדי לאזן מיקרופון רחוק ושקט.</span>
+        <span style=${p}><b>מתי לא להשתמש:</b> במוזיקה, בכלים ובשירה – האוטומיקס יוריד את מי שמנגן חלש. הוא נועד לדיבור.</span>
+        <span style=${p}><b>הפס בכל שורה</b> מראה כמה האוטומיקס מוריד את הערוץ ברגע זה (מהמיקסר, מדי 7). בהדגמה הוא מחושב כאן מתוך דיבור מדומה.</span>
+        <span style="font-size:13px;color:#8c8272">טיפ: הפעל את האוטומיקס רק אחרי שכיוונת גיין לכל מיקרופון, כי השיטה משווה בין הרמות שנכנסות אליה.</span>
+      </div>`;
+  }
+  /* a drag bar (sideways) for any law; writes through set() */
+  hbar(label, path, law, color, h) {
+    const v = this.val(path), ok = fin(v), n = ok ? clamp(v, 0, 1) : 0, end = () => { this.rd = null; };
+    return html`<button class="panmini" data-p=${path} aria-label=${label + ', drag sideways'} style=${`height:${h || 38}px;width:100%;border-radius:8px;display:flex;align-items:center;padding:0 10px;gap:8px;cursor:ew-resize;position:relative;opacity:${ok ? 1 : 0.45}`}
+      onPointerDown=${e => { capture(e); if (ok) this.rd = { path, x: e.clientX, n0: n, w: e.currentTarget.getBoundingClientRect().width, moved: false }; }}
+      onPointerMove=${e => { const d = this.rd; if (!d || d.path !== path) return; const dx = e.clientX - d.x; if (!d.moved && Math.abs(dx) < 4) return; d.moved = true; this.set(path, 'f', q(d.n0 + dx / d.w, law.n)); }}
+      onPointerUp=${end} onPointerCancel=${end}>
+      <span style=${`position:absolute;left:0;top:0;bottom:0;width:${Math.round(n * 100)}%;border-radius:8px;background:${color};opacity:.25`}></span>
+      <span style="position:relative;font-size:11px;font-weight:700;letter-spacing:.12em;color:#b8a78a">${label}</span>
+      <span style="position:relative;flex:1;text-align:right;font-family:var(--mono);font-size:14px;color:#e9dcc2">${ok ? law.fmt(n) : '···'}</span></button>`;
+  }
+  /* the X-Air effects tick: demo levels for the in/out meters, and redraw while a moving picture is on screen */
+  fxTick() {
+    const st = this.state, onFx = st.screen === 'fx' || st.screen === 'insert', onAmx = st.screen === 'automix'; if (!onFx && !onAmx) return;
+    if (onFx && !this.linked()) { const t = Date.now() / 1000; for (let n = 1; n <= 4; n++) { const b = (n - 1) * 14, beat = Math.max(0, Math.sin(t * 4.2 + n)) * 14, lv = -26 + beat + 4 * Math.sin(t * 1.3 + n);
+      this.fxm[b] = lv; this.fxm[b + 1] = lv - 2; this.fxm[b + 12] = lv - 4; this.fxm[b + 13] = lv - 5; } }
+    this.bump();
   }
   /* the fine pan window: a long press on any pan */
   renderPanPop(Hd) {
@@ -1083,7 +1856,7 @@ class App extends Component {
 
   renderMain(Hd) {
     const st = this.state, L = this.L(), bank = L.banks[st.bank] || L.banks[0];
-    const FH = Math.round(Hd - 236), T = FH - 44;
+    const SU = !!st.prefs.soloUnder, FH = Math.round(Hd - 236 - (SU ? 36 : 0)), T = FH - 44;
     const marks = [[1, '+10'], [0.875, '+5'], [0.75, '0'], [0.625, '-5'], [0.5, '-10'], [0.375, '-20'], [0.25, '-30'], [0.125, '-50'], [0, '-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const SO = st.sofOn, D = SO ? L.dests[st.sof] : null, tcol = D ? D.col : '', cmp = Hd < 600;
@@ -1098,7 +1871,7 @@ class App extends Component {
           <span style="position:absolute;left:50%;top:7px;bottom:7px;width:1px;background:#4a4339"></span>
           <span style="position:absolute;left:12px;right:12px;top:0;bottom:0">${pan !== undefined && html`<span class="knob" style=${`left:${pan * 100}%;width:18px;height:18px;margin:-9px 0 0 -9px`}></span>`}</span>
         </button>` : html`<div class="panmini" style="border-color:transparent;background:transparent"></div>`}
-        <div class="ms">
+        <div class="ms" style=${SU ? `flex-direction:column;height:${isMain ? 32 : 68}px` : ""}>
           <button onClick=${() => this.tog(s.on)} aria-pressed=${String(on === 0)} aria-label=${'Mute ' + (nm || s.def)}
             style=${on === 0 ? 'background:#d0392b;color:#fff6ee;border:1px solid #4a2420;box-shadow:0 0 12px rgba(208,57,43,.55)' : `background:#2a1513;color:#d48a80;border:1px solid #4a2420${on === undefined ? ';opacity:.45' : ''}`}>MUTE</button>
           ${!isMain && html`<button onClick=${() => this.tog(s.solo)} aria-pressed=${String(solo === 1)} aria-label=${'Solo ' + (nm || s.def)}
@@ -1135,6 +1908,7 @@ class App extends Component {
               style=${[1, 2, 3, 4].some(k => this.val('/config/mute/' + k) === 1) ? 'background:#3a1714;border-color:#d0392b;color:#ffb4a8;box-shadow:0 0 12px rgba(208,57,43,.45)' : ''}>${IC.mute}<span>Mute</span></button>
             <button class="navbtn" data-nav="routing" onClick=${() => this.setState({ screen: 'routing' })} aria-label="Routing">${IC.route}<span>Routing</span></button>
             <button class="navbtn" data-nav="fx" onClick=${() => this.setState({ screen: 'fx' })} aria-label="Effects">${IC.fx}<span>FX</span></button>
+            <button class="navbtn" data-nav="automix" onClick=${() => this.setState({ screen: 'automix' })} aria-label="Automix" style=${['X', 'Y'].some(g => this.val('/config/amixenable/' + g) === 1) ? 'border-color:#4fc9b7;color:#9ff0e0' : ''}><span style="font-size:15px;font-weight:900;line-height:22px">X·Y</span><span>Auto</span></button>
             <button class="navbtn" onClick=${() => this.setState({ screen: 'settings' })}>${IC.gear}<span>הגדרות</span></button>
             ${!NATIVE && html`<button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>`}
           </nav>
@@ -1217,7 +1991,10 @@ class App extends Component {
     return html`<div style="display:flex;gap:4px;flex-wrap:wrap">${labels.map((l, k) => html`<button class=${'pill' + (v === k ? ' on' : '')} data-e=${path + '=' + k} style="height:40px;padding:0 11px;font-size:13px;letter-spacing:.04em" onClick=${() => this.pick(path, k)}>${l}</button>`)}</div>`;
   }
   /* after an effect type change the mixer loads new parameters: read them again */
-  fxReread(n) { setTimeout(() => { const t = this.val(`/fx/${n}/type`), ps = fin(t) && FXP[FX_KEYS[t]]; if (ps) this.need(ps.map((_, k) => `/fx/${n}/par/${pad2(k + 1)}`), true); }, 250); }
+  fxReread(n) { setTimeout(() => this.need(this.fxParamPaths(n), true), 250); }
+  fxParamPaths(n) { return (FXD[this.fxK(n)] || []).map(p => this.fxPath(n, p)); }
+  /* demo values for a new effect: the middle of each control, lists at their first entry, switches on where it is "Active" */
+  fxDefaults(D, n, t) { (FXD[FX_KEYS[t]] || []).forEach(p => { D[`/fx/${n}/par/${pad2(p.i + 1)}`] = p.kind === 't' ? (/^Active/.test(p.label) ? 1 : 0) : p.kind === 'e' ? Math.min(p.names.length - 1, /Factor|Pattern/.test(p.label) ? 4 : 0) : /Hz [AB]?$|Hz$|^Master|^Gain|Out Gain|Level|Semitone|Cent|Pan|Balance|Attack [AB]|Sustain/.test(p.label) ? 0.5 : /Lo Cut/.test(p.label) ? 0.1 : /Hi Cut/.test(p.label) ? 0.9 : 0.4; }); }
   pick(path, k) { if (this.val(path) === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', k); }
   /* the WING value box: drag sideways. A float on the mixer's own grid. */
   pbox(label, path, law, color, extra) {
@@ -1299,6 +2076,7 @@ class App extends Component {
             style=${`height:44px;border-radius:7px;cursor:pointer;border:0;${nameLook(k)};outline:${col === k ? '2px solid #f3c27a' : 'none'};outline-offset:2px;font-size:13px;font-weight:700`}>${k === 0 || k === 8 ? 'OFF' : 'Aa'}</button>`)}</div>
         </div>`; })()}
       ${kp && this.keyPickPop(Hd)}
+      ${st.srcPick && this.renderSrcPick(Hd)}
       ${sp && this.sendTapPop(Hd, s)}
       ${st.ask && html`
         <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
@@ -1646,7 +2424,7 @@ class App extends Component {
         <span style="position:relative;font-size:11px;font-weight:700;letter-spacing:.12em;color:#b8a78a">${label}</span>
         <span style="position:relative;flex:1;text-align:right;font-family:var(--mono);font-size:15px;color:#e9dcc2">${!ok ? '···' : ilabels ? ilabels[v] || '?' : law.fmt(n)}</span></button>`; };
     const G = isCh ? this.gv(s) : null, C = T.includes('Comp') ? this.cv(s) : null, gb = s.base + '/gate', cb = s.base + '/dyn', MODES = ['EXP 2', 'EXP 3', 'EXP 4', 'GATE', 'DUCK'];
-    const gain = ha ? this.val(ha + '/gain') : undefined, ph = ha ? this.val(ha + '/phantom') : undefined, GH = Math.round(bodyH * 0.5) - 22, GT = GH - 36, inv = this.val(s.base + '/preamp/invert'), hpon = this.val(s.base + '/preamp/hpon'), hpf = this.val(s.base + '/preamp/hpf');
+    const gain = ha ? this.val(ha + '/gain') : undefined, ph = ha ? this.val(ha + '/phantom') : undefined, GH = Math.max(80, Math.min(Math.round(bodyH * 0.5) - 22, bodyH - 290)), GT = GH - 36, inv = this.val(s.base + '/preamp/invert'), hpon = this.val(s.base + '/preamp/hpon'), hpf = this.val(s.base + '/preamp/hpf');
     const chip = (txt, on) => html`<span style=${`padding:3px 8px;border-radius:6px;font-family:var(--mono);font-size:12px;white-space:nowrap;${on ? 'background:#2a2014;color:var(--brass-hi);border:1px solid #8a6a3a' : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${txt}</span>`;
     const pan = s.pan ? this.val(s.pan) : undefined, lr = this.val(s.base + '/mix/lr');
     return html`
@@ -1665,9 +2443,16 @@ class App extends Component {
           <span style="font-family:var(--mono);font-size:17px;color:#6fb8ff;text-shadow:0 0 10px rgba(95,168,255,.35)">${fin(gain) ? LAW.gain.fmt(clamp(gain, 0, 1)).replace(' dB', '') : '—'}</span>
           ${ha && html`<button data-t=${ha + '/phantom'} aria-pressed=${String(ph === 1)} aria-label="Phantom power" onClick=${() => ph === 1 ? this.tog(ha + '/phantom') : ph === 0 ? this.setState({ ask: { text: PH_ASK, path: ha + '/phantom' } }) : null}
             style=${`width:76px;height:40px;flex:none;border-radius:9px;font-weight:900;font-size:14px;cursor:pointer;${ph === 1 ? 'background:#d0392b;color:#fff6ee;border:1px solid #ff6b5a;box-shadow:0 0 14px rgba(208,57,43,.6)' : 'background:#2a1513;color:#8a5a52;border:1px solid #5a2a24'}`}>+48V</button>`}
+          <button data-t=${s.base + '/preamp/invert'} data-home="phase" aria-pressed=${String(inv === 1)} aria-label="Phase invert" onClick=${() => this.tog(s.base + '/preamp/invert')}
+            style=${`width:76px;height:58px;flex:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;${inv === 1 ? 'background:#2a2014;color:var(--brass-hi);border:1px solid var(--brass);box-shadow:0 0 12px rgba(232,163,61,.4)' : 'background:#1a1714;color:#8a8170;border:1px solid #3a342c'}${inv === undefined ? ';opacity:.45' : ''}`}>
+            <span style="font-size:28px;line-height:1">Ø</span><span style="font-size:10px;font-weight:800;letter-spacing:.1em">PHASE</span></button>
+          ${(() => { const lo = s.n % 2 ? s.n : s.n - 1, lp = `/config/chlink/${lo}-${lo + 1}`, lv = this.val(lp), mate = s.n % 2 ? s.n + 1 : s.n - 1;
+            return html`<button data-home="link" aria-pressed=${String(lv === 1)} aria-label=${'Link with channel ' + mate}
+              onClick=${() => lv === 1 ? this.pick(lp, 0) : lv === 0 ? this.setState({ ask: { text: LINK_ASK, path: lp, value: 1 } }) : this.toastRO('המיקסר עוד לא דיווח על הערך הזה')}
+              style=${`width:76px;height:52px;flex:none;border-radius:9px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;${lv === 1 ? 'background:#16252a;color:#8fd0e0;border:1px solid #8fd0e0;box-shadow:0 0 12px rgba(143,208,224,.4)' : 'background:#1a1714;color:#8a8170;border:1px solid #3a342c'}${lv === undefined ? ';opacity:.45' : ''}`}>
+              <span style="font-size:14px;font-weight:900;letter-spacing:.1em">LINK</span><span style="font-family:var(--mono);font-size:11px">${s.n % 2 ? s.n + '→' + mate : mate + '←' + s.n}</span></button>`; })()}
           <button onClick=${() => this.goTab('Config')} aria-label="Open input settings" style="width:100%;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:none;background:none;color:inherit;cursor:pointer;overflow:hidden">
             <span style="max-width:100%;font-family:var(--mono);font-size:12px;color:var(--brass-hi);white-space:nowrap">${ha ? 'IN ' + ha.slice(-2) : ''}</span>
-            ${inv === 1 && html`<span style="font-family:var(--mono);font-size:13px;color:var(--brass-hi)">Ø</span>`}
             ${hpon === 1 && fin(hpf) && html`<span style="font-family:var(--mono);font-size:11px;color:#cbbd9f">LC ${LAW.hpf.fmt(clamp(hpf, 0, 1))}</span>`}
           </button>
         </div>`}
@@ -1722,12 +2507,12 @@ class App extends Component {
       ${this.chanHeader('Config', s)}
       <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
         ${isCh && html`<section class="sec" style="width:238px;flex:none;padding:8px;gap:8px;border-color:#8a6a3a;background:linear-gradient(180deg,#2a2420,#1a1815)">
-          <button data-insrc="1" onClick=${() => this.setState({ keyPick: { path: s.base + '/config/insrc', title: 'INPUT SOURCE', labels: Array.from({ length: 16 }, (_, k) => 'IN ' + pad2(k + 1)) } })} aria-label="Choose the input"
+          <button data-insrc="1" onClick=${() => this.setState({ srcPick: s.id })} aria-label="Choose the input"
             style="height:52px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:8px;border:1px solid #3a342c;background:#100f0d;cursor:pointer;text-align:left">
             <span style="width:22px;height:22px;flex:none;border-radius:50%;background:radial-gradient(circle,#050404 40%,#c9a25a 44%,#7a5a26 70%,#151311 72%)"></span>
             <span style="flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.1">
               <span style="font-size:12px;letter-spacing:.14em;color:#b8a78a">INPUT</span>
-              <span style="font-family:var(--mono);font-size:17px;color:var(--brass-hi)">${fin(insrc) ? 'IN ' + pad2(insrc + 1) : '···'}</span></span>
+              <span style=${`font-family:var(--mono);font-size:17px;color:${this.val(s.base + '/preamp/rtnsw') === 1 ? '#8fd0e0' : 'var(--brass-hi)'}`}>${this.srcText(s)}</span></span>
             <span style="color:#b8a78a">▾</span>
           </button>
           <div style="flex:1;min-height:0;display:flex;gap:8px">
@@ -1764,6 +2549,12 @@ class App extends Component {
             <span style=${`width:12px;height:12px;border-radius:50%;background:${lr === 1 ? '#62b85c' : '#2c2721'};box-shadow:${lr === 1 ? '0 0 10px #62b85c' : 'none'}`}></span>
             <span style="font-size:18px;font-weight:700;letter-spacing:.08em">MAIN LR</span><span style="flex:1"></span><span style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.8">${lr === 1 ? 'Assigned' : 'Not assigned'}</span></button>`}
           ${s.kind !== 'lr' && s.kind !== 'dca' && this.assignBlock(s, Hd)}
+          ${isCh && (() => { const gp = s.base + '/automix/group', g = this.val(gp), cols = ['#3a342c', '#4fc9b7', '#f0a24a'];
+            return html`<div data-amxrow="1" style="display:flex;align-items:center;gap:8px;flex:none">
+              <button class="small" style="height:40px;padding:0 10px;font-size:12px;font-weight:800;letter-spacing:.12em" onClick=${() => this.setState({ screen: 'automix' })}>AUTOMIX ›</button>
+              ${['OFF', 'X', 'Y'].map((t, k) => html`<button data-amx=${s.n + ':' + k} aria-pressed=${String(g === k)} onClick=${() => this.pick(gp, k)}
+                style=${`width:52px;height:40px;border-radius:7px;cursor:pointer;font-size:14px;font-weight:900;${g === k ? `background:${k ? cols[k] : '#3a342c'};color:${k ? '#10100e' : '#e9dcc2'};border:1px solid ${cols[k]}` : 'background:#1a1714;color:#8a8170;border:1px solid #2c2721'}${g === undefined ? ';opacity:.45' : ''}`}>${t}</button>`)}
+              <div style="flex:1;min-width:0">${this.hbar('WEIGHT', s.base + '/automix/weight', LAW.amxw, g > 0 ? cols[g] : '#8a7d66', 40)}</div></div>`; })()}
         </section>
         ${isCh && html`<div style="width:262px;flex:none;display:flex;flex-direction:column;gap:10px">
           <button data-t=${pre + '/invert'} onClick=${() => this.tog(pre + '/invert')} aria-pressed=${String(inv === 1)}
@@ -1999,6 +2790,16 @@ class App extends Component {
       </div>`;
   }
 
+  /* what the mixer says about itself: model, name, firmware, address, network mode (read only) */
+  mixerFacts(p) {
+    const c = this.state.conn, v = k => this.val(k), LAN = ['DHCP', 'STATIC'], IS = ['AP', 'CLIENT', 'LAN'];
+    const lanM = v('/-prefs/lan/mode'), rows = [['דגם', c.model], ['שם ברשת', v('/-prefs/name') || c.name], ['קושחה', c.fw], ['כתובת IP', c.ip],
+      ['כתובת קבועה', v('/-prefs/lan/addr')], ['מסכה', v('/-prefs/lan/mask')], ['שער', v('/-prefs/lan/gateway')], ['רשת LAN', fin(lanM) ? LAN[lanM] || lanM : ''],
+      ['WiFi', fin(v('/-prefs/is/mode')) ? IS[v('/-prefs/is/mode')] || v('/-prefs/is/mode') : ''], ['רשת WiFi', v('/-prefs/ap/ssid') || v('/-prefs/is/ssid')], ['ערוץ WiFi', v('/-prefs/ap/channel')],
+      ['קצב דגימה', fin(v('/-prefs/clockrate')) ? ['48 kHz', '44.1 kHz'][v('/-prefs/clockrate')] || v('/-prefs/clockrate') : '']].filter(r => r[1] !== undefined && r[1] !== '' && r[1] !== null);
+    return html`<div data-facts="1" style="display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:8px 10px;border-radius:8px;background:#100f0d;border:1px solid #2c2721">
+      ${rows.map(([k, val]) => html`<span style="font-size:13px;color:#9b927f">${k}</span><span dir="ltr" style="font-family:var(--mono);font-size:13px;color:#e9dcc2;text-align:right">${String(val)}</span>`)}</div>`;
+  }
   renderSettings(Hd) {
     const st = this.state, c = st.conn, d = st.dump, sec = 'flex:1;min-width:0;gap:10px;' + HEB, h = 'font-size:18px;font-weight:700;color:var(--brass-hi)', p = 'font-size:14.5px;line-height:1.55;color:#d9cdb3';
     return html`
@@ -2012,6 +2813,7 @@ class App extends Component {
         <div class="sec" style=${sec}>
           <span style=${h}>המיקסר</span>
           <span style=${p}>${this.linked() ? html`מחובר: <b dir="ltr">${c.model}</b> · <b dir="ltr">${c.name || '—'}</b> · <span dir="ltr">${c.ip}</span>` : 'לא מחובר. הדגם מזוהה לבד בחיבור, והמיקסר האחרון נזכר לפעם הבאה.'}</span>
+          ${this.linked() && this.mixerFacts(p)}
           <button class="pill" onClick=${() => this.setState({ connPop: true, screen: 'main' })}>חיבור למיקסר</button>
           <span style=${h + ';margin-top:8px'}>מצב הדגמה</span>
           <span style=${p}>הדגם שמוצג כשאין חיבור. מה שמשחקים בהדגמה נשאר באפליקציה ולא נשלח לעולם.</span>
@@ -2031,6 +2833,9 @@ class App extends Component {
           <span style=${h + ';margin-top:4px'}>צד כפתור החזרה</span>
           <span style=${p}>בכל המסכים: באיזה צד כפתור החזרה למיקסר, ובמסכי הערוץ גם החיצים לערוץ הבא.</span>
           <div style="display:flex;gap:6px">${[[false, 'חזרה מימין, חיצים משמאל'], [true, 'חזרה משמאל, חיצים מימין']].map(([sw, t]) => html`<button class=${'pill' + (!!st.prefs.navSwap === sw ? ' on' : '')} data-pref=${'nav' + sw} style=${`flex:1;height:48px;padding:0 6px;font-size:13px;letter-spacing:0;text-transform:none;${HEB}`} onClick=${() => this.setPref({ navSwap: sw })}>${t}</button>`)}</div>
+          <span style=${h + ';margin-top:4px'}>כפתור סולו במסך הראשי</span>
+          <span style=${p}>ליד המיוט (חוסך גובה לפיידר) או מתחת לכל מיוט (כפתורים רחבים יותר, קל ללחוץ).</span>
+          <div style="display:flex;gap:6px">${[[false, 'ליד המיוט'], [true, 'מתחת למיוט']].map(([v, t]) => html`<button class=${'pill' + (!!st.prefs.soloUnder === v ? ' on' : '')} data-pref=${'solo' + v} style=${`flex:1;height:44px;padding:0 6px;font-size:13px;letter-spacing:0;text-transform:none;${HEB}`} onClick=${() => this.setPref({ soloUnder: v })}>${t}</button>`)}</div>
           <span style=${h + ';margin-top:4px'}>כניסה לערוץ מהמיקסר</span>
           <span style=${p}>לאיזה מסך להגיע כשלוחצים על שם הערוץ במסך הראשי.</span>
           <div style="display:flex;gap:6px" dir="ltr">${[['home', 'HOME'], ['eq', 'EQ'], ['config', 'CONFIG']].map(([k, t]) => html`<button class=${'pill' + (st.prefs.enter === k ? ' on' : '')} data-pref=${'enter' + k} style="flex:1" onClick=${() => this.setPref({ enter: k })}>${t}</button>`)}</div>
@@ -2057,7 +2862,7 @@ class App extends Component {
     return html`
       <div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
-          ${st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'eq' ? this.renderEq(Hd) : st.screen === 'gate' ? this.renderGate(Hd) : st.screen === 'comp' ? this.renderComp(Hd) : st.screen === 'sends' ? this.renderSendsTab(Hd) : st.screen === 'routing' ? this.renderRouting(Hd) : st.screen === 'fx' ? this.renderFx(Hd) : st.screen === 'tape' ? this.renderTape(Hd) : this.renderMain(Hd)}
+          ${st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'eq' ? this.renderEq(Hd) : st.screen === 'gate' ? this.renderGate(Hd) : st.screen === 'comp' ? this.renderComp(Hd) : st.screen === 'sends' ? this.renderSendsTab(Hd) : st.screen === 'routing' ? this.renderRouting(Hd) : st.screen === 'fx' ? this.renderFx(Hd) : st.screen === 'insert' ? this.renderInsert(Hd) : st.screen === 'automix' ? this.renderAutomix(Hd) : st.screen === 'tape' ? this.renderTape(Hd) : this.renderMain(Hd)}
         </div>
         ${!st.started && html`
           <div class="overlay" dir="rtl">

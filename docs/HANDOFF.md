@@ -279,3 +279,39 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   chorus/flanger/phaser, P1A/PQ5, limiter, leisure comp; other types show a note. CHANGE EFFECT asks first, then re-reads.
   Next (the user's plan): accessible effect faces with a simulated analyser of what the effect does.
 - 98 checks.
+
+## 14. Air Console 0.7.0 – effect faces, INSERT, input source with USB, automix, settings (20 Nov)
+
+- Effects tables: `FXD_SRC` holds the facts for all 61 types (label | l/g | lo | hi | steps | unit, or e | names, or t),
+  parsed into `FXD`. Names as X-Air Edit shows them (`FX_NAMES`). `FX_FACE(key)` gives the face family: rev, dly, combo, mod,
+  geq, peq, des, wavd, comp, tone. Dual types are the ones whose labels end in " A"/" B" (`fxDual`). Hebrew help:
+  `FX_INFO` per type, `PI` / `piOf()` one line per parameter. The old `FXP` / `fxLaw` are gone.
+- Controls on a face (`fknob`, `ffader`, `fsw`, `fsel`, `fctl`) write `/fx/N/par/NN` through `set()` only (`fxDrag`:
+  up or right = more, numbers on their own grid with `q(x, n)`, lists step every 28 px as 'i').
+- Pictures: `revPic` (direct sound, early reflections, tail, pre delay, decay, damping, cuts – from the WING app, with a
+  "ball" travelling the room), `dlyPic` (repeats per side, darker with the feedback cut, tempo light), `modPic` (moving wave,
+  turning horn, panner ball, moving filter, octaves), `geqFace` (31 faders and the curve), `peqPic` (estimated Pultec curves),
+  `desPic` (a voice spectrum: the dashed line is the voice, on each "s" the sibilance band rises and the de-esser pulls
+  exactly that band down – the GR per band is shown), `wavdPic` (envelope of a hit before/after – SPL style grey/red face,
+  one row per side), `vuPic` (GR needle for the compressors; Fair Compressor uses the effect meters when they arrive,
+  otherwise an estimate), `tonePic` (enhancer/exciter curves, stereo width cloud, drive curve and harmonics, pitch voices).
+- `fxMeter`: IN/OUT bars from `/meters/3` (`onFxm`). Layout assumed 14 values per slot (2 in, 10 state, 2 out) – VERIFY
+  on a real report; the compressors read GR from the state values. Demo levels from `fxTick`.
+- TAP (`tapBtn`, `fxTap`) on the delays and combos: average of the taps → the Time parameter.
+- FX screen: slots on the left, `fxBar` (name, SEND/INSERT, help, A/B for dual types, TAP), meter + face. A/B switching
+  only here. When a slot is in insert mode the left side lists which strips use it.
+- INSERT tab (ch, bus, main): `insert/on`, slot choice 0 OFF / 1 FX1A … 8 FX4B. The command list names `insert/fxslot`
+  but the XR16 did not answer it – `INS_SEL` tries `fxslot` then `sel`, and only the one the mixer answers is used.
+  The face shows only the channel's half of a dual effect. A slot in SEND mode gets a warning and a button (asks first).
+- Input source (`renderSrcPick`, CONFIG and ROUTING): analog IN 01–16 (`config/insrc`, `preamp/rtnsw` 0) or USB
+  (`config/rtnsrc` then `preamp/rtnsw` 1). XR18: USB 1–18 from the computer. XR16/XR12: USB L/R = stick player
+  (rtnsrc 0/1 – VERIFY).
+- HOME: PHASE and LINK (odd↔even, asks before linking) under +48V.
+- AUTOMIX screen (top bar X·Y): groups X/Y on/off (`/config/amixenable/X|Y`, lock read), per channel group (`automix/group`
+  0 OFF 1 X 2 Y) and weight (`automix/weight`, −12..+12 dB, 49 steps), and the gain now (`/meters/7`, `onAmx`; demo: gain
+  sharing worked out locally). Hebrew explanation (i button). Group/weight also in CONFIG.
+- Settings: SOLO beside or under MUTE on the main screen (`prefs.soloUnder`); mixer facts (model, name, firmware, IP,
+  LAN/WiFi, clock rate) read from `/-prefs/...`.
+- Report: also asks `insert/sel`, `amixlock/X|Y`, LAN/WiFi prefs.
+- 106 checks (new: effect face with all parameters, help, TAP, INSERT, PHASE/LINK, USB source, automix).
+- Still to verify on a real mixer: the insert slot address, `/meters/3` and `/meters/7` layouts, USB L/R on the XR16.

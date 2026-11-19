@@ -52,7 +52,10 @@
   for (let k = 1; k <= 4; k++) { store['/config/mute/' + k] = ['i', 0]; store[`/fx/${k}/insert`] = ['i', k === 4 ? 1 : 0]; for (let p = 1; p <= 16; p++) store[`/fx/${k}/par/${pad2(p)}`] = ['f', 0.5]; }
   for (let k = 1; k <= 6; k++) { store[`/routing/aux/${pad2(k)}/src`] = ['i', 25 + k]; store[`/routing/aux/${pad2(k)}/pos`] = ['i', 10]; }
   for (let k = 1; k <= 18; k++) { store[`/routing/usb/${pad2(k)}/src`] = ['i', k <= 2 ? 35 + k : k - 1]; store[`/routing/usb/${pad2(k)}/pos`] = ['i', k <= 2 ? 4 : 0]; }
-  if (MODEL === 'XR18') for (let n = 1; n <= NCH; n++) { store[`/ch/${pad2(n)}/preamp/rtnsw`] = ['i', 0]; store[`/ch/${pad2(n)}/config/rtnsrc`] = ['i', n - 1]; }
+  for (let n = 1; n <= NCH; n++) { const b = `/ch/${pad2(n)}`; store[b + '/preamp/rtnsw'] = ['i', 0]; store[b + '/config/rtnsrc'] = ['i', n - 1]; store[b + '/insert/on'] = ['i', 0]; store[b + '/insert/fxslot'] = ['i', 0];
+    store[b + '/automix/group'] = ['i', 0]; store[b + '/automix/weight'] = ['f', 0.5]; }
+  for (let n = 1; n <= NBUS; n++) { store[`/bus/${n}/insert/on`] = ['i', 0]; store[`/bus/${n}/insert/fxslot`] = ['i', 0]; } store['/lr/insert/on'] = ['i', 0]; store['/lr/insert/fxslot'] = ['i', 0];
+  for (const g of ['X', 'Y']) { store['/config/amixenable/' + g] = ['i', 0]; store['/config/amixlock/' + g] = ['i', 0]; }
 Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0], '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
   for (let k = 1; k <= 54; k++) store['/-stat/solosw/' + pad2(k)] = ['i', 0];
   store['/-stat/solo'] = ['i', 0]; store['/-stat/usbmounted'] = ['i', MODEL === 'XR18' ? 0 : 1]; store['/-stat/tape/state'] = ['i', 0]; store['/-prefs/name'] = ['s', 'FAKE-' + MODEL];

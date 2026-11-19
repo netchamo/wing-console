@@ -148,3 +148,13 @@ rate, name).
 
 - XR16: four physical aux outputs (XLR) plus the main L/R pair. Buses 5–6 exist and work (groups, FX…) but have no
   physical output. The routing screen shows four aux outputs on the XR16, as it should.
+
+## Added in 0.7.0 (from the command list; marked VERIFY until a report confirms)
+
+- Insert: `/ch/NN/insert/on`, `/bus/N/insert/on`, `/lr/insert/on` (answered on the XR16). Slot choice 0 OFF, 1 FX1A … 8 FX4B:
+  documented as `…/insert/fxslot`, did not answer on the XR16 – the app also asks `…/insert/sel` and uses whichever answers.
+- Automix: `/ch/NN/automix/group` 0 OFF 1 X 2 Y; `/ch/NN/automix/weight` float, −12..+12 dB, 49 steps;
+  `/config/amixenable/X|Y`, `/config/amixlock/X|Y`. Gains: `/meters/7` (16 values, 1/256 dB) – VERIFY.
+- Effect meters: `/meters/3` – assumed 4 × [2 in, 10 state, 2 out] – VERIFY.
+- USB return as a channel source: `/ch/NN/preamp/rtnsw` 0/1 and `/ch/NN/config/rtnsrc` (XR18: U01–18). Both answered on
+  the XR16; there the source is the stick player, assumed rtnsrc 0 = L, 1 = R – VERIFY.
