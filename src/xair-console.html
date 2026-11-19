@@ -928,7 +928,7 @@ class App extends Component {
         <div style="display:flex;gap:8px">${Array.from({ length: na }, (_, k) => card('AUX ' + (k + 1), 'Physical output', `/routing/aux/${pad2(k + 1)}`, srcAux, 'flex:1;min-width:0'))}</div>
         <span style=${sm}>${xr18 ? 'USB OUTPUTS (TO THE COMPUTER)' : 'USB STICK RECORDER'}</span>
         <div style=${`display:grid;grid-template-columns:repeat(${xr18 ? 6 : 4},1fr);gap:8px`}>${Array.from({ length: nu }, (_, k) => card(xr18 ? 'USB ' + (k + 1) : 'REC ' + (k ? 'R' : 'L'), xr18 ? 'To the computer' : 'Into the recorder', `/routing/usb/${pad2(k + 1)}`, src, ''))}</div>
-        <span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.5;color:#8c8272`}>+M אחרי נקודת הלקיחה: היציאה עוקבת אחרי המיוט של המקור. מספר היציאות לפי הדגם.</span>
+        <span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.5;color:#8c8272`}>+M אחרי נקודת הלקיחה: היציאה עוקבת אחרי המיוט של המקור. מספר היציאות לפי הדגם${L.M.bus > na ? ` – הבאסים ${na + 1} עד ${L.M.bus} עובדים כרגיל אבל בלי יציאה פיזית, למשל לגרופים.` : '.'}</span>
       </div>`;
     }
     return html`${this.toolHeader('ROUTING', tabs)}${body}${this.chanPopsLite(Hd)}`;

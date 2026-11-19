@@ -143,3 +143,8 @@ rate, name).
 - Names carry a `_NN` suffix on this mixer ("Guitar _23") – origin not known yet (asked the user).
 - The user's tablet hops between two Wi-Fi networks (mixer LAN without internet ↔ phone hotspot); the link recovered by itself.
 - `usbmounted` was 0 – the recorder paths are still unverified on a real stick.
+
+## Confirmed by the user (19 Nov 2026)
+
+- XR16: four physical aux outputs (XLR) plus the main L/R pair. Buses 5–6 exist and work (groups, FX…) but have no
+  physical output. The routing screen shows four aux outputs on the XR16, as it should.

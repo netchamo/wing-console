@@ -270,7 +270,7 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
 - `renderRouting`: INPUTS (channel → `config/insrc` IN 01–16; on XR18 also ANALOG/USB `preamp/rtnsw` + `config/rtnsrc`;
   stereo links `chlink` / `buslink` with a question first) and OUTPUTS (`/routing/aux/NN/src|pos`, sources Ch1–16, Aux L/R,
   FX1–4 L/R, Bus1–6, Send1–4, Main L/R (+ USB 1–18 on XR18); taps AIN…POST, "+M" follows mute).
-  Aux outputs shown per model: XR18 6, XR16 4, XR12 2 (`VERIFY` on the user's XR16 – the firmware answers all six).
+  Aux outputs shown per model: XR18 6, XR16 4 (confirmed by the user: 4 XLR + main; buses 5–6 have no jack), XR12 2.
   XR16/XR12: `/routing/usb/01-02` is shown as the stick recorder's L/R input (`VERIFY`; the user's values are Main L/R, pos 4).
   Main out routing (`/routing/main/01-02`) is not shown yet – its meaning is not confirmed.
 - `renderFx`: four slots (name, family colour, INSERT/SEND from `/fx/N/insert`), send master and return level, the chosen
