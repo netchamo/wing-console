@@ -248,3 +248,16 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
 - Q: two-finger pinch on the graph changes the selected band's Q (apart = wider); mouse wheel too. Not on shelves/cuts.
 - Pan: long press on any pan (main screen, strip column on the strip screens) opens `renderPanPop` (track at half speed,
   L100…R100 presets, one-step arrows). 78 checks.
+
+## 12. Air Console 0.5.0 – sends window and bus mixes on the main screen (19 Nov)
+
+- Long press (500 ms) beside the knob of a channel / aux / FX-return fader on the main screen opens `renderSendsWin`
+  (ported from WING `renderSends`): arrows, name, METERS ON/OFF (`prefs.sendMeters`), DONE; 10 send faders (6 buses +
+  4 FX sends) each with its tap button (→ `sendTapPop`, shared with the Sends tab) and a meter; the strip's own fader,
+  mute and meter on the right. On the knob a long press is still the slow drag.
+- Send meters are **worked out** (the mixer has no send meters): strip meter + send level, + fader for POST/GRP taps,
+  silent when muted (`sendLv`, `paintSends`, elements `.mcol[data-sm]`).
+- Main screen, under the layers: "MIXES" – one square per bus (2 per row). A tap = sends on faders for that bus (the
+  right fader becomes the bus master, the sends row shows on top); the same square again = back to the main mix.
+  Room is left under them for a user layer (`cmp` = compact sizes when the screen is short).
+- 87 checks.

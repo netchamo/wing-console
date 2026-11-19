@@ -79,7 +79,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.4.0';
+const DW = 1180, APP_VER = '0.5.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -277,9 +277,9 @@ class App extends Component {
   constructor() {
     super();
     const last = load('xair.last', null);
-    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, panPop: null, connPop: false, liveAsk: false, rev: 0,
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, panPop: null, sendsWin: null, connPop: false, liveAsk: false, rev: 0,
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
-      prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', eqR: 18, rta: true, ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
+      prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', eqR: 18, rta: true, sendMeters: true, ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
     this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
     this.gr = new Float32Array(39); this.grAt = 0; this.rtaR = new Float32Array(RTA_N).fill(-90); this.rtaS = new Float32Array(RTA_N).fill(-90); this.rtaAt = 0; this.rtaDemo = ''; this.ptrs = new Map(); this.mt = new Float32Array(40).fill(-128); this.pk = new Float32Array(40).fill(-128); this.pkT = new Float64Array(40);
     this.sim = new Float32Array(40).fill(-60);
@@ -383,6 +383,7 @@ class App extends Component {
     const sh = CH_SCREENS.includes(st.screen) && L.byId[st.sheet];
     if (sh) { P.push(...chanPaths(sh)); const ha = this.headamp(sh); if (ha) P.push(ha + '/gain', ha + '/phantom'); if (sh.kind === 'ch') L.ch.forEach(c => P.push(c.name));
       L.dests.forEach(d => { P.push(d.strip.name); if (sh.sends) { const b = sh.base + '/mix/' + pad2(d.k); P.push(b + '/level', b + '/tap', b + '/grpon'); if (d.k < 6 && d.k % 2) P.push(b + '/pan'); } }); }
+    const sw = st.sendsWin && L.byId[st.sendsWin.id]; if (sw) L.dests.forEach(d => { const b = sw.base + '/mix/' + pad2(d.k); P.push(b + '/level', b + '/tap', b + '/grpon', d.strip.name, d.strip.color); if (d.k < 6 && d.k % 2) P.push(b + '/pan'); });
     if (this.rtaWant() >= 0) P.push('/-stat/rta/source', '/-stat/rta/pos');
     if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
@@ -546,6 +547,22 @@ class App extends Component {
       f.style.height = (lv * 100).toFixed(1) + '%';
       k.style.bottom = (p * 100).toFixed(1) + '%'; k.style.opacity = p > 0.02 ? 1 : 0; k.style.background = p > 0.95 ? '#ff5a45' : p > 0.8 ? '#f0b04a' : '#9be08f';
     }
+    if (this.state.sendsWin) this.paintSends(now);
+  }
+  /* a send's level: the strip's meter + the send, + the fader when it is taken after the fader. The mixer has no send meters, so this is worked out. */
+  sendLv(sp) {
+    const lv = sp.mt.length ? Math.max(...sp.mt.map(i => this.mt[i])) : -128, sv = this.val(sp.send), tap = this.val(sp.tap), fv = this.val(sp.fader);
+    if (!fin(sv) || this.val(sp.on) === 0 || lv < -100) return -128;
+    return lv + dbOf(clamp(sv, 0, 1)) + (tap === 4 || tap === 5 ? dbOf(fin(fv) ? clamp(fv, 0, 1) : 0.75) : 0);
+  }
+  paintSends(now) {
+    const els = this.stage ? this.stage.querySelectorAll('.mcol[data-sm]') : [], P = this.smPk || (this.smPk = {});
+    for (const el of els) {
+      const k = el.dataset.sm, sp = (this.smSpec || [])[+k]; if (!sp) continue; const v = this.sendLv(sp), lv = clamp((v + 60) / 60, 0, 1);
+      let pk = P[k] || { v: -128, t: 0 }; if (v >= pk.v) pk = { v, t: now }; else if (now - pk.t > 1200) pk = { v: Math.max(v, pk.v - 1.5), t: pk.t }; P[k] = pk;
+      const p = clamp((pk.v + 60) / 60, 0, 1), f = el.firstChild, kk = f.nextSibling;
+      f.style.height = (lv * 100).toFixed(1) + '%'; kk.style.bottom = (p * 100).toFixed(1) + '%'; kk.style.opacity = p > 0.02 ? 1 : 0; kk.style.background = p > 0.95 ? '#ff5a45' : p > 0.8 ? '#f0b04a' : '#9be08f';
+    }
   }
   demoTick() {
     if (this.linked()) return;
@@ -614,7 +631,7 @@ class App extends Component {
   }
   componentDidUpdate(pp, ps) {
     const st = this.state;
-    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
+    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
     if (CH_SCREENS.includes(st.screen) || st.screen === 'tape') this.readView();
     if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
@@ -649,13 +666,14 @@ class App extends Component {
     if (spec.def !== null && (onCap || !spec.tap) && this.dbl('f' + spec.path)) { this.set(spec.path, 'f', q(0.75, spec.steps)); this.fd = null; return; }
     this.fd = { spec, y: e.clientY, ly: e.clientY, start: v0, px: r.height * T / FH, moved: false, tapOpen: !!spec.tap && !onCap, slow: 1 };
     if (onCap || !spec.tap) this.ft = setTimeout(() => { const f = this.fd; if (f && !f.moved) { f.slow = 4; try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} } }, 450);
+    else if (spec.long) this.ft = setTimeout(() => { const f = this.fd; if (f && !f.moved) { this.fd = null; this.fdLp = true; try { navigator.vibrate && navigator.vibrate(12); } catch (_) {} spec.long(); } }, 500);
   }
   faderMove(e) {
     const f = this.fd; if (!f) return; const dy = e.clientY - f.y;
     if (!f.moved && Math.abs(dy) > 4) { f.moved = true; clearTimeout(this.ft); }
     if (f.moved && !f.dead && !f.tapOpen) this.set(f.spec.path, 'f', q(f.start - dy / (f.px * f.slow), f.spec.steps));
   }
-  faderUp() { clearTimeout(this.ft); const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) { this.eatClicks(); f.spec.tap(); } }
+  faderUp() { clearTimeout(this.ft); if (this.fdLp) { this.fdLp = false; this.eatClicks(300); return; } const f = this.fd; this.fd = null; if (f && f.tapOpen && !f.moved) { this.eatClicks(); f.spec.tap(); } }
   panDown(path, e, s) {
     capture(e); clearTimeout(this.pt); const v0 = this.val(path); if (v0 === undefined) return;
     if (this.dbl('p' + path)) { this.set(path, 'f', q(0.5, STEPS.pan)); this.pd = null; return; }
@@ -668,6 +686,61 @@ class App extends Component {
     if (p.moved) { let v = clamp(p.start + dx / (p.w * 1.6), 0, 1); if (Math.abs(v - 0.5) < 0.015) v = 0.5; this.set(p.path, 'f', q(v, STEPS.pan)); }
   }
   panUp() { clearTimeout(this.pt); if (this.pd && this.pd.opened) this.eatClicks(300); this.pd = null; }
+  /* the sends window: a long press beside a fader's knob on the mixer screen, as in the WING app */
+  renderSendsWin(Hd) {
+    const st = this.state, L = this.L(), s = L.byId[st.sendsWin.id]; if (!s) return null;
+    const close = () => this.setState({ sendsWin: null, sendPop: null }), M = st.prefs.sendMeters !== false;
+    const G = [...L.ch, L.aux, ...L.rtn], go = d => { const n = G[(G.indexOf(s) + d + G.length) % G.length]; this.smPk = {}; this.setState({ sendsWin: { id: n.id }, sendPop: null }); };
+    const PH = Hd - 40, FH = PH - 24 - 26 - 36 - 18 - 30, T = FH - 44, v = this.val(s.fader), on = this.val(s.on), col = this.val(s.color);
+    const ab = 'flex:1;height:58px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#2e2924,#1a1714);border:1px solid #5a4630;color:var(--brass-hi)';
+    this.smSpec = [];
+    const smeter = sp => { const k = this.smSpec.push(sp) - 1, c = html`<span class="mcol" data-sm=${k}><span class="mfill" style=${`height:0%;background-size:100% ${T}px`}></span><span class="mpk" style="bottom:0;opacity:0"></span></span>`;
+      return html`<span class="meter" style=${`height:${T}px`}>${c}${c}</span>`; };
+    return html`
+      <button class="scrim" style="z-index:4" aria-label="Close sends" onClick=${close}></button>
+      <div class="pop" data-sendswin=${s.id} style=${`z-index:5;left:20px;top:20px;width:1140px;height:${PH}px;padding:12px 14px;gap:10px;flex-direction:row`}>
+        <div style="width:122px;flex:none;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;gap:8px">
+            <button aria-label="Previous channel" style=${ab} onClick=${() => go(-1)}><svg width="30" height="30" viewBox="0 0 24 24"><path d="M15 5 L8 12 L15 19" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button aria-label="Next channel" style=${ab} onClick=${() => go(1)}><svg width="30" height="30" viewBox="0 0 24 24"><path d="M9 5 L16 12 L9 19" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+          <span style=${`padding:10px 8px;border-radius:8px;${nameLook(col)};font-size:19px;font-weight:800;letter-spacing:.03em;text-align:center;word-break:break-word;line-height:1.15`}>${this.nm(s) || s.def}
+            <span style="display:block;font-family:var(--mono);font-size:11px;font-weight:600;opacity:.7;margin-top:3px">${s.def}</span></span>
+          <span style="font-size:13px;font-weight:700;letter-spacing:.16em;color:#9b927f;text-align:center">SENDS</span>
+          <span style="flex:1"></span>
+          <button data-smt="1" aria-pressed=${String(M)} onClick=${() => this.setPref({ sendMeters: !M })}
+            style=${`height:46px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;letter-spacing:.08em;${M ? 'background:#16221a;border:1px solid #4f8a5c;color:#9fe0a8' : 'background:#141210;border:1px solid #3a342c;color:#8a8170'}`}>${M ? 'METERS ON' : 'METERS OFF'}</button>
+          <button onClick=${close} style="height:66px;border-radius:12px;cursor:pointer;font-size:20px;font-weight:800;letter-spacing:.14em;color:#1a1405;background:linear-gradient(180deg,#f3c27a,#c9933f);border:1px solid #f3c27a;box-shadow:0 0 18px rgba(243,194,122,.45),inset 0 1px 0 rgba(255,255,255,.4)">DONE</button>
+        </div>
+        <div style="flex:1;min-width:0;display:flex;gap:4px">
+          ${L.dests.map((d, k) => { const p = sendPath(s, d), sv = this.val(p), b = s.base + '/mix/' + pad2(d.k), tap = this.val(b + '/tap'), grp = this.val(b + '/grpon'), dc = this.val(d.strip.color);
+            return html`<div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 2px;border-radius:8px;background:#161412;border:1px solid #2c2721">
+              <span style=${`width:100%;box-sizing:border-box;padding:3px 4px;border-radius:5px;text-align:center;font-size:13px;font-weight:800;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${fin(dc) && dc ? nameLook(dc) : `color:#121110;background:${d.col}`}`}>${this.nm(d.strip) || d.label}</span>
+              <button class="pill" data-swtap=${k} aria-label=${'Send settings ' + d.label} onClick=${() => this.setState({ sendPop: { k } })}
+                style=${`width:100%;height:32px;padding:0;border-radius:6px;font-size:12px;letter-spacing:.02em;${tap === 5 ? (grp === 1 ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : 'color:#8a8170') : ''}`}>${fin(tap) && TAPS[tap] ? TAPS[tap][0] + (tap === 5 ? (grp === 1 ? ' ON' : ' OFF') : '') : '···'}</button>
+              <span style="font-family:var(--mono);font-size:11px;color:#d9cdb3">${dbText(sv)}</span>
+              <button class="fader" data-f=${p} style=${`height:${FH}px;width:84px`} aria-label=${d.label + ' send ' + dbText(sv)}
+                onPointerDown=${e => this.faderDown({ path: p, steps: STEPS.level }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+                <span class="slot"></span>
+                ${fin(sv) && html`<span style=${`position:absolute;left:41px;width:6px;bottom:20px;height:${Math.round(clamp(sv, 0, 1) * (T - 0))}px;border-radius:3px;background:${d.col};opacity:.5`}></span>`}
+                ${M && smeter({ mt: s.mt, send: p, tap: b + '/tap', fader: s.fader, on: s.on })}
+                ${fin(sv) && html`<span class="cap" style=${'top:' + Math.round((1 - clamp(sv, 0, 1)) * T) + 'px'}></span>`}
+              </button>
+            </div>`; })}
+        </div>
+        <div style="width:124px;flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px 4px;border-radius:8px;background:#1a1714;border:1.5px solid #6a5232">
+          <span style=${`width:100%;padding:5px 4px;border-radius:5px;text-align:center;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${nameLook(col)}`}>${this.nm(s) || s.def}</span>
+          <button data-t=${s.on} onClick=${() => this.tog(s.on)} aria-pressed=${String(on === 0)} style=${`width:100%;height:32px;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer;${on === 0 ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--brass-hi)">${dbText(v)}</span>
+          <button class="fader" data-f=${s.fader} style=${`height:${FH}px;width:84px`} aria-label=${'Fader ' + dbText(v)}
+            onPointerDown=${e => this.faderDown({ path: s.fader, steps: STEPS.fader }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+            <span class="slot"></span>${this.meter(s.mt, T)}
+            ${fin(v) && html`<span class="cap" style=${'top:' + Math.round((1 - clamp(v, 0, 1)) * T) + 'px'}></span>`}
+          </button>
+          <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#9b927f">FADER</span>
+        </div>
+      </div>
+      ${st.sendPop && this.sendTapPop(Hd, s)}`;
+  }
   /* the fine pan window: a long press on any pan */
   renderPanPop(Hd) {
     const pp = this.state.panPop, s = this.L().byId[pp.id]; if (!s) return null;
@@ -743,7 +816,7 @@ class App extends Component {
     const FH = Math.round(Hd - 236), T = FH - 44;
     const marks = [[1, '+10'], [0.875, '+5'], [0.75, '0'], [0.625, '-5'], [0.5, '-10'], [0.375, '-20'], [0.25, '-30'], [0.125, '-50'], [0, '-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
-    const SO = st.sofOn, D = SO ? L.dests[st.sof] : null, tcol = D ? D.col : '';
+    const SO = st.sofOn, D = SO ? L.dests[st.sof] : null, tcol = D ? D.col : '', cmp = Hd < 600;
     const strip = (s, tgt) => {
       const snd = SO && !tgt, fp = snd ? sendPath(s, D) : s.fader, v = this.val(fp), on = this.val(s.on), solo = this.val(s.solo), pan = s.pan ? this.val(s.pan) : undefined, nm = this.nm(s), col = this.val(s.color);
       const isMain = s.kind === 'lr' || tgt;
@@ -763,7 +836,7 @@ class App extends Component {
         </div>
         <div class="dbr">${dbText(v)}</div>
         <button class="fader" data-f=${fp} style=${'height:' + FH + 'px'} aria-label=${'Fader ' + dbText(v) + ' dB'}
-          onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.openStrip(s.id) }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
+          onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.openStrip(s.id), long: s.sends && !snd ? () => this.setState({ sendsWin: { id: s.id } }) : null }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
           ${marks.map(m => html`<span class="mk" style=${'top:' + m.top + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.tick + 'px'}></span>`)}
           <span class="slot"></span>
           ${this.meter(s.mt, T)}
@@ -810,12 +883,24 @@ class App extends Component {
         <div style=${`width:140px;flex:none;display:flex;flex-direction:column;gap:6px;border-radius:10px;transition:box-shadow .45s,background .45s,outline-color .45s;outline:1.5px solid ${SO ? tcol : 'transparent'};outline-offset:3px;${SO ? `box-shadow:0 0 22px ${tcol}66,inset 0 0 26px ${tcol}22;background:${tcol}10` : ''}`}>
           <span style=${`font-size:11px;letter-spacing:.16em;color:${SO ? tcol : '#b8a78a'};text-transform:uppercase;padding:2px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:${SO ? 700 : 400}`}>${SO ? 'Sends → ' + D.label : 'Layers'}</span>
           ${L.banks.map((b, n) => !b.strips.length ? null : SO && !b.ins ? html`<button class="layer" disabled style="opacity:.25;cursor:default"><i style=${`background:${b.col}`}></i>${b.label}</button>`
-            : html`<button class=${'layer' + (n === st.bank ? ' on' : '')} onClick=${() => this.setState({ bank: n })}><i style=${`background:${b.col};opacity:${n === st.bank ? 1 : 0.7};box-shadow:${n === st.bank ? '0 0 8px ' + b.col : 'none'}`}></i>${b.label}</button>`)}
+            : html`<button class=${'layer' + (n === st.bank ? ' on' : '')} style=${cmp ? 'height:40px;font-size:17px' : ''} onClick=${() => this.setState({ bank: n })}><i style=${`background:${b.col};opacity:${n === st.bank ? 1 : 0.7};box-shadow:${n === st.bank ? '0 0 8px ' + b.col : 'none'}`}></i>${b.label}</button>`)}
+          <span style=${`font-size:11px;letter-spacing:.16em;color:#b8a78a;text-transform:uppercase;padding:${cmp ? 2 : 6}px 4px 0`}>Mixes</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+            ${L.bus.map(b => { const k = L.dests.findIndex(d => d.strip === b), on = SO && st.sof === k, cc = this.val(b.color), cl = fin(cc) && cc & 7 ? COLORS[cc & 7] : '#c9a25a';
+              return html`<button data-busq=${b.n} aria-pressed=${String(on)} aria-label=${'Monitor mix ' + (this.nm(b) || b.def)}
+                onClick=${() => this.setState(s0 => on ? { sofOn: false } : { sofOn: true, sof: k, bank: (L.banks[s0.bank] || {}).ins ? s0.bank : 0 })}
+                style=${`height:${cmp ? 44 : 52}px;min-width:0;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;padding:0 7px;position:relative;overflow:hidden;text-align:left;
+                  ${on ? `background:${cl}33;border:1.5px solid ${cl};box-shadow:0 0 12px ${cl}88,inset 0 0 10px ${cl}55` : 'background:#161412;border:1px solid #302b25'}`}>
+                <i style=${`position:absolute;left:0;top:0;bottom:0;width:4px;background:${cl}`}></i>
+                <span style=${`font-size:10px;font-weight:700;letter-spacing:.12em;color:${on ? '#ffe3ad' : '#c9a25a'}`}>BUS ${b.n}</span>
+                <span style=${`font-size:13px;font-weight:700;color:#f1e7d2;max-width:56px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${this.nm(b) || '—'}</span></button>`; })}
+          </div>
           <div style="flex:1"></div>
         </div>
         <div class="wood" style="width:18px;flex:none;box-shadow:inset 2px 0 4px rgba(0,0,0,.5)"></div>
       </div>
       ${st.connPop && this.renderConn(Hd)}
+      ${st.sendsWin && this.renderSendsWin(Hd)}
       ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
@@ -942,16 +1027,7 @@ class App extends Component {
           <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">${kp.labels.map((l, k) => html`<button class=${'pill' + (this.val(kp.path) === k ? ' on' : '')} data-kp=${k} style="height:46px;padding:0 6px;font-size:14px;letter-spacing:.02em;text-transform:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"
             onClick=${() => { this.pick(kp.path, k); this.setState({ keyPick: null }); }}>${l}</button>`)}</div>
         </div>`}
-      ${sp && (() => { const d = L.dests[sp.k]; if (!d || !s.sends) return null; const b = s.base + '/mix/' + pad2(d.k), tap = this.val(b + '/tap'), hasPan = this.val(b + '/pan') !== undefined, close = () => this.setState({ sendPop: null });
-        return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
-        <div class="pop" style=${`z-index:7;left:${(DW - 600) / 2}px;top:${Math.max(8, Math.round((Hd - (hasPan ? 380 : 310)) / 2))}px;width:600px;padding:16px;gap:12px`}>
-          <div style="display:flex;align-items:center;gap:10px"><span style=${`font-size:20px;font-weight:700;letter-spacing:.08em;color:${d.col};flex:1`}>${this.nm(s) || s.def} → ${d.label} ${this.nm(d.strip)}</span><button class="small" onClick=${close}>CLOSE</button></div>
-          <span dir="rtl" style=${`${HEB};font-size:14px;color:#b8a78a`}>מאיפה בערוץ הסנד נלקח:</span>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${TAPS.map((t, k) => html`<button class=${'pill' + (tap === k ? ' on' : '')} data-tap=${k} style="height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0" onClick=${() => this.pick(b + '/tap', k)}>
-            <span style="font-size:15px">${t[0]}</span><span dir="rtl" style=${`${HEB};font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.8`}>${t[1]}</span></button>`)}</div>
-          <div style="display:flex;align-items:center;gap:10px">${this.tgl('GROUP ON', b + '/grpon', '#c9a25a')}<span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.4;color:#8c8272`}>שיוך הערוץ לבאס כשהבאס עובד כגרופ.</span></div>
-          ${hasPan && this.slider('Pan', b + '/pan', LAW.pan)}
-        </div>`; })()}
+      ${sp && this.sendTapPop(Hd, s)}
       ${st.ask && html`
         <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
         <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:9;left:340px;top:${Math.round((Hd - 220) / 2)}px;width:500px;padding:22px;gap:16px;border-color:#e0513f;${HEB}`}>
@@ -962,6 +1038,19 @@ class App extends Component {
       ${st.connPop && this.renderConn(Hd)}
       ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
+  }
+  sendTapPop(Hd, s) {
+    const st = this.state, L = this.L(), sp = st.sendPop;
+    const d = L.dests[sp.k]; if (!d || !s.sends) return null; const b = s.base + '/mix/' + pad2(d.k), tap = this.val(b + '/tap'), hasPan = this.val(b + '/pan') !== undefined, close = () => this.setState({ sendPop: null });
+        return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
+        <div class="pop" style=${`z-index:7;left:${(DW - 600) / 2}px;top:${Math.max(8, Math.round((Hd - (hasPan ? 380 : 310)) / 2))}px;width:600px;padding:16px;gap:12px`}>
+          <div style="display:flex;align-items:center;gap:10px"><span style=${`font-size:20px;font-weight:700;letter-spacing:.08em;color:${d.col};flex:1`}>${this.nm(s) || s.def} → ${d.label} ${this.nm(d.strip)}</span><button class="small" onClick=${close}>CLOSE</button></div>
+          <span dir="rtl" style=${`${HEB};font-size:14px;color:#b8a78a`}>מאיפה בערוץ הסנד נלקח:</span>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">${TAPS.map((t, k) => html`<button class=${'pill' + (tap === k ? ' on' : '')} data-tap=${k} style="height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0" onClick=${() => this.pick(b + '/tap', k)}>
+            <span style="font-size:15px">${t[0]}</span><span dir="rtl" style=${`${HEB};font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.8`}>${t[1]}</span></button>`)}</div>
+          <div style="display:flex;align-items:center;gap:10px">${this.tgl('GROUP ON', b + '/grpon', '#c9a25a')}<span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.4;color:#8c8272`}>שיוך הערוץ לבאס כשהבאס עובד כגרופ.</span></div>
+          ${hasPan && this.slider('Pan', b + '/pan', LAW.pan)}
+        </div>`; 
   }
   /* the strip's own fader on the right of its screens */
   chanStrip(Hd, s) {
@@ -1686,7 +1775,7 @@ class App extends Component {
     catch (e) {
       this.rErr = (this.rErr || 0) + 1;
       try { this.log('err', 'screen error on ' + this.state.screen + ': ' + String(e && e.message || e)); } catch (_) {}
-      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, ask: null, sendPop: null, keyPick: null, nameEdit: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
+      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, ask: null, sendPop: null, sendsWin: null, panPop: null, keyPick: null, nameEdit: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
       return html`<div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0;background:#0b0a09"></div>`;
     }
   }

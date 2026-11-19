@@ -17,6 +17,8 @@ const click = async (p, sel) => { await p.mouse.move(3 + Math.random() * 4, 3); 
   const ok = await p.evaluate(sel => { const e = document.querySelector(sel); if (e) e.click(); return !!e; }, sel); await p.waitForTimeout(160); return ok; };
 const back = p => click(p, '.backbtn');
 /* the analyser's source is a viewing setting the app moves on its own while live (as the WING app does): left out of the general counts */
+/* long press beside a fader's knob (near its bottom) */
+async function longFader(p, path) { const fb = await (await p.$(`[data-f="${path}"]`)).boundingBox(); await p.mouse.move(fb.x + fb.width / 2, fb.y + fb.height - 30); await p.mouse.down(); await p.waitForTimeout(700); await p.mouse.up(); await p.waitForTimeout(500); }
 const sets = p => p.evaluate(() => fake.sets.filter(x => !x[0].startsWith('/-stat/rta/')));
 const rawSets = p => p.evaluate(() => fake.sets.slice());
 const names = p => p.evaluate(() => [...document.querySelectorAll('.strip .cname')].map(e => e.textContent.trim()));
@@ -90,6 +92,14 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   await p.mouse.move(100, 120); const pb = await (await p.$('.strip .panmini')).boundingBox(); await p.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2); await p.mouse.down(); await p.waitForTimeout(700); await p.mouse.up(); await p.waitForTimeout(500);
   const pp1 = await p.evaluate(() => !!document.querySelector('[data-panpop]')); await click(p, '[data-ppv="L50"]');
   ok('read only: a long press on a pan opens the fine pan window, which sends nothing', pp1 && (await rawSets(p)).length === 0, JSON.stringify(await rawSets(p))); await tap(p, 'CLOSE');
+  await longFader(p, '/ch/02/mix/fader');
+  const sw = await p.evaluate(() => ({ id: __app.state.sendsWin && __app.state.sendsWin.id, n: document.querySelectorAll('[data-sendswin] .fader[data-f$="/level"]').length, m: document.querySelectorAll('[data-sm]').length, ch: !!document.querySelector('[data-sendswin] [data-f="/ch/02/mix/fader"]') }));
+  ok('long press beside a fader opens the sends window: 10 sends with meters and the strip fader', sw.id === 'ch2' && sw.n === 10 && sw.m === 20 && sw.ch, JSON.stringify(sw));
+  await drag(p, '/ch/02/mix/03/level', -40); ok('read only: the sends window sends nothing', (await rawSets(p)).length === 0); await tap(p, 'DONE');
+  await click(p, '[data-busq="2"]'); const bq = await p.evaluate(() => ({ so: __app.state.sofOn, d: __app.L().dests[__app.state.sof].label, m: !!document.querySelector('.strip [data-f="/bus/2/mix/fader"]'), s1: !!document.querySelector('.strip [data-f="/ch/01/mix/02/level"]'), row: getComputedStyle(document.querySelector('.sofrow')).opacity }));
+  ok('a bus square turns the faders into that bus mix, with its master on the right and the sends row on top', bq.so && bq.d === 'BUS 2' && bq.m && bq.s1 && +bq.row > 0.5, JSON.stringify(bq));
+  await click(p, '[data-busq="2"]'); ok('the same square again: back to the main mix', await p.evaluate(() => !__app.state.sofOn && !!document.querySelector('.strip [data-f="/lr/mix/fader"]')));
+  ok('six bus squares on the XR16', await p.evaluate(() => document.querySelectorAll('[data-busq]').length === 6));
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
   ok('live on', (await status(p)) === 'connected/XR16W/true' && await p.evaluate(() => fake.live));
@@ -154,6 +164,14 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   await click(p, '[data-ppv="L50"]'); await click(p, '[data-pps="1"]'); S = await sets(p);
   ok('live: the fine pan window sends the pan on its grid (L50, then one step right)', S.length === c0 + 2 && S[c0][0] === '/ch/01/mix/pan' && S[c0][2] === 0.25 && Math.abs(S[c0 + 1][2] - 0.26) < 1e-6, JSON.stringify(S.slice(c0)));
   await tap(p, 'CLOSE');
+  await p.waitForTimeout(400); c0 = (await sets(p)).length; await longFader(p, '/ch/02/mix/fader'); await drag(p, '/ch/02/mix/03/level', -40); S = await sets(p);
+  ok('live: a send fader in the sends window sends only that send, on the 161 grid', S.length > c0 && S.slice(c0).every(x => x[0] === '/ch/02/mix/03/level' && Math.abs(x[2] * 160 - Math.round(x[2] * 160)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; await click(p, '[data-swtap="1"]'); await click(p, '[data-tap="4"]'); await tap(p, 'CLOSE'); await click(p, '[data-sendswin] [data-t="/ch/02/mix/on"]'); S = await sets(p);
+  ok('live: from the sends window – the send tap and the strip mute', S.length === c0 + 2 && S[c0][0] === '/ch/02/mix/02/tap' && S[c0][2] === 4 && S[c0 + 1][0] === '/ch/02/mix/on' && S[c0 + 1][1] === 'i', JSON.stringify(S.slice(c0)));
+  await click(p, '[data-sendswin] [data-t="/ch/02/mix/on"]'); await tap(p, 'DONE');
+  c0 = (await sets(p)).length; await click(p, '[data-busq="1"]'); await drag(p, '/ch/03/mix/01/level', -30); await drag(p, '/bus/1/mix/fader', -20); S = await sets(p);
+  ok('live: in a bus mix the faders move the sends to that bus and the right fader is the bus master', S.length > c0 && S.slice(c0).every(x => x[0] === '/ch/03/mix/01/level' || x[0] === '/bus/1/mix/fader') && S.slice(c0).some(x => x[0] === '/bus/1/mix/fader'), JSON.stringify(S.slice(c0, c0 + 4)));
+  await click(p, '[data-busq="1"]');
   await back(p); c0 = S.length; await drag(p, '/ch/07/mix/fader', -40); await p.waitForTimeout(700); S = await sets(p);
   const pair = await p.evaluate(() => [__app.desk['/ch/07/mix/fader'], __app.desk['/ch/08/mix/fader'], fake.store['/ch/08/mix/fader'][1]]);
   ok('live: a linked pair – only the touched fader is sent, the partner is read back', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/07/mix/fader') && pair[0] === pair[1] && pair[1] === pair[2], JSON.stringify(pair));
@@ -197,6 +215,7 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
   ok('no page errors (1200×540)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
 { const p = await open('index.html?model=XR12'); await p.waitForTimeout(2500);
   await p.waitForTimeout(3500); await tap(p, 'Buses'); ok('XR12 that answers for 2 buses only: 2 shown', (await names(p)).filter(x => /^BUS/.test(x)).length === 2, (await names(p)).join(','));
+  ok('XR12: two bus squares', await p.evaluate(() => document.querySelectorAll('[data-busq]').length === 2));
   ok('XR12: 12 channels, recorder note', (await status(p)) === 'connected/XR12W/false' && await tap(p, 'In 9–12') && (await names(p)).length === 5 && !!(await p.$('[data-nav="tape"]')));
   await tap(p, 'הגדרות'); await click(p, '[data-pref="entereq"]'); await click(p, '[data-pref="navtrue"]'); await back(p); await p.evaluate(() => document.querySelectorAll('.strip .cname')[0].click()); await p.waitForTimeout(300);
   ok('settings: entry screen and back side are kept', await p.evaluate(() => __app.state.screen === 'eq' && !document.querySelector('.topbar').classList.contains('backR') && JSON.parse(localStorage.getItem('xair.prefs')).enter === 'eq'));
