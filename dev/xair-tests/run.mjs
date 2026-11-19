@@ -100,6 +100,14 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   ok('a bus square turns the faders into that bus mix, with its master on the right and the sends row on top', bq.so && bq.d === 'BUS 2' && bq.m && bq.s1 && +bq.row > 0.5, JSON.stringify(bq));
   await click(p, '[data-busq="2"]'); ok('the same square again: back to the main mix', await p.evaluate(() => !__app.state.sofOn && !!document.querySelector('.strip [data-f="/lr/mix/fader"]')));
   ok('six bus squares on the XR16', await p.evaluate(() => document.querySelectorAll('[data-busq]').length === 6));
+  await click(p, '[data-nav="mute"]'); await p.waitForTimeout(500); await click(p, '[data-mg="1"]'); await tap(p, 'DONE');
+  await (await p.$$('.strip .cname'))[0].click(); await p.waitForTimeout(300); await click(p, '[data-tab="Config"]'); await click(p, '[data-bit="/ch/01/grp/dca:1"]'); await back(p);
+  await click(p, '[data-nav="routing"]'); await p.waitForTimeout(500); await click(p, '[data-insrc="3"]'); await click(p, '[data-kp="5"]'); await click(p, '[data-link="1"]'); await click(p, '[data-yes]');
+  await click(p, '[data-rtab="out"]'); await p.waitForTimeout(400); await click(p, '[data-rsrc="/routing/aux/01"]'); await click(p, '[data-kp="36"]'); await back(p);
+  await click(p, '[data-nav="fx"]'); await p.waitForTimeout(500); await click(p, '[data-fxslot="2"]'); await p.waitForTimeout(400); await hdrag(p, '[data-p="/fx/2/par/01"]', 60); await click(p, '[data-fxtype]'); await click(p, '[data-kp="10"]'); await click(p, '[data-yes]');
+  ok('read only: mute groups, DCA, assignment, routing, links and effects send nothing', (await rawSets(p)).length === 0, JSON.stringify(await rawSets(p)));
+  ok('the effects screen names the effect and lists its parameters (Rich Plate: 16)', await p.evaluate(() => document.querySelector('[data-fxname]').textContent === 'Rich Plate' && document.querySelector('[data-fxparams]').dataset.fxparams === '16'));
+  await back(p);
   const w1 = await walk(p); ok(`read only: walking every view (${w1} taps) sends nothing`, (await sets(p)).length === 0, JSON.stringify(await sets(p)));
   await tap(p, 'LIVE OFF'); ok('live asks first', await p.evaluate(() => __app.state.liveAsk && !fake.live)); await tap(p, 'Turn on');
   ok('live on', (await status(p)) === 'connected/XR16W/true' && await p.evaluate(() => fake.live));
@@ -172,6 +180,21 @@ const walk = async p => { let t = 0; for (const x of ['In 9–16', 'Returns', 'B
   c0 = (await sets(p)).length; await click(p, '[data-busq="1"]'); await drag(p, '/ch/03/mix/01/level', -30); await drag(p, '/bus/1/mix/fader', -20); S = await sets(p);
   ok('live: in a bus mix the faders move the sends to that bus and the right fader is the bus master', S.length > c0 && S.slice(c0).every(x => x[0] === '/ch/03/mix/01/level' || x[0] === '/bus/1/mix/fader') && S.slice(c0).some(x => x[0] === '/bus/1/mix/fader'), JSON.stringify(S.slice(c0, c0 + 4)));
   await click(p, '[data-busq="1"]');
+  c0 = (await sets(p)).length; await click(p, '[data-nav="mute"]'); await p.waitForTimeout(500); await click(p, '[data-mg="1"]'); await click(p, '[data-mgpop] [data-t="/dca/1/on"]'); await tap(p, 'DONE'); S = await sets(p);
+  ok('live: the mute window switches mute group 1 on and mutes DCA 1', S.length === c0 + 2 && S[c0][0] === '/config/mute/1' && S[c0][1] === 'i' && S[c0][2] === 1 && S[c0 + 1][0] === '/dca/1/on' && S[c0 + 1][2] === 0, JSON.stringify(S.slice(c0)));
+  await click(p, '[data-nav="mute"]'); await p.waitForTimeout(400); await click(p, '[data-mg="1"]'); await click(p, '[data-mgpop] [data-t="/dca/1/on"]'); await tap(p, 'DONE');
+  c0 = (await sets(p)).length; const dca0 = await p.evaluate(() => fake.store['/ch/01/grp/dca'][1]);
+  await (await p.$$('.strip .cname'))[0].click(); await p.waitForTimeout(300); await click(p, '[data-tab="Config"]'); await p.waitForTimeout(300); await click(p, '[data-bit="/ch/01/grp/dca:1"]'); await click(p, '[data-bit="/ch/01/grp/mute:2"]'); S = await sets(p);
+  ok('live: CONFIG assigns the strip to DCA 2 and mute group 3 (one bit each)', S.length === c0 + 2 && S[c0][0] === '/ch/01/grp/dca' && S[c0][2] === (dca0 ^ 2) && S[c0 + 1][0] === '/ch/01/grp/mute' && S[c0 + 1][1] === 'i', JSON.stringify(S.slice(c0)));
+  await back(p); c0 = S.length; await click(p, '[data-nav="routing"]'); await p.waitForTimeout(300); await click(p, '[data-rtab="in"]'); await p.waitForTimeout(400); await click(p, '[data-insrc="3"]'); await click(p, '[data-kp="5"]'); await click(p, '[data-link="1"]'); const la = await p.evaluate(() => !!__app.state.ask); await click(p, '[data-yes]'); S = await sets(p);
+  ok('live: routing input – channel 3 from IN 06; a stereo link asks first', la && S.length === c0 + 2 && S[c0][0] === '/ch/03/config/insrc' && S[c0][2] === 5 && S[c0 + 1][0] === '/config/chlink/1-2' && S[c0 + 1][2] === 1, JSON.stringify(S.slice(c0)));
+  c0 = S.length; await click(p, '[data-rtab="out"]'); await p.waitForTimeout(500); await click(p, '[data-rsrc="/routing/aux/01"]'); await click(p, '[data-kp="36"]'); await click(p, '[data-rpos="/routing/aux/01"]'); await click(p, '[data-kp="8"]'); S = await sets(p);
+  ok('live: routing output – AUX 1 from MAIN L, taken PRE', S.length === c0 + 2 && S[c0][0] === '/routing/aux/01/src' && S[c0][2] === 36 && S[c0 + 1][0] === '/routing/aux/01/pos' && S[c0 + 1][2] === 8, JSON.stringify(S.slice(c0)));
+  ok('XR16: four aux outputs and the recorder L/R', await p.evaluate(() => document.querySelectorAll('[data-rsrc^="/routing/aux/"]').length === 4 && document.querySelectorAll('[data-rsrc^="/routing/usb/"]').length === 2));
+  await back(p); c0 = S.length; await click(p, '[data-nav="fx"]'); await p.waitForTimeout(500); await click(p, '[data-fxslot="2"]'); await p.waitForTimeout(500); await hdrag(p, '[data-p="/fx/2/par/01"]', 60); S = await sets(p);
+  ok('live: an effect parameter sends only itself on its grid (Pre Delay, 101 steps)', S.length > c0 && S.slice(c0).every(x => x[0] === '/fx/2/par/01' && Math.abs(x[2] * 100 - Math.round(x[2] * 100)) < 1e-3), JSON.stringify(S.slice(c0, c0 + 3)));
+  c0 = S.length; const g0 = await p.evaluate(() => fake.gets); await click(p, '[data-fxtype]'); await click(p, '[data-kp="10"]'); const fa = await p.evaluate(() => !!__app.state.ask); await click(p, '[data-yes]'); await p.waitForTimeout(800); S = await sets(p);
+  ok('live: changing the effect asks first, sends the type, then reads the new parameters', fa && S.length === c0 + 1 && S[c0][0] === '/fx/2/type' && S[c0][1] === 'i' && S[c0][2] === 10 && await p.evaluate(g0 => fake.gets > g0 + 10 && document.querySelector('[data-fxname]').textContent === 'Stereo Delay', g0), JSON.stringify(S.slice(c0)));
   await back(p); c0 = S.length; await drag(p, '/ch/07/mix/fader', -40); await p.waitForTimeout(700); S = await sets(p);
   const pair = await p.evaluate(() => [__app.desk['/ch/07/mix/fader'], __app.desk['/ch/08/mix/fader'], fake.store['/ch/08/mix/fader'][1]]);
   ok('live: a linked pair – only the touched fader is sent, the partner is read back', S.length > c0 && S.slice(c0).every(s => s[0] === '/ch/07/mix/fader') && pair[0] === pair[1] && pair[1] === pair[2], JSON.stringify(pair));
@@ -208,6 +231,8 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
 
 /* ---------- models and the mixer report ---------- */
 { const p = await open('index.html?model=XR18', { width: 1200, height: 540 }); await p.waitForTimeout(2500); await tap(p, 'Buses');
+  await click(p, '[data-nav="routing"]'); await p.waitForTimeout(500); ok('XR18 routing: USB return switch on each channel', await p.evaluate(() => document.querySelectorAll('[data-t$="/preamp/rtnsw"]').length === 16)); await click(p, '[data-rtab="out"]'); await p.waitForTimeout(400);
+  ok('XR18 routing: six aux outputs and 18 USB outputs', await p.evaluate(() => document.querySelectorAll('[data-rsrc^="/routing/aux/"]').length === 6 && document.querySelectorAll('[data-rsrc^="/routing/usb/"]').length === 18)); await back(p); await tap(p, 'Buses');
   ok('XR18: model detected, 6 buses, no recorder note', (await status(p)) === 'connected/XR18W/false' && (await names(p)).filter(x => /^BUS/.test(x)).length === 6 && !(await p.$('[data-nav="tape"]')));
   await tap(p, 'הגדרות'); await tap(p, 'הכן דוח'); await p.waitForTimeout(45000);
   const d = await p.evaluate(() => ({ d: __app.state.dump, t: __app.dumpText.slice(0, 400), sizes: __app.dumpParts.map(x => x.length), f: /\/ch\/01: config\/name="D01" config\/color=i1 mix\/fader=f0\.\d+/.test(__app.dumpText), sets: fake.sets.length }));

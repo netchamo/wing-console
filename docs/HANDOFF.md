@@ -261,3 +261,21 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   right fader becomes the bus master, the sends row shows on top); the same square again = back to the main mix.
   Room is left under them for a user layer (`cmp` = compact sizes when the screen is short).
 - 87 checks.
+
+## 13. Air Console 0.6.0 – mute groups, DCA, routing, effects window (19 Nov)
+
+- Top bar (main screen): MUTE (glows red when a mute group is on), ROUTING, FX next to PLAYER / REC / settings.
+- `renderMg`: four mute groups (`/config/mute/N`, members from each strip's `grp/mute` bits) and four DCAs (mute, level,
+  members from `grp/dca`). Assignment is in CONFIG (`assignBlock`: two rows of four bit buttons, `bit()` flips one bit).
+- `renderRouting`: INPUTS (channel → `config/insrc` IN 01–16; on XR18 also ANALOG/USB `preamp/rtnsw` + `config/rtnsrc`;
+  stereo links `chlink` / `buslink` with a question first) and OUTPUTS (`/routing/aux/NN/src|pos`, sources Ch1–16, Aux L/R,
+  FX1–4 L/R, Bus1–6, Send1–4, Main L/R (+ USB 1–18 on XR18); taps AIN…POST, "+M" follows mute).
+  Aux outputs shown per model: XR18 6, XR16 4, XR12 2 (`VERIFY` on the user's XR16 – the firmware answers all six).
+  XR16/XR12: `/routing/usb/01-02` is shown as the stick recorder's L/R input (`VERIFY`; the user's values are Main L/R, pos 4).
+  Main out routing (`/routing/main/01-02`) is not shown yet – its meaning is not confirmed.
+- `renderFx`: four slots (name, family colour, INSERT/SEND from `/fx/N/insert`), send master and return level, the chosen
+  slot's parameters as WING drag boxes. The 61 types follow the X32 FX1–4 list – the user's report matches it exactly
+  (PLAT 12 params, P1A2 22, 3TAP 15, LEC2 10, mixed i/f types). Parameter tables (`FXP`) written for the reverbs, delays,
+  chorus/flanger/phaser, P1A/PQ5, limiter, leisure comp; other types show a note. CHANGE EFFECT asks first, then re-reads.
+  Next (the user's plan): accessible effect faces with a simulated analyser of what the effect does.
+- 98 checks.

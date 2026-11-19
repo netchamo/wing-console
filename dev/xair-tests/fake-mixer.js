@@ -47,7 +47,13 @@
   eq('/lr', 6); dyn('/lr');
   for (let k = 1; k < 16; k += 2) store[`/config/chlink/${k}-${k + 1}`] = ['i', k === 7 ? 1 : 0];
   for (let k = 1; k < 6; k += 2) store[`/config/buslink/${k}-${k + 1}`] = ['i', 0];
-  Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0], '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
+  ['/rtn/aux', '/rtn/1', '/rtn/2', '/rtn/3', '/rtn/4', '/fxsend/1', '/fxsend/2', '/fxsend/3', '/fxsend/4'].concat(Array.from({ length: NCH }, (_, k) => '/ch/' + pad2(k + 1)), Array.from({ length: NBUS }, (_, k) => '/bus/' + (k + 1)))
+    .forEach((b, i) => { store[b + '/grp/dca'] = ['i', i % 3 === 0 ? 1 : 0]; store[b + '/grp/mute'] = ['i', i % 4 === 0 ? 2 : 0]; });
+  for (let k = 1; k <= 4; k++) { store['/config/mute/' + k] = ['i', 0]; store[`/fx/${k}/insert`] = ['i', k === 4 ? 1 : 0]; for (let p = 1; p <= 16; p++) store[`/fx/${k}/par/${pad2(p)}`] = ['f', 0.5]; }
+  for (let k = 1; k <= 6; k++) { store[`/routing/aux/${pad2(k)}/src`] = ['i', 25 + k]; store[`/routing/aux/${pad2(k)}/pos`] = ['i', 10]; }
+  for (let k = 1; k <= 18; k++) { store[`/routing/usb/${pad2(k)}/src`] = ['i', k <= 2 ? 35 + k : k - 1]; store[`/routing/usb/${pad2(k)}/pos`] = ['i', k <= 2 ? 4 : 0]; }
+  if (MODEL === 'XR18') for (let n = 1; n <= NCH; n++) { store[`/ch/${pad2(n)}/preamp/rtnsw`] = ['i', 0]; store[`/ch/${pad2(n)}/config/rtnsrc`] = ['i', n - 1]; }
+Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0], '/-stat/tape/file': ['s', ''], '/-stat/tape/etime': ['i', 0], '/-stat/tape/rtime': ['i', 0], '/-stat/usb/path': ['s', ''], '/-stat/usb/count': ['i', 0] });
   for (let k = 1; k <= 54; k++) store['/-stat/solosw/' + pad2(k)] = ['i', 0];
   store['/-stat/solo'] = ['i', 0]; store['/-stat/usbmounted'] = ['i', MODEL === 'XR18' ? 0 : 1]; store['/-stat/tape/state'] = ['i', 0]; store['/-prefs/name'] = ['s', 'FAKE-' + MODEL];
 

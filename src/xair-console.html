@@ -79,7 +79,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.5.0';
+const DW = 1180, APP_VER = '0.6.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -213,6 +213,9 @@ const IC = {
   back: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>`,
   gear: html`<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M10.3 2h3.4l.5 2.6a7.8 7.8 0 0 1 1.9.8l2.2-1.5 2.4 2.4-1.5 2.2c.3.6.6 1.2.8 1.9l2.6.5v3.4l-2.6.5a7.8 7.8 0 0 1-.8 1.9l1.5 2.2-2.4 2.4-2.2-1.5a7.8 7.8 0 0 1-1.9.8l-.5 2.6h-3.4l-.5-2.6a7.8 7.8 0 0 1-1.9-.8l-2.2 1.5-2.4-2.4 1.5-2.2a7.8 7.8 0 0 1-.8-1.9L2 13.7v-3.4l2.6-.5c.2-.7.5-1.3.8-1.9L3.9 5.7l2.4-2.4 2.2 1.5c.6-.3 1.2-.6 1.9-.8zM12 8.3a3.7 3.7 0 1 0 0 7.4 3.7 3.7 0 0 0 0-7.4z"/></svg>`,
   full: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+  mute: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6M21 9l-4 6"/></svg>`,
+  route: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 6c6 0 6 6 10 6M7 18c6 0 6-6 10-6"/></svg>`,
+  fx: html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M3 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/></svg>`,
   sends: html`<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h7M4 17h11" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M16 9l4 3-4 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 };
 const HEB = "font-family:'Heebo',sans-serif";
@@ -251,6 +254,7 @@ function chanPaths(s) {
   if (s.kind === 'ch') { add(b + '/preamp', ['hpf', 'hpon', 'invert']); P.push(b + '/config/insrc'); add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); }
   if (T.includes('COMP')) add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
   if (s.kind !== 'lr' && s.kind !== 'dca' && s.kind !== 'fxs') P.push(b + '/mix/lr');
+  if (s.kind !== 'lr' && s.kind !== 'dca') P.push(b + '/grp/dca', b + '/grp/mute');
   return P;
 }
 /* names on this mixer carry a "_NN" tail written by another app: shown without it, written back with it */
@@ -268,6 +272,67 @@ const SCREEN_OF = { Home: 'home', Config: 'config', EQ: 'eq', Gate: 'gate', Comp
 const RTA_N = 100, rtaHz = k => 20 * Math.pow(1000, k / (RTA_N - 1));
 const rtaIdx = s => s.kind === 'ch' ? s.n - 1 : s.kind === 'aux' ? 16 : s.kind === 'rtn' ? 16 + s.n : s.kind === 'bus' ? 20 + s.n : s.kind === 'fxs' ? 26 + s.n : s.kind === 'lr' ? 31 : -1;
 const EQ_R = [18, 12, 6, 3], EQ_STEP = { 18: 6, 12: 3, 6: 2, 3: 1 };
+/* ---------- effects: the 61 types of an X-Air slot (the X32 FX1–4 list – the user's mixer reports matching
+   parameter counts and types for PLAT, P1A2, 3TAP and LEC2) and the parameters of the common ones ---------- */
+const FX_KEYS = ['HALL', 'AMBI', 'RPLT', 'ROOM', 'CHAM', 'PLAT', 'VREV', 'VRM', 'GATE', 'RVRS', 'DLY', '3TAP', '4TAP', 'CRS', 'FLNG', 'PHAS', 'DIMC', 'FILT', 'ROTA', 'PAN',
+  'SUB', 'D/RV', 'CR/R', 'FL/R', 'D/CR', 'D/FL', 'MODD', 'GEQ2', 'GEQ', 'TEQ2', 'TEQ', 'DES2', 'DES', 'P1A', 'P1A2', 'PQ5', 'PQ5S', 'WAVD', 'LIM', 'CMB', 'CMB2',
+  'FAC', 'FAC1M', 'FAC2', 'LEC', 'LEC2', 'ULC', 'ULC2', 'ENH2', 'ENH', 'EXC2', 'EXC', 'IMG', 'EDI', 'SON', 'AMP2', 'AMP', 'DRV2', 'DRV', 'PIT2', 'PIT'];
+const FX_NAMES = ['Hall Reverb', 'Ambience', 'Rich Plate', 'Room Reverb', 'Chamber', 'Plate Reverb', 'Vintage Reverb', 'Vintage Room', 'Gated Reverb', 'Reverse Reverb',
+  'Stereo Delay', '3-Tap Delay', '4-Tap Delay', 'Stereo Chorus', 'Stereo Flanger', 'Stereo Phaser', 'Dimension Chorus', 'Mood Filter', 'Rotary Speaker', 'Tremolo / Panner',
+  'Sub Octaver', 'Delay + Chamber', 'Chorus + Chamber', 'Flanger + Chamber', 'Delay + Chorus', 'Delay + Flanger', 'Modulation Delay', 'Dual Graphic EQ', 'Graphic EQ',
+  'Dual TruEQ', 'TruEQ', 'Dual De-esser', 'De-esser', 'Program EQ', 'Dual Program EQ', 'Mid EQ', 'Dual Mid EQ', 'Wave Designer', 'Precision Limiter', 'Combinator',
+  'Dual Combinator', 'Fair Comp', 'Fair Comp M/S', 'Dual Fair Comp', 'Leisure Comp', 'Dual Leisure Comp', 'Ultimo Comp', 'Dual Ultimo Comp', 'Dual Enhancer', 'Enhancer',
+  'Dual Exciter', 'Exciter', 'Stereo Imager', 'Edison EX1', 'Sound Maxer', 'Dual Guitar Amp', 'Guitar Amp', 'Dual Tube Stage', 'Tube Stage', 'Dual Pitch', 'Stereo Pitch'];
+const FX_FAM = k => k <= 9 || k === 21 || k === 22 || k === 23 ? 'REVERB' : k <= 12 || k === 24 || k === 25 || k === 26 ? 'DELAY' : k <= 20 ? 'MOD' : k <= 37 ? 'EQ' : k <= 47 ? 'DYN' : 'TONE';
+const FX_COL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
+/* a parameter: [label, kind, lo, hi, steps, unit, decimals] – kind 'l' linear, 'g' log; or [label, 'e', [names]] / [label, 't'] */
+const fmtK = (v, dp) => v >= 1000 ? (v / 1000).toFixed(v >= 10000 ? 1 : 2) + 'k' : v.toFixed(dp);
+const P_ = {
+  pre: ['Pre Delay', 'l', 0, 200, 101, 'ms', 0], lvl: ['Level', 'l', -12, 12, 49, 'dB', 1], damp: ['Damping', 'g', 1000, 20000, 25, 'Hz', 1],
+  loc: ['Lo Cut', 'g', 10, 500, 51, 'Hz', 0], hic: ['Hi Cut', 'g', 200, 20000, 51, 'Hz', 0], bass4: ['Bass Multi', 'g', 0.25, 4, 53, '', 2],
+  size: ['Size', 'l', 2, 100, 50, '', 0], dif: ['Diffuse', 'l', 1, 30, 30, '', 0], spread: ['Spread', 'l', 0, 50, 51, '', 0], shape: ['Shape', 'l', 0, 250, 51, '', 0],
+  spin: ['Spin', 'l', 0, 100, 21, '%', 0], time: ['Time', 'l', 1, 3000, 3000, 'ms', 0], fb: ['Feedback', 'l', 0, 100, 51, '%', 1], mix: ['Mix', 'l', 0, 100, 51, '%', 0],
+  onoff: n => [n, 't'], pct: n => [n, 'l', 0, 100, 51, '%', 0], tpan: n => [n, 'l', -100, 100, 41, '%', 0], fac: n => [n, 'e', ['1/4', '3/8', '1/2', '2/3', '1', '4/3', '3/2', '2', '3']]
+};
+const decay = (lo, hi) => ['Decay', 'g', lo, hi, 51, 's', 2], echo = n => [n, 'l', 0, 1200, 241, 'ms', 0], knob = n => [n, 'l', 0, 10, 101, '', 1];
+const p1a = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', -12, 12, 49, 'dB', 1], knob('Lo Boost' + c), ['Lo Freq' + c, 'e', ['20', '30', '60', '100']], knob('Lo Atten' + c), knob('Hi Width' + c), knob('Hi Boost' + c),
+  ['Hi Freq' + c, 'e', ['3k', '4k', '5k', '8k', '10k', '12k', '16k']], knob('Hi Atten' + c), ['Hi Atten Freq' + c, 'e', ['5k', '10k', '20k']], P_.onoff('Transformer' + c)];
+const pq5 = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', -12, 12, 49, 'dB', 1], ['Lo Freq' + c, 'e', ['200', '300', '500', '700', '1000']], knob('Lo Boost' + c),
+  ['Mid Freq' + c, 'e', ['200', '300', '500', '700', '1k', '1k5', '2k', '3k', '4k', '5k', '7k']], knob('Mid Cut' + c), ['Hi Freq' + c, 'e', ['1k5', '2k', '3k', '4k', '5k']], knob('Hi Boost' + c), P_.onoff('Transformer' + c)];
+const lec = c => [P_.onoff('Active' + c), ['Gain' + c, 'l', 0, 100, 51, '', 0], ['Peak' + c, 'l', 0, 100, 51, '', 0], ['Mode' + c, 'e', ['COMP', 'LIM']], ['Out Gain' + c, 'l', -18, 6, 49, 'dB', 1]];
+const FXP = {
+  HALL: [P_.pre, decay(0.2, 5), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, ['Bass Multi', 'g', 0.5, 2, 51, '', 2], P_.spread, P_.shape, ['Mod Speed', 'l', 0, 100, 21, '', 0]],
+  AMBI: [P_.pre, decay(0.2, 7.3), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, P_.pct('Modulate'), P_.pct('Tail Gain')],
+  RPLT: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 39, 36, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, ['Attack', 'l', 0, 100, 51, '', 0], P_.spin, echo('Echo L'), echo('Echo R'), ['Echo Feed L', 'l', -100, 100, 101, '%', 0], ['Echo Feed R', 'l', -100, 100, 101, '%', 0]],
+  ROOM: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 76, 37, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, P_.shape, P_.spin, echo('Echo L'), echo('Echo R'), ['Echo Feed L', 'l', -100, 100, 101, '%', 0], ['Echo Feed R', 'l', -100, 100, 101, '%', 0]],
+  CHAM: [P_.pre, decay(0.3, 29), ['Size', 'l', 4, 76, 37, 'm', 0], P_.damp, ['Diffuse', 'l', 0, 100, 26, '%', 0], P_.lvl, P_.loc, P_.hic, P_.bass4, P_.spread, P_.shape, P_.spin, ['Reflection L', 'l', 0, 500, 101, 'ms', 0], ['Reflection R', 'l', 0, 500, 101, 'ms', 0], P_.pct('Refl Gain L'), P_.pct('Refl Gain R')],
+  PLAT: [P_.pre, decay(0.5, 10), P_.size, P_.damp, P_.dif, P_.lvl, P_.loc, P_.hic, ['Bass Multi', 'g', 0.5, 2, 51, '', 2], ['Xover', 'g', 10, 500, 51, 'Hz', 0], ['Mod Depth', 'l', 1, 50, 50, '', 0], ['Mod Speed', 'l', 0, 100, 21, '', 0]],
+  VREV: [['Pre Delay', 'l', 0, 120, 61, 'ms', 0], ['Decay', 'l', 0.4, 4.5, 42, 's', 1], P_.pct('Modulate'), P_.onoff('Vintage'), ['Position', 'e', ['FRONT', 'REAR']], P_.lvl, P_.loc, ['Hi Cut', 'g', 10000, 20000, 51, 'Hz', 0], ['Lo Multiply', 'g', 0.5, 2, 51, '', 2], ['Hi Multiply', 'g', 0.25, 1, 51, '', 2]],
+  VRM: [['Reverb Delay', 'l', 0, 200, 101, 'ms', 0], decay(0.1, 20), P_.size, ['Density', 'l', 1, 30, 30, '', 0], P_.pct('ER Level'), P_.lvl, ['Lo Multiply', 'g', 0.1, 10, 51, '', 2], ['Hi Multiply', 'g', 0.1, 10, 51, '', 2], P_.loc, P_.hic, ['ER Left', 'l', 0, 200, 101, 'ms', 0], ['ER Right', 'l', 0, 200, 101, 'ms', 0], P_.onoff('Freeze')],
+  GATE: [P_.pre, ['Decay', 'l', 140, 1000, 51, 'ms', 0], ['Attack', 'l', 0, 30, 31, '', 0], ['Density', 'l', 1, 50, 50, '', 0], ['Spread', 'l', 0, 100, 51, '', 0], P_.lvl, P_.loc, ['Hi Shv Freq', 'g', 200, 20000, 51, 'Hz', 0], ['Hi Shv Gain', 'l', -30, 0, 61, 'dB', 1], P_.dif],
+  RVRS: [P_.pre, ['Decay', 'g', 140, 1000, 51, 'ms', 0], ['Rise', 'l', 0, 50, 51, '', 0], P_.dif, ['Spread', 'l', 0, 100, 51, '', 0], P_.lvl, P_.loc, ['Hi Shv Freq', 'g', 200, 20000, 51, 'Hz', 0], ['Hi Shv Gain', 'l', -30, 0, 61, 'dB', 1]],
+  DLY: [P_.mix, P_.time, ['Mode', 'e', ['ST', 'X', 'M']], P_.fac('Factor L'), P_.fac('Factor R'), ['Offset L/R', 'l', -100, 100, 201, 'ms', 0], P_.loc, P_.hic, ['Feed Lo Cut', 'g', 10, 500, 51, 'Hz', 0], P_.pct('Feed Left'), P_.pct('Feed Right'), ['Feed Hi Cut', 'g', 200, 20000, 51, 'Hz', 0]],
+  '3TAP': [P_.time, P_.pct('Gain Base'), P_.tpan('Pan Base'), P_.fb, P_.loc, P_.hic, P_.fac('Factor A'), P_.pct('Gain A'), P_.tpan('Pan A'), P_.fac('Factor B'), P_.pct('Gain B'), P_.tpan('Pan B'), P_.onoff('Cross Feed'), P_.onoff('Mono'), P_.onoff('Dry')],
+  '4TAP': [P_.time, P_.pct('Gain Base'), P_.fb, P_.loc, P_.hic, ['Spread', 'l', 0, 6, 7, '', 0], P_.fac('Factor A'), P_.pct('Gain A'), P_.fac('Factor B'), P_.pct('Gain B'), P_.fac('Factor C'), P_.pct('Gain C'), P_.onoff('Cross Feed'), P_.onoff('Mono'), P_.onoff('Dry')],
+  CRS: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], ['Depth L', 'l', 0, 100, 21, '%', 0], ['Depth R', 'l', 0, 100, 21, '%', 0], ['Delay L', 'g', 0.5, 50, 51, 'ms', 1], ['Delay R', 'g', 0.5, 50, 51, 'ms', 1], P_.mix, P_.loc, P_.hic, ['Phase', 'l', 0, 180, 37, '°', 0], ['Wave', 'l', 0, 100, 21, '%', 0], ['Spread', 'l', 0, 100, 21, '%', 0]],
+  FLNG: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], ['Depth L', 'l', 0, 100, 21, '%', 0], ['Depth R', 'l', 0, 100, 21, '%', 0], ['Delay L', 'g', 0.5, 20, 51, 'ms', 1], ['Delay R', 'g', 0.5, 20, 51, 'ms', 1], P_.mix, P_.loc, P_.hic, ['Phase', 'l', 0, 180, 37, '°', 0], ['Feed Lo Cut', 'g', 10, 500, 51, 'Hz', 0], ['Feed Hi Cut', 'g', 200, 20000, 51, 'Hz', 0], ['Feed', 'l', -90, 90, 37, '%', 0]],
+  PHAS: [['Speed', 'g', 0.05, 5, 101, 'Hz', 2], P_.pct('Depth'), ['Resonance', 'l', 0, 80, 41, '%', 0], ['Base', 'l', 0, 50, 26, '', 0], ['Stages', 'l', 2, 12, 11, '', 0], P_.mix, ['Wave', 'l', -50, 50, 21, '', 0], ['Phase', 'l', 0, 180, 37, '°', 0], ['Env Mod', 'l', -100, 100, 41, '%', 0], ['Attack', 'g', 10, 1000, 51, 'ms', 0], ['Hold', 'g', 1, 2000, 51, 'ms', 0], ['Release', 'g', 10, 1000, 51, 'ms', 0]],
+  P1A: p1a(''), P1A2: [...p1a(' A'), ...p1a(' B')], PQ5: pq5(''), PQ5S: [...pq5(' A'), ...pq5(' B')],
+  LIM: [['Input Gain', 'l', 0, 18, 37, 'dB', 1], ['Out Gain', 'l', -18, 0, 37, 'dB', 1], P_.pct('Squeeze'), ['Knee', 'l', 0, 10, 11, 'dB', 0], ['Attack', 'g', 0.05, 1, 51, 'ms', 2], ['Release', 'g', 20, 2000, 51, 'ms', 0], P_.onoff('Stereo Link'), P_.onoff('Auto Gain')],
+  LEC: lec(''), LEC2: [...lec(' A'), ...lec(' B')]
+};
+/* a parameter as a law the controls understand */
+function fxLaw(p) {
+  if (p[1] === 'e' || p[1] === 't') return null;
+  const [, k, lo, hi, n, unit, dp] = p, of = x => k === 'g' ? lo * Math.pow(hi / lo, x) : lo + (hi - lo) * x;
+  return { n, of, fmt: x => { const v = of(x); return unit === 'Hz' ? hzT(v) : v.toFixed(dp) + (unit ? ' ' + unit : ''); } };
+}
+
+/* routing: sources of an output (/routing/aux|usb/NN/src) and where it is taken from (…/pos) */
+const ROUT_POS = ['AIN', 'AIN+M', 'IN', 'IN+M', 'PRE EQ', 'PRE EQ+M', 'POST EQ', 'POST EQ+M', 'PRE', 'PRE+M', 'POST'];
+const AUX_OUTS = { XR18: 6, XR16: 4, XR12: 2 };
+const LINK_ASK = 'לקשר את שני הערוצים לסטריאו? המיקסר מעתיק את ההגדרות מהערוץ האי־זוגי לזוגי.';
+const FX_ASK = n => `להחליף את האפקט בסלוט ${n}? ההגדרות של האפקט הנוכחי יוחלפו בברירת המחדל של החדש.`;
 const PH_ASK = 'להפעיל מתח פנטום 48V בכניסה הזו? אל תפעיל על מיקרופון סרט או על ציוד שלא מיועד לזה.';
 const TAPE = ['STOP', 'PAUSE', 'PLAY', 'REC PAUSE', 'REC', 'FF', 'REW'];
 const TAPE_PATHS = ['/-stat/usbmounted', '/-stat/tape/state', '/-stat/tape/file', '/-stat/tape/etime', '/-stat/tape/rtime', '/-stat/usb/path', '/-stat/usb/count'];
@@ -277,7 +342,7 @@ class App extends Component {
   constructor() {
     super();
     const last = load('xair.last', null);
-    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, panPop: null, sendsWin: null, connPop: false, liveAsk: false, rev: 0,
+    this.state = { cw: innerWidth, ch: innerHeight, started: !!NATIVE, isFs: false, toast: '', screen: 'main', bank: 0, sofOn: false, sof: 0, sheet: null, band: 1, nameEdit: null, ask: null, sendPop: null, keyPick: null, panPop: null, sendsWin: null, mgPop: false, rtab: 'in', fxSlot: 1, connPop: false, liveAsk: false, rev: 0,
       conn: { status: NATIVE ? 'search' : 'demo', ip: '', name: '', model: '', fw: '', live: false, found: [], update: false, apk: null, dl: -1, wifi: true },
       prefs: { demoModel: 'XR16', navSwap: false, enter: 'home', eqR: 18, rta: true, sendMeters: true, ...load('xair.prefs', {}) }, last, ipText: last ? last.ip : '', dump: null };
     this.desk = {}; this.dtype = {}; this.demo = {}; this.hold = {}; this.pend = new Map(); this.queue = []; this.outq = new Map(); this.missing = new Set();
@@ -285,7 +350,7 @@ class App extends Component {
     this.sim = new Float32Array(40).fill(-60);
     this.taps = {}; this.logs = []; this.sent = 0; this.lastRx = 0; this.searchT0 = Date.now(); this.wantIp = '';
     this.demoInit(this.state.prefs.demoModel);
-    window.__app = this; window.__xm = { cleanName, nameSuffix, TABS, LAW, bandDb, chanPaths, q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
+    window.__app = this; window.__xm = { FX_KEYS, FX_NAMES, FXP, fxLaw, cleanName, nameSuffix, TABS, LAW, bandDb, chanPaths, q, dbOf, posOf, dbText, panText, STEPS, oscMsg, oscParse, b64, unb64, layoutOf, dumpPaths, MODELS, modelKey };
   }
 
   /* ---------- stores ---------- */
@@ -321,6 +386,14 @@ class App extends Component {
       else if (/\/dyn\//.test(p)) D[p] = { on: 0, mode: 0, det: 0, env: 1, thr: q(0.7, 121), ratio: 5, knee: 0.2, mgain: 0, attack: q(0.08333, 121), hold: 0.54, release: 0.51, mix: 1, auto: 0, keysrc: 0, type: 6, f: 0.565 }[k];
       else D[p] = { on: 1, mode: 0, hpf: 0.3, hpon: 0, invert: 0, insrc: st.n - 1, lr: 1 }[k]; } });
     for (let n = 1; n <= 16; n++) { D[`/headamp/${pad2(n)}/gain`] = q(0.5, 145); D[`/headamp/${pad2(n)}/phantom`] = 0; }
+    L.all.forEach(x => { if (x.kind === 'lr' || x.kind === 'dca') return; const n = x.n;
+      D[x.base + '/grp/dca'] = x.kind === 'ch' ? (n <= 7 ? 1 : n <= 12 ? 2 : n <= 15 ? 4 : 0) : x.kind === 'rtn' ? 8 : 0; D[x.base + '/grp/mute'] = x.kind === 'ch' && n <= 8 ? 1 : x.kind === 'rtn' ? 2 : 0; });
+    for (let k = 1; k <= 4; k++) D['/config/mute/' + k] = 0;
+    for (let k = 1; k < 16; k += 2) D[`/config/chlink/${k}-${k + 1}`] = k === 11 ? 1 : 0; for (let k = 1; k < 6; k += 2) D[`/config/buslink/${k}-${k + 1}`] = 0;
+    for (let k = 1; k <= 6; k++) { D[`/routing/aux/${pad2(k)}/src`] = 25 + k; D[`/routing/aux/${pad2(k)}/pos`] = 10; }
+    for (let k = 1; k <= 18; k++) { D[`/routing/usb/${pad2(k)}/src`] = k <= 2 ? 35 + k : k - 1; D[`/routing/usb/${pad2(k)}/pos`] = k <= 2 ? 4 : 0; }
+    L.ch.forEach(c => { D[c.base + '/preamp/rtnsw'] = 0; D[c.base + '/config/rtnsrc'] = c.n - 1; });
+    [0, 5, 10, 13].forEach((t, i) => { D[`/fx/${i + 1}/type`] = t; D[`/fx/${i + 1}/insert`] = 0; (FXP[FX_KEYS[t]] || []).forEach((p, k) => { D[`/fx/${i + 1}/par/${pad2(k + 1)}`] = p[1] === 'e' || p[1] === 't' ? 0 : 0.5; }); });
     Object.assign(D, { '/-stat/usbmounted': 1, '/-stat/tape/state': 0, '/-stat/tape/file': 'REC_0007.WAV', '/-stat/tape/etime': 0, '/-stat/tape/rtime': 5400, '/-stat/usb/path': '/', '/-stat/usb/count': 3,
       '/-stat/usb/001/name': 'PLAYBACK', '/-stat/usb/001/type': 1, '/-stat/usb/002/name': 'REC_0006.WAV', '/-stat/usb/002/type': 0, '/-stat/usb/003/name': 'REC_0007.WAV', '/-stat/usb/003/type': 0 });
     [...L.ch, L.aux, ...L.rtn].forEach((s, i) => L.dests.forEach((d, j) => { D[sendPath(s, d)] = q(d.k > 6 ? (i >= 12 && i < 15 ? 0.5 : 0) : ((i * 7 + j * 13) % 10) / 14, 161); const b = s.base + '/mix/' + pad2(d.k); D[b + '/tap'] = d.k > 6 ? 4 : d.k > 4 ? 5 : 3; D[b + '/grpon'] = d.k === 5 && i < 8 ? 1 : 0; if (d.k < 6 && d.k % 2) D[b + '/pan'] = 0.5; }));
@@ -328,6 +401,8 @@ class App extends Component {
 
   /* ---------- the only write path ---------- */
   set(path, type, value) {
+    const fm = /^\/fx\/(\d)\/type$/.exec(path);
+    if (fm) { if (!this.linked()) { const ps = FXP[FX_KEYS[value]] || []; ps.forEach((p, k) => { this.demo[`/fx/${fm[1]}/par/${pad2(k + 1)}`] = p[1] === 'e' || p[1] === 't' ? 0 : 0.5; }); } else this.fxReread(+fm[1]); }
     if (!this.linked()) { this.demo[path] = value; this.bump(); return true; }
     const c = this.state.conn;
     if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
@@ -370,6 +445,7 @@ class App extends Component {
   }
   readCore(force) {
     const L = this.L(), P = ['/-stat/solo'];
+    for (let k = 1; k <= 4; k++) P.push('/config/mute/' + k);
     for (let k = 1; k < 16; k += 2) P.push(`/config/chlink/${k}-${k + 1}`); for (let k = 1; k < 6; k += 2) P.push(`/config/buslink/${k}-${k + 1}`);
     L.all.forEach(s => P.push(...corePaths(s)));
     if (L.M.rec) P.push('/-stat/usbmounted', '/-stat/tape/state');
@@ -385,6 +461,15 @@ class App extends Component {
       L.dests.forEach(d => { P.push(d.strip.name); if (sh.sends) { const b = sh.base + '/mix/' + pad2(d.k); P.push(b + '/level', b + '/tap', b + '/grpon'); if (d.k < 6 && d.k % 2) P.push(b + '/pan'); } }); }
     const sw = st.sendsWin && L.byId[st.sendsWin.id]; if (sw) L.dests.forEach(d => { const b = sw.base + '/mix/' + pad2(d.k); P.push(b + '/level', b + '/tap', b + '/grpon', d.strip.name, d.strip.color); if (d.k < 6 && d.k % 2) P.push(b + '/pan'); });
     if (this.rtaWant() >= 0) P.push('/-stat/rta/source', '/-stat/rta/pos');
+    const grpd = x => x.kind !== 'lr' && x.kind !== 'dca';
+    if (sh && grpd(sh)) L.dca.forEach(d => P.push(d.name, d.color));
+    if (st.mgPop) { L.all.filter(grpd).forEach(x => P.push(x.name, x.base + '/grp/dca', x.base + '/grp/mute')); L.dca.forEach(d => P.push(d.name, d.color, d.fader, d.on)); for (let k = 1; k <= 4; k++) P.push('/config/mute/' + k); }
+    if (st.screen === 'routing') { L.ch.forEach(c => P.push(c.name, c.color, c.base + '/config/insrc')); L.bus.forEach(b => P.push(b.name)); L.fxs.forEach(f => P.push(f.name));
+      if (L.M.key === 'XR18') L.ch.forEach(c => P.push(c.base + '/preamp/rtnsw', c.base + '/config/rtnsrc'));
+      for (let k = 1; k <= AUX_OUTS[L.M.key]; k++) P.push(`/routing/aux/${pad2(k)}/src`, `/routing/aux/${pad2(k)}/pos`);
+      for (let k = 1; k <= (L.M.key === 'XR18' ? 18 : 2); k++) P.push(`/routing/usb/${pad2(k)}/src`, `/routing/usb/${pad2(k)}/pos`); }
+    if (st.screen === 'fx') { for (let n = 1; n <= 4; n++) { P.push(`/fx/${n}/type`, `/fx/${n}/insert`); const a = L.fxs[n - 1], r = L.rtn[n - 1]; P.push(a.name, a.color, a.fader, a.on, r.name, r.fader, r.on); }
+      const t = this.val(`/fx/${st.fxSlot}/type`), ps = fin(t) && FXP[FX_KEYS[t]]; if (ps) ps.forEach((_, k) => P.push(`/fx/${st.fxSlot}/par/${pad2(k + 1)}`)); }
     if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
   }
@@ -631,8 +716,8 @@ class App extends Component {
   }
   componentDidUpdate(pp, ps) {
     const st = this.state;
-    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
-    if (CH_SCREENS.includes(st.screen) || st.screen === 'tape') this.readView();
+    if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin || st.mgPop !== ps.mgPop || st.fxSlot !== ps.fxSlot || st.rtab !== ps.rtab) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
+    if (CH_SCREENS.includes(st.screen) || st.screen === 'tape' || st.screen === 'fx' || st.screen === 'routing' || st.mgPop) this.readView();
     if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
@@ -741,6 +826,175 @@ class App extends Component {
       </div>
       ${st.sendPop && this.sendTapPop(Hd, s)}`;
   }
+  /* bit k of a group mask (DCA, mute group) flips with one tap */
+  bit(path, k) { const v = this.val(path); if (!Number.isInteger(v)) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', v ^ (1 << k)); }
+  assignBlock(s, Hd) {
+    const L = this.L(), dca = this.val(s.base + '/grp/dca'), mg = this.val(s.base + '/grp/mute'), H = Hd < 600 ? 44 : 50;
+    const row = (label, path, v, names, col) => html`<div style="display:flex;align-items:center;gap:6px">
+      <span style="width:84px;flex:none;font-size:13px;font-weight:700;letter-spacing:.12em;color:#b8a78a">${label}</span>
+      ${[0, 1, 2, 3].map(k => { const on = Number.isInteger(v) && (v >> k) & 1; return html`<button data-bit=${path + ':' + k} aria-pressed=${String(!!on)} onClick=${() => this.bit(path, k)}
+        style=${`flex:1;min-width:0;height:${H}px;border-radius:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px;overflow:hidden;
+          ${on ? `background:${col}2e;border:1.5px solid ${col};color:#f1e7d2;box-shadow:0 0 10px ${col}55` : 'background:#141210;border:1px solid #2c2721;color:#8a8170'}${Number.isInteger(v) ? '' : ';opacity:.45'}`}>
+        <span style="font-size:15px;font-weight:800">${k + 1}</span><span style="font-size:11px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${names[k]}</span></button>`; })}</div>`;
+    return html`<div data-assign="1" style="display:flex;flex-direction:column;gap:8px;margin-top:auto;padding:10px;border-radius:10px;background:#100f0d;border:1px solid #2c2721">
+      ${row('DCA', s.base + '/grp/dca', dca, L.dca.map(d => this.nm(d) || d.def), '#4fc9b7')}
+      ${row('MUTE GRP', s.base + '/grp/mute', mg, [0, 1, 2, 3].map(k => this.val('/config/mute/' + (k + 1)) === 1 ? 'MUTED' : ''), '#e0513f')}
+    </div>`;
+  }
+  /* mute groups and DCAs, from the top bar */
+  renderMg(Hd) {
+    const L = this.L(), close = () => this.setState({ mgPop: false }), mem = (b, k) => L.all.filter(x => x.kind !== 'lr' && x.kind !== 'dca' && Number.isInteger(this.val(x.base + b)) && (this.val(x.base + b) >> k) & 1);
+    const list = xs => xs.length ? xs.map(x => this.nm(x) || x.def).join(' · ') : '—';
+    const PH = Math.min(Hd - 40, 470), TH = Math.round((PH - 120) / 2), LF = { n: STEPS.fader, of: dbOf, fmt: x => dbText(x) + ' dB' };
+    return html`<button class="scrim" style="z-index:4" aria-label="Close" onClick=${close}></button>
+      <div class="pop" data-mgpop="1" style=${`z-index:5;left:40px;top:${Math.round((Hd - PH) / 2)}px;width:1100px;height:${PH}px;padding:14px 16px;gap:10px`}>
+        <div style="display:flex;align-items:center;gap:12px"><span style="font-size:22px;font-weight:800;letter-spacing:.1em;color:var(--brass-hi);flex:1">MUTE GROUPS · DCA</span><button class="small" onClick=${close}>DONE</button></div>
+        <div style=${`height:${TH}px;display:flex;gap:10px`}>${[1, 2, 3, 4].map(k => { const on = this.val('/config/mute/' + k), xs = mem('/grp/mute', k - 1);
+          return html`<button data-mg=${k} aria-pressed=${String(on === 1)} onClick=${() => this.tog('/config/mute/' + k)}
+            style=${`flex:1;min-width:0;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:12px;text-align:left;overflow:hidden;
+              ${on === 1 ? 'background:radial-gradient(ellipse at 50% 0%,#5a1a14,#2a0f0c);border:2px solid #ff5a45;box-shadow:0 0 22px rgba(224,81,63,.55),inset 0 0 18px rgba(224,81,63,.3);color:#fff0ea' : 'background:linear-gradient(180deg,#221f1b,#161412);border:1px solid #4a4036;color:#e9dcc2'}${on === undefined ? ';opacity:.45' : ''}`}>
+            <span style="display:flex;align-items:center;gap:8px"><span style="font-size:13px;font-weight:700;letter-spacing:.16em;opacity:.8">MUTE GROUP</span><span style="flex:1"></span>
+              <span style=${`padding:3px 10px;border-radius:6px;font-weight:900;font-size:14px;${on === 1 ? 'background:#ff5a45;color:#1a0503' : 'background:#141210;color:#8a8170;border:1px solid #2c2721'}`}>${on === 1 ? 'MUTED' : 'OFF'}</span></span>
+            <span style="font-size:40px;font-weight:900;line-height:1">${k}</span>
+            <span style="font-size:13px;line-height:1.35;opacity:.85;overflow:hidden">${list(xs)}</span></button>`; })}</div>
+        <div style=${`height:${TH}px;display:flex;gap:10px`}>${L.dca.map((d, k) => { const on = this.val(d.on), xs = mem('/grp/dca', k), cc = this.val(d.color);
+          return html`<div style="flex:1;min-width:0;border-radius:12px;display:flex;flex-direction:column;gap:6px;padding:10px;background:linear-gradient(180deg,#1d2422,#141816);border:1px solid #2f4a46;overflow:hidden">
+            <div style="display:flex;align-items:center;gap:8px"><span class="tag" style=${nameLook(fin(cc) && cc ? cc : 6) + ';height:30px;font-size:15px;max-width:150px;overflow:hidden'}>${this.nm(d) || d.def}</span><span style="flex:1"></span>
+              <button data-t=${d.on} aria-pressed=${String(on === 0)} onClick=${() => this.tog(d.on)} style=${`height:34px;padding:0 12px;border-radius:7px;font-weight:800;font-size:13px;cursor:pointer;${on === 0 ? 'background:#d0392b;color:#fff6ee;border:1px solid #d0392b' : 'background:#2a1513;color:#d48a80;border:1px solid #4a2420'}`}>MUTE</button></div>
+            ${this.pbox('Level', d.fader, LF, '#4fc9b7')}
+            <span style="font-size:13px;line-height:1.35;color:#9fb8b2;overflow:hidden">${list(xs)}</span></div>`; })}</div>
+        <span dir="rtl" style=${`${HEB};font-size:13px;color:#8c8272`}>שיוך ערוץ לקבוצה: במסך CONFIG של הערוץ.</span>
+      </div>`;
+  }
+  /* screen header for the full-page tools (routing, effects) */
+  toolHeader(title, extra) {
+    return html`<header class=${this.topCls()} style="height:52px;gap:10px">
+      <div class="wood" style="width:18px;align-self:stretch"></div>
+      <button class="navbtn hot backbtn" onClick=${() => this.setState({ screen: 'main', keyPick: null, ask: null })} aria-label="Back to the mixer">${IC.back}<span>Mixer</span></button>
+      <span style="font-size:22px;font-weight:700;letter-spacing:.06em">${title}</span>${extra || ''}<span style="flex:1"></span>
+      ${this.connPill()}
+      <div class="wood" style="width:18px;align-self:stretch"></div></header>`;
+  }
+  routSrcLabels() {
+    const L = this.L(), nm = (x, d) => { const n = x ? this.nm(x) : ''; return n ? d + ' ' + n : d; }, out = [];
+    for (let k = 1; k <= 16; k++) out.push(nm(L.ch[k - 1], 'CH' + pad2(k)));
+    out.push('AUX L', 'AUX R'); for (let k = 1; k <= 4; k++) out.push('FX' + k + ' L', 'FX' + k + ' R');
+    for (let k = 1; k <= 6; k++) out.push(nm(L.bus[k - 1], 'BUS' + k)); for (let k = 1; k <= 4; k++) out.push(nm(L.fxs[k - 1], 'SEND' + k));
+    out.push('MAIN L', 'MAIN R'); return out;
+  }
+  renderRouting(Hd) {
+    const st = this.state, L = this.L(), tab = st.rtab, xr18 = L.M.key === 'XR18', sm = 'font-size:12px;font-weight:700;letter-spacing:.14em;color:#b8a78a';
+    const tabs = html`<nav style="display:flex;gap:4px;margin-left:16px">${[['in', 'INPUTS'], ['out', 'OUTPUTS']].map(([k, t]) => html`<button class=${'tab' + (tab === k ? ' on' : '')} data-rtab=${k} onClick=${() => this.setState({ rtab: k })}>${t}</button>`)}</nav>`;
+    let body;
+    if (tab === 'in') {
+      const ins = Array.from({ length: 16 }, (_, k) => 'IN ' + pad2(k + 1)), usb = Array.from({ length: 18 }, (_, k) => 'USB ' + pad2(k + 1));
+      body = html`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 26px">
+        <div style="display:grid;grid-template-columns:repeat(8,1fr);grid-auto-rows:min-content;gap:8px;align-content:start">
+          ${L.ch.map(c => { const v = this.val(c.base + '/config/insrc'), sw = xr18 ? this.val(c.base + '/preamp/rtnsw') : 0, us = xr18 ? this.val(c.base + '/config/rtnsrc') : undefined, col = this.val(c.color);
+            return html`<div class="sec" style="padding:8px;gap:6px;min-height:0">
+              <span class="tag" style=${nameLook(col) + ';height:28px;font-size:14px;justify-content:center;overflow:hidden;white-space:nowrap'}>${this.nm(c) || c.def}</span>
+              <span style="font-family:var(--mono);font-size:11px;color:#8c8272;text-align:center">${c.def}</span>
+              <button class="box" data-insrc=${c.n} style="cursor:pointer;justify-content:center;gap:6px" onClick=${() => this.setState({ keyPick: { path: c.base + '/config/insrc', title: (this.nm(c) || c.def) + ' · INPUT', labels: ins, cols: 8 } })}>
+                <em style="font-size:17px;color:var(--brass-hi)">${fin(v) && ins[v] ? ins[v] : '···'}</em><span style="color:#b8a78a">▾</span></button>
+              ${xr18 && html`<div style="display:flex;gap:4px">
+                <button class="pill" data-t=${c.base + '/preamp/rtnsw'} aria-pressed=${String(sw === 1)} onClick=${() => this.tog(c.base + '/preamp/rtnsw')} style=${`flex:1;height:36px;padding:0;font-size:12px;${sw === 1 ? 'background:#16252a;color:#8fd0e0;border-color:#8fd0e0' : ''}`}>${sw === 1 ? 'USB' : 'ANALOG'}</button>
+                <button class="pill" style="flex:1;height:36px;padding:0;font-size:12px" onClick=${() => this.setState({ keyPick: { path: c.base + '/config/rtnsrc', title: (this.nm(c) || c.def) + ' · USB RETURN', labels: usb, cols: 6 } })}>${fin(us) ? 'U' + pad2(us + 1) : '···'}</button></div>`}
+            </div>`; })}
+        </div>
+        <div class="sec" style="flex:none;padding:10px 12px;gap:8px">
+          <span style=${sm}>STEREO LINK</span>
+          <div style="display:flex;gap:6px">${[1, 3, 5, 7, 9, 11, 13, 15].map(k => { const p = `/config/chlink/${k}-${k + 1}`, v = this.val(p);
+            return html`<button class="pill" data-link=${k} aria-pressed=${String(v === 1)} onClick=${() => v === 1 ? this.pick(p, 0) : v === 0 ? this.setState({ ask: { text: LINK_ASK, path: p, value: 1 } }) : this.toastRO('המיקסר עוד לא דיווח על הערך הזה')}
+              style=${`flex:1;height:46px;padding:0;font-family:var(--mono);font-size:14px;${v === 1 ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : ''}`}>CH ${k}-${k + 1}</button>`; })}
+            <span style="width:14px"></span>
+            ${[1, 3, 5].slice(0, Math.ceil(L.bus.length / 2)).map(k => { const p = `/config/buslink/${k}-${k + 1}`, v = this.val(p);
+              return html`<button class="pill" data-blink=${k} aria-pressed=${String(v === 1)} onClick=${() => v === 1 ? this.pick(p, 0) : v === 0 ? this.setState({ ask: { text: LINK_ASK, path: p, value: 1 } }) : this.toastRO('המיקסר עוד לא דיווח על הערך הזה')}
+                style=${`flex:1;height:46px;padding:0;font-family:var(--mono);font-size:14px;${v === 1 ? 'background:#2a2014;color:var(--brass-hi);border-color:var(--brass)' : ''}`}>BUS ${k}-${k + 1}</button>`; })}
+          </div></div>
+      </div>`;
+    } else {
+      const src = this.routSrcLabels(), srcAux = xr18 ? [...src, ...Array.from({ length: 18 }, (_, k) => 'USB ' + pad2(k + 1))] : src;
+      const card = (title, sub, b, labels, w) => { const v = this.val(b + '/src'), pz = this.val(b + '/pos');
+        return html`<div class="sec" style=${`padding:10px;gap:8px;${w}`}>
+          <span style="font-size:20px;font-weight:800;letter-spacing:.06em;color:#f1e7d2">${title}</span><span style="font-size:12px;color:#8c8272;margin-top:-6px">${sub}</span>
+          <button class="box big" data-rsrc=${b} style="cursor:pointer" onClick=${() => this.setState({ keyPick: { path: b + '/src', title: title + ' · SOURCE', labels, cols: 6, h: 40, w: 1000, ph: 420 } })}>
+            <b>Source</b><em style="display:flex;align-items:center;gap:6px;max-width:150px;overflow:hidden">${fin(v) && labels[v] ? labels[v] : '···'}<span style="color:#b8a78a">▾</span></em></button>
+          <button class="box" data-rpos=${b} style="cursor:pointer" onClick=${() => this.setState({ keyPick: { path: b + '/pos', title: title + ' · TAP', labels: ROUT_POS, cols: 4 } })}>
+            <b>Tap</b><em style="display:flex;align-items:center;gap:6px">${fin(pz) && ROUT_POS[pz] ? ROUT_POS[pz] : '···'}<span style="color:#b8a78a">▾</span></em></button>
+        </div>`; };
+      const na = AUX_OUTS[L.M.key], nu = xr18 ? 18 : 2;
+      body = html`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:10px;padding:12px 26px;overflow:auto">
+        <span style=${sm}>AUX OUTPUTS</span>
+        <div style="display:flex;gap:8px">${Array.from({ length: na }, (_, k) => card('AUX ' + (k + 1), 'Physical output', `/routing/aux/${pad2(k + 1)}`, srcAux, 'flex:1;min-width:0'))}</div>
+        <span style=${sm}>${xr18 ? 'USB OUTPUTS (TO THE COMPUTER)' : 'USB STICK RECORDER'}</span>
+        <div style=${`display:grid;grid-template-columns:repeat(${xr18 ? 6 : 4},1fr);gap:8px`}>${Array.from({ length: nu }, (_, k) => card(xr18 ? 'USB ' + (k + 1) : 'REC ' + (k ? 'R' : 'L'), xr18 ? 'To the computer' : 'Into the recorder', `/routing/usb/${pad2(k + 1)}`, src, ''))}</div>
+        <span dir="rtl" style=${`${HEB};font-size:13px;line-height:1.5;color:#8c8272`}>+M אחרי נקודת הלקיחה: היציאה עוקבת אחרי המיוט של המקור. מספר היציאות לפי הדגם.</span>
+      </div>`;
+    }
+    return html`${this.toolHeader('ROUTING', tabs)}${body}${this.chanPopsLite(Hd)}`;
+  }
+  /* the pickers and questions without a strip behind them */
+  chanPopsLite(Hd) {
+    const st = this.state, kp = st.keyPick;
+    return html`
+      ${kp && this.keyPickPop(Hd)}
+      ${st.ask && html`
+        <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
+        <div class="pop" role="alertdialog" dir="rtl" style=${`z-index:9;left:340px;top:${Math.round((Hd - 220) / 2)}px;width:500px;padding:22px;gap:16px;border-color:#e0513f;${HEB}`}>
+          <span style="font-size:17px;line-height:1.55;color:#f1e7d2">${st.ask.text}</span>
+          <div style="display:flex;gap:10px"><button class="pill" style="flex:1;height:50px" onClick=${() => this.setState({ ask: null })}>ביטול</button>
+            <button class="pill" data-yes="1" style="flex:1;height:50px;background:#e0513f;color:#fff6ee;border-color:#e0513f" onClick=${() => { const a = st.ask; this.setState({ ask: null }); if (this.set(a.path, 'i', a.value) && a.after) a.after(); }}>אישור</button></div>
+        </div>`}
+      ${st.connPop && this.renderConn(Hd)}
+      ${st.liveAsk && this.renderLiveAsk(Hd)}`;
+  }
+  keyPickPop(Hd) {
+    const kp = this.state.keyPick;
+    return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${() => this.setState({ keyPick: null })}></button>
+        <div class="pop" style=${`z-index:7;left:${(DW - (kp.w || 700)) / 2}px;top:${Math.max(8, Math.round((Hd - (kp.ph || 360)) / 2))}px;width:${kp.w || 700}px;padding:16px;gap:10px;max-height:${Hd - 16}px;overflow:auto`}>
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brass-hi);flex:1">${kp.title}</span><button class="small" onClick=${() => this.setState({ keyPick: null })}>CLOSE</button></div>
+          <div style=${`display:grid;grid-template-columns:repeat(${kp.cols || 6},1fr);gap:6px`}>${kp.labels.map((l, k) => html`<button class=${'pill' + (this.val(kp.path) === k ? ' on' : '')} data-kp=${k}
+            style=${`height:${kp.h || 46}px;padding:0 6px;font-size:14px;letter-spacing:.02em;text-transform:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis`}
+            onClick=${() => { if (kp.ask) { this.setState({ keyPick: null, ask: { text: kp.ask, path: kp.path, value: k } }); return; } this.pick(kp.path, k); this.setState({ keyPick: null }); }}>${l}</button>`)}</div>
+        </div>`;
+  }
+  /* the effects: four slots, the chosen one's parameters */
+  renderFx(Hd) {
+    const st = this.state, L = this.L(), n = st.fxSlot, LF = { n: STEPS.fader, of: dbOf, fmt: x => dbText(x) + ' dB' };
+    const slot = k => { const t = this.val(`/fx/${k}/type`), ins = this.val(`/fx/${k}/insert`), ok = Number.isInteger(t) && t >= 0 && t < FX_NAMES.length, fam = ok ? FX_FAM(t) : 'REVERB', c = FX_COL[fam], on = k === n;
+      return html`<button data-fxslot=${k} aria-pressed=${String(on)} onClick=${() => this.setState({ fxSlot: k })}
+        style=${`flex:1;min-height:0;border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:4px;padding:0 14px;text-align:left;position:relative;overflow:hidden;
+          ${on ? `background:${c}22;border:1.5px solid ${c};box-shadow:0 0 16px ${c}55` : 'background:linear-gradient(180deg,#221f1b,#161412);border:1px solid #3a342c'}`}>
+        <i style=${`position:absolute;left:0;top:0;bottom:0;width:5px;background:${c}`}></i>
+        <span style=${`font-size:12px;font-weight:800;letter-spacing:.16em;color:${c}`}>FX ${k} · ${ins === 1 ? 'INSERT' : 'SEND'}</span>
+        <span style="font-size:19px;font-weight:800;color:#f1e7d2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${ok ? FX_NAMES[t] : '···'}</span>
+        <span style="font-size:12px;color:#9b927f">${fam}</span></button>`; };
+    const t = this.val(`/fx/${n}/type`), ok = Number.isInteger(t) && t >= 0 && t < FX_NAMES.length, key = ok ? FX_KEYS[t] : '', ps = ok ? FXP[key] : null, c = FX_COL[ok ? FX_FAM(t) : 'REVERB'], ins = this.val(`/fx/${n}/insert`);
+    const a = L.fxs[n - 1], r = L.rtn[n - 1];
+    const param = (p, k) => { const path = `/fx/${n}/par/${pad2(k + 1)}`;
+      if (p[1] === 't') { const v = this.val(path); return html`<button class="pill" data-t=${path} aria-pressed=${String(v === 1)} onClick=${() => this.tog(path)} style=${`height:44px;font-size:14px;${v === 1 ? `background:${c}33;color:#f1e7d2;border-color:${c}` : ''}${v === undefined ? ';opacity:.45' : ''}`}>${p[0]} ${v === 1 ? 'ON' : 'OFF'}</button>`; }
+      if (p[1] === 'e') return this.ibox(p[0], path, p[2], c);
+      return this.pbox(p[0], path, fxLaw(p), c); };
+    return html`${this.toolHeader('EFFECTS')}
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:12px 26px">
+        <div style="width:240px;flex:none;display:flex;flex-direction:column;gap:8px">${[1, 2, 3, 4].map(slot)}</div>
+        <section class="sec" style=${`flex:1;min-width:0;gap:10px;padding:12px 14px;border-color:${c}66`}>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style=${`font-size:13px;font-weight:800;letter-spacing:.16em;color:${c}`}>FX ${n}</span>
+            <span data-fxname="1" style="font-size:26px;font-weight:800;color:#f1e7d2">${ok ? FX_NAMES[t] : '···'}</span>
+            <span style=${`padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800;letter-spacing:.1em;border:1px solid ${c};color:${c}`}>${ins === 1 ? 'INSERT' : 'SEND'}</span>
+            <span style="flex:1"></span>
+            <button class="pill" data-fxtype="1" style="height:44px;padding:0 16px" onClick=${() => this.setState({ keyPick: { path: `/fx/${n}/type`, title: 'FX ' + n + ' · EFFECT', labels: FX_NAMES, cols: 5, h: 38, w: 1060, ph: 560, ask: FX_ASK(n) } })}>CHANGE EFFECT</button>
+          </div>
+          ${ins !== 1 && html`<div style="display:flex;gap:8px">
+            ${this.pbox('Send master ' + (this.nm(a) || ''), a.fader, LF, '#4fc9b7', 'flex:1;min-width:0')}
+            ${this.pbox('Return ' + (this.nm(r) || ''), r.fader, LF, '#a993d9', 'flex:1;min-width:0')}</div>`}
+          ${ps ? html`<div data-fxparams=${ps.length} style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:min-content;gap:6px 10px;align-content:start">${ps.map(param)}</div>`
+            : html`<div dir="rtl" style=${`${HEB};flex:1;font-size:16px;line-height:1.6;color:#9b927f;padding:20px`}>${ok ? 'עריכת הפרמטרים של האפקט הזה תגיע בשלב עיצוב האפקטים. בינתיים אפשר לראות ולהחליף את סוג האפקט, ולשלוט ברמות.' : 'ממתין לדיווח מהמיקסר…'}</div>`}
+        </section>
+      </div>
+      ${this.chanPopsLite(Hd)}`;
+  }
   /* the fine pan window: a long press on any pan */
   renderPanPop(Hd) {
     const pp = this.state.panPop, s = this.L().byId[pp.id]; if (!s) return null;
@@ -801,7 +1055,7 @@ class App extends Component {
       ${this.linked() && html`<button onClick=${() => this.askLive(!c.live)} aria-pressed=${String(c.live)}
         style=${B + (c.live ? 'background:#62b85c;color:#08140a;border:1px solid #62b85c;box-shadow:0 0 12px rgba(98,184,92,.5)' : 'background:#2a1d10;color:#ffc98f;border:1px solid #8a5a2a')}>LIVE ${c.live ? 'ON' : 'OFF'}</button>`}
       <button onClick=${() => this.setState({ connPop: true })} aria-label="Mixer connection"
-        style=${`height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid ${L.border};background:#1d1611;color:${L.fg};font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;max-width:330px;white-space:nowrap;overflow:hidden;min-width:0`}>
+        style=${`height:40px;display:flex;align-items:center;gap:8px;padding:0 14px;border-radius:999px;border:1px solid ${L.border};background:#1d1611;color:${L.fg};font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;max-width:240px;white-space:nowrap;overflow:hidden;min-width:0`}>
         <span style=${`width:10px;height:10px;flex:none;border-radius:50%;background:${L.dot};box-shadow:0 0 8px ${L.dot}`}></span><span style="overflow:hidden;text-overflow:ellipsis">${L.text}</span></button>`;
   }
   apkUpdate() {
@@ -861,6 +1115,10 @@ class App extends Component {
             ${anyS && html`<button class="navbtn hot" style="width:84px;background:#3a2f10;border-color:#e8b93a;color:#ffe08a" onClick=${() => this.clearSolo()} aria-label="Clear all solos"><span style="font-size:15px;letter-spacing:.06em">CLEAR</span><span>Solo</span></button>`}
             ${L.M.rec && html`<button class="navbtn" data-nav="tape" onClick=${() => this.setState({ screen: 'tape' })} aria-label="USB player"><span style="font-size:18px;line-height:22px">▶</span><span>Player</span></button>
             <button class="navbtn" data-nav="rec" style=${this.val('/-stat/tape/state') === 4 ? 'background:#d0392b;border-color:#ff6b5a;color:#fff6ee' : 'color:#ff8a78'} onClick=${() => this.setState({ screen: 'tape' })} aria-label="USB recorder"><span style="font-size:18px;line-height:22px">●</span><span>Rec</span></button>`}
+            <button class="navbtn" data-nav="mute" onClick=${() => this.setState({ mgPop: true })} aria-label="Mute groups and DCA"
+              style=${[1, 2, 3, 4].some(k => this.val('/config/mute/' + k) === 1) ? 'background:#3a1714;border-color:#d0392b;color:#ffb4a8;box-shadow:0 0 12px rgba(208,57,43,.45)' : ''}>${IC.mute}<span>Mute</span></button>
+            <button class="navbtn" data-nav="routing" onClick=${() => this.setState({ screen: 'routing' })} aria-label="Routing">${IC.route}<span>Routing</span></button>
+            <button class="navbtn" data-nav="fx" onClick=${() => this.setState({ screen: 'fx' })} aria-label="Effects">${IC.fx}<span>FX</span></button>
             <button class="navbtn" onClick=${() => this.setState({ screen: 'settings' })}>${IC.gear}<span>הגדרות</span></button>
             ${!NATIVE && html`<button class="navbtn" onClick=${() => this.toggleFullscreen()} aria-label="Toggle full screen">${IC.full}<span>${st.isFs ? 'Exit' : 'Full'}</span></button>`}
           </nav>
@@ -901,6 +1159,7 @@ class App extends Component {
       </div>
       ${st.connPop && this.renderConn(Hd)}
       ${st.sendsWin && this.renderSendsWin(Hd)}
+      ${st.mgPop && this.renderMg(Hd)}
       ${st.panPop && this.renderPanPop(Hd)}
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
@@ -941,6 +1200,8 @@ class App extends Component {
     const v = this.val(path);
     return html`<div style="display:flex;gap:4px;flex-wrap:wrap">${labels.map((l, k) => html`<button class=${'pill' + (v === k ? ' on' : '')} data-e=${path + '=' + k} style="height:40px;padding:0 11px;font-size:13px;letter-spacing:.04em" onClick=${() => this.pick(path, k)}>${l}</button>`)}</div>`;
   }
+  /* after an effect type change the mixer loads new parameters: read them again */
+  fxReread(n) { setTimeout(() => { const t = this.val(`/fx/${n}/type`), ps = fin(t) && FXP[FX_KEYS[t]]; if (ps) this.need(ps.map((_, k) => `/fx/${n}/par/${pad2(k + 1)}`), true); }, 250); }
   pick(path, k) { if (this.val(path) === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; } this.set(path, 'i', k); }
   /* the WING value box: drag sideways. A float on the mixer's own grid. */
   pbox(label, path, law, color, extra) {
@@ -1021,12 +1282,7 @@ class App extends Component {
           <div style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px">${Array.from({ length: 16 }, (_, k) => html`<button data-c=${k} aria-label=${'Colour ' + k} aria-pressed=${String(col === k)} onClick=${() => this.pick(s.color, k)}
             style=${`height:44px;border-radius:7px;cursor:pointer;border:0;${nameLook(k)};outline:${col === k ? '2px solid #f3c27a' : 'none'};outline-offset:2px;font-size:13px;font-weight:700`}>${k === 0 || k === 8 ? 'OFF' : 'Aa'}</button>`)}</div>
         </div>`; })()}
-      ${kp && html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${() => this.setState({ keyPick: null })}></button>
-        <div class="pop" style=${`z-index:7;left:${(DW - 700) / 2}px;top:${Math.max(8, Math.round((Hd - 360) / 2))}px;width:700px;padding:16px;gap:10px`}>
-          <div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px;font-weight:700;letter-spacing:.08em;color:var(--brass-hi);flex:1">${kp.title}</span><button class="small" onClick=${() => this.setState({ keyPick: null })}>CLOSE</button></div>
-          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">${kp.labels.map((l, k) => html`<button class=${'pill' + (this.val(kp.path) === k ? ' on' : '')} data-kp=${k} style="height:46px;padding:0 6px;font-size:14px;letter-spacing:.02em;text-transform:none;overflow:hidden;white-space:nowrap;text-overflow:ellipsis"
-            onClick=${() => { this.pick(kp.path, k); this.setState({ keyPick: null }); }}>${l}</button>`)}</div>
-        </div>`}
+      ${kp && this.keyPickPop(Hd)}
       ${sp && this.sendTapPop(Hd, s)}
       ${st.ask && html`
         <button class="scrim" style="z-index:8" aria-label="Cancel" onClick=${() => this.setState({ ask: null })}></button>
@@ -1491,6 +1747,7 @@ class App extends Component {
             style=${`height:56px;flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;border-radius:8px;cursor:pointer;${lr === 1 ? 'background:#1d2a19;border:1px solid #62b85c;color:#a6e39c' : 'background:var(--panel);border:1px solid var(--line);color:#cbbd9f'}`}>
             <span style=${`width:12px;height:12px;border-radius:50%;background:${lr === 1 ? '#62b85c' : '#2c2721'};box-shadow:${lr === 1 ? '0 0 10px #62b85c' : 'none'}`}></span>
             <span style="font-size:18px;font-weight:700;letter-spacing:.08em">MAIN LR</span><span style="flex:1"></span><span style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;opacity:.8">${lr === 1 ? 'Assigned' : 'Not assigned'}</span></button>`}
+          ${s.kind !== 'lr' && s.kind !== 'dca' && this.assignBlock(s, Hd)}
         </section>
         ${isCh && html`<div style="width:262px;flex:none;display:flex;flex-direction:column;gap:10px">
           <button data-t=${pre + '/invert'} onClick=${() => this.tog(pre + '/invert')} aria-pressed=${String(inv === 1)}
@@ -1775,7 +2032,7 @@ class App extends Component {
     catch (e) {
       this.rErr = (this.rErr || 0) + 1;
       try { this.log('err', 'screen error on ' + this.state.screen + ': ' + String(e && e.message || e)); } catch (_) {}
-      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, ask: null, sendPop: null, sendsWin: null, panPop: null, keyPick: null, nameEdit: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
+      if (this.rErr < 3) setTimeout(() => this.setState({ screen: 'main', sheet: null, ask: null, sendPop: null, sendsWin: null, panPop: null, mgPop: false, keyPick: null, nameEdit: null, connPop: false, liveAsk: false, sofOn: false, toast: 'המסך הזה נתקל בנתון לא צפוי וחזרתי למיקסר' }), 0);
       return html`<div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0;background:#0b0a09"></div>`;
     }
   }
@@ -1784,7 +2041,7 @@ class App extends Component {
     return html`
       <div ref=${el => { if (el) this.stage = el; }} style="position:absolute;inset:0">
         <div class="console" style=${`left:${offX}px;height:${Hd}px;transform:scale(${s})`}>
-          ${st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'eq' ? this.renderEq(Hd) : st.screen === 'gate' ? this.renderGate(Hd) : st.screen === 'comp' ? this.renderComp(Hd) : st.screen === 'sends' ? this.renderSendsTab(Hd) : st.screen === 'tape' ? this.renderTape(Hd) : this.renderMain(Hd)}
+          ${st.screen === 'settings' ? this.renderSettings(Hd) : st.screen === 'home' ? this.renderHome(Hd) : st.screen === 'config' ? this.renderConfig(Hd) : st.screen === 'eq' ? this.renderEq(Hd) : st.screen === 'gate' ? this.renderGate(Hd) : st.screen === 'comp' ? this.renderComp(Hd) : st.screen === 'sends' ? this.renderSendsTab(Hd) : st.screen === 'routing' ? this.renderRouting(Hd) : st.screen === 'fx' ? this.renderFx(Hd) : st.screen === 'tape' ? this.renderTape(Hd) : this.renderMain(Hd)}
         </div>
         ${!st.started && html`
           <div class="overlay" dir="rtl">
