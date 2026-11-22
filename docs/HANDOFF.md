@@ -340,3 +340,22 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   orange dot, a glow and a label (frequency, how much above). A legend on the EQ screen. The marks never take a touch, so the
   EQ handles work as before. Demo: calmer noise and two resonances per channel so the marks can be seen and an EQ cut on
   them makes them go away.
+
+## 17. Air Console 0.7.3 – finding mixers fast, also when the address changes (22 Nov)
+
+- Every mixer that answers `/xinfo` is remembered in `xair.known` (up to 12): name, model, last address, time. The name
+  holds the end of the mixer's MAC address ("XR16W-B2-3E-C9"), so it identifies the mixer when DHCP gives a new address;
+  the last mixer is reconnected by name at its new address and the log says "moved".
+- `probe()` = broadcast on every local network + the router + a direct question to every known mixer at its last address
+  (`NATIVE.send`, a question only – allowed while read only). Once a second while searching, every 4 s while connected,
+  so the list is already fresh when the connection window opens.
+- `sweep()`: asks every address of the local network one by one (up to /22, 32 per 15 ms) for routers that drop
+  broadcasts or isolate Wi-Fi clients. Runs when the window opens and nothing new answered in 0.9 s (`burst`), when the
+  first search finds nothing for 2.5 s, and every 15 s while the window is open.
+- `seen()` keeps the list (`conn.found`) with times; entries not heard for 12 s are dropped. The connection window lists the
+  mixers on the network now (connected one marked, others "switch" – one tap) and the known mixers not answering
+  (greyed, "try" = ask that address).
+- Switching while connected: the old mixer's analyser source is given back first (if LIVE), then the new one starts
+  read only. Disconnect keeps looking but never reconnects on its own.
+- No change to the Android code: everything goes through `discover` and `send`.
+- Fake mixer: `?ip=` moves the mixer, `?ghost=1` adds an XR18 that answers only direct questions. 114 checks.

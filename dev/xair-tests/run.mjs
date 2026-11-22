@@ -262,4 +262,22 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
   ok('settings: entry screen and back side are kept', await p.evaluate(() => __app.state.screen === 'eq' && !document.querySelector('.topbar').classList.contains('backR') && JSON.parse(localStorage.getItem('xair.prefs')).enter === 'eq'));
   await p.close(); }
 
+
+{ const p = await B.newPage({ viewport: { width: 1180, height: 640 } }); p.errs = []; p.on('pageerror', e => p.errs.push(String(e)));
+  await p.addInitScript(() => { const k = { ip: '192.168.1.9', name: 'XR16W-B2-3E-C9', model: 'XR16W' }; localStorage.setItem('xair.last', JSON.stringify(k)); localStorage.setItem('xair.known', JSON.stringify([{ ...k, at: 1 }])); });
+  const t0 = Date.now(); await p.goto(`http://127.0.0.1:${PORT}/index.html?ip=192.168.1.30`);
+  await p.waitForFunction(() => window.__app && __app.state.conn.status === 'connected', null, { timeout: 5000 }).catch(() => {});
+  const ms = Date.now() - t0, k = await p.evaluate(() => [__app.state.conn.ip, JSON.parse(localStorage.getItem('xair.known'))[0].ip, __app.state.last.ip]);
+  ok('the known mixer got a new address: found by its name and connected at once', k[0] === '192.168.1.30' && k[1] === '192.168.1.30' && k[2] === '192.168.1.30' && ms < 2500, ms + ' ms ' + JSON.stringify(k));
+  ok('no page errors (moved mixer)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
+{ const p = await open('index.html?ghost=1'); await p.waitForTimeout(2500);
+  ok('ghost test: connected to the first mixer', (await status(p)).startsWith('connected/XR16W'), await status(p));
+  await p.evaluate(() => __app.setState({ connPop: true })); await p.waitForFunction(() => !!document.querySelector('[data-mixer="192.168.1.77"]'), null, { timeout: 4000 }).catch(() => {});
+  ok('a mixer that does not hear broadcasts is found by asking every address, while connected to another', await p.evaluate(() => !!document.querySelector('[data-mixer="192.168.1.77"]') && fake.unicast > 200 && fake.sets.length === 0));
+  await click(p, '[data-mixer="192.168.1.77"]'); await p.waitForTimeout(400);
+  ok('one tap switches to it (read only again), and both are remembered', await p.evaluate(() => __app.state.conn.ip === '192.168.1.77' && __app.state.conn.model === 'XR18W' && !__app.state.conn.live && JSON.parse(localStorage.getItem('xair.known')).length === 2));
+  await p.evaluate(() => __app.setState({ connPop: true })); await p.waitForTimeout(1500);
+  ok('the list shows the other mixer ready to switch back', await p.evaluate(() => !!document.querySelector('[data-mixer="192.168.1.1"]')));
+  ok('no page errors (two mixers)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
+
 console.log(`\n${n - fails} of ${n} passed`); await B.close(); srv.close(); process.exit(fails ? 1 : 0);

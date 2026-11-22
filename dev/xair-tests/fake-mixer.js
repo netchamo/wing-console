@@ -2,7 +2,7 @@
    URL: ?model=XR16|XR18|XR12  &delay=ms (the mixer starts answering only after this long)
    window.fake.sets = every packet that carried a value (what a real mixer would have been told to change). */
 (function () {
-  const Q = new URLSearchParams(location.search), MODEL = Q.get('model') || 'XR16', DELAY = +(Q.get('delay') || 0), IP = '192.168.1.1';
+  const Q = new URLSearchParams(location.search), MODEL = Q.get('model') || 'XR16', DELAY = +(Q.get('delay') || 0), IP = Q.get('ip') || '192.168.1.1', GHOST = Q.get('ghost') ? '192.168.1.77' : '';  /* ghost: a second mixer (XR18) that answers only when asked at its own address, as behind a router that drops broadcasts */
   const NBUS = +(Q.get('bus') || (MODEL === 'XR12' ? 2 : 6)), NCH = MODEL === 'XR12' ? 12 : 16;
   const TE = new TextEncoder(), TD = new TextDecoder(), pad2 = n => String(n).padStart(2, '0');
   const oscStr = s => { const b = TE.encode(s), o = new Uint8Array((b.length + 4) & ~3); o.set(b); return o; };
@@ -86,6 +86,7 @@ Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0]
   window.XAirNative = { ready() {}, version() { return 'test'; }, wifi() { return true; }, wifiAddress() { return '192.168.1.50/24'; }, netInfo() { return '[]'; },
     setLive(on) { fake.live = !!on; window.calls.push(['setLive', !!on]); },
     discover(b) { window.calls.push(['discover']); handle(unb64(b)); },
-    send(ip, b) { if (ip === IP) handle(unb64(b)); },
+    send(ip, b) { fake.unicast = (fake.unicast || 0) + 1; if (ip === IP) handle(unb64(b));
+      else if (GHOST && ip === GHOST && dec(unb64(b)).addr === '/xinfo') { out.push({ type: 'rx', ip: GHOST, d: b64(enc('/xinfo', [['s', GHOST], ['s', 'XR18W-11-22-33'], ['s', 'XR18W'], ['s', '1.19']])) }); if (!fl) fl = setTimeout(() => { fl = 0; const l = out.splice(0); if (window.__xairNative) window.__xairNative(l); }, 4); } },
     openWifi() {}, copy(t) { fake.copied = t; }, reload() {}, build() { return 1; }, checkUpdate() {}, downloadUpdate() { return 'ok'; }, updateProgress() { return -1; }, updateReason() { return ''; }, openUpdateLink() {} };
 })();

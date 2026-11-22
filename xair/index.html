@@ -98,7 +98,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.2';
+const DW = 1180, APP_VER = '0.7.3';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -705,16 +705,41 @@ class App extends Component {
     const strs = args.filter(a => typeof a === 'string'), model = isXAir(strs[2]) ? strs[2] : strs.find(isXAir) || '';
     const info = { ip, name: strs[1] || '', model, fw: strs.length > 3 ? strs[3] : '', raw: strs };
     const c = this.state.conn;
-    if (this.linked() && ip === c.ip) { this.lastRx = Date.now(); if (model && model !== c.model) { this.log('sys', 'model ' + model); this.setState(s => ({ conn: { ...s.conn, ...info } }), () => this.readCore()); } return; }
+    if (this.linked() && ip === c.ip) { this.lastRx = Date.now(); if (model) this.seen(info); if (model && model !== c.model) { this.log('sys', 'model ' + model); this.setState(s => ({ conn: { ...s.conn, ...info } }), () => this.readCore()); } return; }
     if (!model) return;
-    if (!c.found.some(f => f.ip === ip)) { this.log('in', `found ${model} "${info.name}" at ${ip} fw ${info.fw}`); this.setState(s => ({ conn: { ...s.conn, found: [...s.conn.found.filter(f => f.ip !== ip), info] } })); }
+    this.seen(info);
     if (this.linked()) return;
     const last = this.state.last;
+    if (last && last.name && last.name === info.name && last.ip !== ip) this.log('sys', `${info.name} moved: ${last.ip} → ${ip}`);
     if (this.noAuto && this.wantIp !== ip) return;   /* the user disconnected: wait for a choice */
     if (this.wantIp === ip || !last || last.ip === ip || (last.name && last.name === info.name)) this.connect(info);
   }
+  /* a mixer answered: keep it in the list with the time, and remember it. The name carries the end of the mixer's MAC
+     address ("XR16W-B2-3E-C9"), so it is the same mixer even when the network gives it a new address. */
+  seen(info) {
+    const now = Date.now(), key = info.name || info.ip; this.logged = this.logged || {};
+    if (now - (this.logged[key] || 0) > 30000) this.log('in', `found ${info.model} "${info.name}" at ${info.ip} fw ${info.fw}`); this.logged[key] = now;
+    this.setState(s => { const same = f => f.ip === info.ip || (info.name && f.name === info.name), old = s.conn.found.find(same);
+      if (old && old.ip === info.ip && now - (old.seen || 0) < 900) return null;
+      return { conn: { ...s.conn, found: [...s.conn.found.filter(f => !same(f)), { ...info, seen: now }].sort((a, b) => (a.name || a.ip).localeCompare(b.name || b.ip)) } }; });
+    const K = this.known(), k = K.find(x => (info.name && x.name === info.name) || x.ip === info.ip);
+    if (!k || k.ip !== info.ip || k.name !== info.name || now - (k.at || 0) > 60e3) { save('xair.known', [{ ip: info.ip, name: info.name, model: info.model, at: now }, ...K.filter(x => x !== k)].slice(0, 12)); this.knownC = null; }
+  }
+  known() { return this.knownC || (this.knownC = load('xair.known', [])); }
+  /* every address of the local networks (up to /22), asked one by one – for networks that drop broadcasts */
+  sweep(force) {
+    if (!NATIVE || (!force && Date.now() - (this.sweepAt || 0) < 12000)) return; this.sweepAt = Date.now();
+    let a = ''; try { a = NATIVE.wifiAddress() || ''; } catch (e) {}
+    const x = b64(oscMsg('/xinfo')), T = [];
+    a.split(',').forEach(t => { const m = /(\d+)\.(\d+)\.(\d+)\.(\d+)\/(\d+)/.exec(t.trim()); if (!m) return; const p = +m[5]; if (p < 22 || p > 30) return;
+      const me = ((+m[1] << 24) >>> 0) + (+m[2] << 16) + (+m[3] << 8) + +m[4], mask = (0xFFFFFFFF << (32 - p)) >>> 0, base = (me & mask) >>> 0, n = 2 ** (32 - p);
+      for (let i = 1; i < n - 1; i++) { const v = base + i; if (v !== me) T.push([v >>> 24, (v >>> 16) & 255, (v >>> 8) & 255, v & 255].join('.')); } });
+    if (!T.length) return; this.log('sys', `asking ${T.length} addresses one by one`);
+    let i = 0; const step = () => { for (let k = 0; k < 32 && i < T.length; k++, i++) { try { NATIVE.send(T[i], x); } catch (e) {} } if (i < T.length) setTimeout(step, 15); }; step();
+  }
   connect(info) {
     if (this.cBusy) return; this.cBusy = true; setTimeout(() => { this.cBusy = false; }, 500);
+    if (this.linked() && this.state.conn.ip !== info.ip) { if (this.rtaPrev !== undefined && this.state.conn.live && this.desk['/-stat/rta/source'] !== this.rtaPrev) this.set('/-stat/rta/source', 'i', this.rtaPrev); this.rtaPrev = undefined; this.log('sys', `switching from ${this.state.conn.name} to ${info.name}`); }
     this.desk = {}; this.dtype = {}; this.hold = {}; this.pend.clear(); this.queue = []; this.outq.clear(); this.missing.clear(); this.mt.fill(-128); this.pk.fill(-128); this.wantIp = '';
     try { NATIVE.setLive(false); } catch (e) {}
     const last = { ip: info.ip, name: info.name, model: info.model }; save('xair.last', last);
@@ -724,20 +749,24 @@ class App extends Component {
   }
   disconnect() {
     try { NATIVE.setLive(false); } catch (e) {}
-    this.noAuto = true; this.log('sys', 'disconnected'); this.searchT0 = Date.now() + 3600e3;   /* stay in demo until asked to search again */
-    this.setState(s => ({ conn: { ...s.conn, status: 'search', ip: '', live: false, found: [] }, screen: 'main', sofOn: false, sheet: null }));
+    this.noAuto = true; this.log('sys', 'disconnected'); this.searchT0 = Date.now();   /* keep looking, but connect only when asked */
+    this.setState(s => ({ conn: { ...s.conn, status: 'search', ip: '', live: false }, screen: 'main', sofOn: false, sheet: null }));
   }
   manual(ip) {
     ip = String(ip || '').trim(); if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) { this.toast('כתובת לא תקינה'); return; }
     this.wantIp = ip; this.log('sys', 'asking ' + ip); this.tx('/xinfo', [], ip); setTimeout(() => this.tx('/xinfo', [], ip), 400);
     setTimeout(() => { if (this.wantIp === ip) { this.wantIp = ''; this.toast('אין תשובה מהכתובת ' + ip); } }, 2500);
   }
+  /* a question to everyone: broadcast on every local network, the router, and each mixer met before at its last address */
   probe() {
-    if (!NATIVE || this.linked()) return;
-    const x = b64(oscMsg('/xinfo')), last = this.state.last;
-    try { NATIVE.discover(x, last ? last.ip : ''); } catch (e) { this.log('err', 'discover ' + e.message); }
+    if (!NATIVE) return;
+    const x = b64(oscMsg('/xinfo')), last = this.state.last, cur = this.linked() ? this.state.conn.ip : '';
+    try { NATIVE.discover(x, last && last.ip !== cur ? last.ip : ''); } catch (e) { this.log('err', 'discover ' + e.message); }
+    this.known().forEach(k => { if (k.ip && k.ip !== cur) try { NATIVE.send(k.ip, x); } catch (e) {} });
   }
-  search() { this.noAuto = false; this.searchT0 = Date.now(); this.setState(s => ({ conn: { ...s.conn, found: [] } })); this.probe(); }
+  /* quick burst: answers usually come within a few hundred ms; if nothing new answers, ask every address */
+  burst() { const n0 = this.state.conn.found.length; [0, 200, 600].forEach(t => setTimeout(() => this.probe(), t)); setTimeout(() => { if (this.state.conn.found.filter(f => f.ip !== this.state.conn.ip).length <= Math.max(0, n0 - (this.linked() ? 1 : 0))) this.sweep(); }, 900); }
+  search() { this.noAuto = false; this.searchT0 = Date.now(); this.sweepAt = 0; this.burst(); }
   pulse() {
     if (!this.linked()) return;
     this.tx('/xremote'); this.tx('/meters', [['s', '/meters/1'], ['i', 0]]); this.tx('/meters', [['s', '/meters/6'], ['i', 0]]); this.tx('/xinfo');
@@ -748,16 +777,19 @@ class App extends Component {
   watch() {
     const now = Date.now(), c = this.state.conn; this.wn = (this.wn || 0) + 1;
     if (!NATIVE) return;
+    const fresh = c.found.filter(f => now - (f.seen || 0) < 12000 || f.ip === c.ip); if (fresh.length !== c.found.length) this.setState(s => ({ conn: { ...s.conn, found: s.conn.found.filter(f => now - (f.seen || 0) < 12000 || f.ip === s.conn.ip) } }));
+    if (this.state.connPop && this.wn % 15 === 0) this.sweep();
     if (!this.linked()) {
-      if (this.wn % 2 === 0 && now >= this.searchT0) this.probe();
+      if (now >= this.searchT0) this.probe();
       const el = now - this.searchT0;
-      if (el > 3500 && el < 3600e3 && c.found.length && !this.autoT) {
+      if (el > 2500 && el < 4000 && !c.found.length) this.sweep();
+      if (el > 2000 && el < 3600e3 && c.found.length && !this.autoT && !this.noAuto) {
         if (c.found.length === 1) this.connect(c.found[0]); else if (!this.state.connPop) { this.autoT = 1; this.setState({ connPop: true }); }
       }
       return;
     }
     this.autoT = 0;
-    if (this.wn % 3 === 0) this.pulse();
+    if (this.wn % 3 === 0) this.pulse(); if (this.wn % 4 === 2) this.probe();
     const quiet = now - this.lastRx;
     if (c.status === 'connected' && quiet > 7000) { this.log('err', 'no answer from the mixer for 7 s'); this.setState(s => ({ conn: { ...s.conn, status: 'lost' } })); }
     else if (c.status === 'lost' && quiet < 2500) { this.log('sys', 'the mixer answers again: reading everything'); this.setState(s => ({ conn: { ...s.conn, status: 'connected' } }), () => this.readCore(true)); }
@@ -931,6 +963,7 @@ class App extends Component {
     const st = this.state;
     if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin || st.mgPop !== ps.mgPop || st.fxSlot !== ps.fxSlot || st.rtab !== ps.rtab) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
     if (CH_SCREENS.includes(st.screen) || ['tape', 'fx', 'routing', 'automix', 'settings'].includes(st.screen) || st.mgPop || st.srcPick) this.readView();
+    if (st.connPop && !ps.connPop) this.burst();
     if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
@@ -2888,8 +2921,26 @@ class App extends Component {
       ${st.liveAsk && this.renderLiveAsk(Hd)}`;
   }
 
+  /* the mixers on the network now (kept fresh in the background, so switching is one tap), and the ones met before */
+  renderFound() {
+    const c = this.state.conn, now = Date.now(), K = this.known(), away = K.filter(k => !c.found.some(f => f.name === k.name || f.ip === k.ip)).slice(0, 4);
+    const ago = t => { const s = Math.round((now - t) / 1000); return s < 3 ? 'עונה עכשיו' : 'לפני ' + s + ' שניות'; };
+    const row = (f, cur, gone) => { const k = K.find(x => x.name && x.name === f.name), moved = k && !gone && k.ip !== f.ip;
+      return html`<button data-mixer=${f.ip} class="pill" disabled=${cur} onClick=${() => gone ? this.manual(f.ip) : this.connect(f)}
+        style=${`height:56px;text-transform:none;letter-spacing:0;display:flex;align-items:center;gap:12px;padding:0 14px;${cur ? 'border-color:#62b85c;background:#16210f;opacity:1' : gone ? 'opacity:.55' : ''}`}>
+        <span style=${`width:10px;height:10px;border-radius:50%;flex:none;background:${cur ? '#62b85c' : gone ? '#4a4339' : '#8fd0e0'};box-shadow:${gone ? 'none' : '0 0 8px currentColor'}`}></span>
+        <span style="display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;gap:1px">
+          <span style="display:flex;gap:8px;align-items:baseline"><b dir="ltr" style="font-size:16px">${f.model}</b><span dir="ltr" style="font-size:14px;color:#d9cdb3">${f.name}</span></span>
+          <span style="font-size:12px;color:#9b927f">${cur ? 'מחובר' : gone ? 'לא עונה כרגע · הכתובת האחרונה' : ago(f.seen)}${moved ? ' · קיבל כתובת חדשה' : ''}</span></span>
+        <span dir="ltr" style="font-family:var(--mono);font-size:14px;color:#e9dcc2">${f.ip}</span>
+        ${!cur && html`<span style="font-size:13px;font-weight:800;color:${gone ? '#9b927f' : '#8fd0e0'}">${gone ? 'נסה' : this.linked() ? 'עבור' : 'התחבר'}</span>`}</button>`; };
+    return html`<div data-found="1" style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:14px;color:#b8a78a">${c.found.length ? 'מיקסרים ברשת:' : 'מחפש מיקסרים ברשת…'}</span>
+      ${c.found.map(f => row(f, this.linked() && f.ip === c.ip, false))}
+      ${away.length > 0 && html`<span style="font-size:13px;color:#8c8272;margin-top:4px">מיקסרים שהתחברת אליהם בעבר:</span>${away.map(k => row(k, false, true))}`}</div>`;
+  }
   renderConn(Hd) {
-    const st = this.state, c = st.conn, H = Math.min(Hd - 30, 440), close = () => this.setState({ connPop: false });
+    const st = this.state, c = st.conn, H = Hd - 30, close = () => this.setState({ connPop: false });
     const T = { demo: 'מצב הדגמה. חיבור למיקסר אפשרי רק מתוך אפליקציית האנדרואיד.', search: c.wifi ? 'מחפש מיקסר ברשת… בינתיים מצב הדגמה.' : 'אין רשת Wi‑Fi. התחבר לרשת של המיקסר.', connected: 'מחובר למיקסר.', lost: 'המיקסר לא עונה. ממשיך לנסות.' }[c.status];
     const row = 'display:flex;align-items:center;gap:10px';
     return html`
@@ -2900,9 +2951,7 @@ class App extends Component {
         ${this.linked() && html`<div style="font-size:15px;line-height:1.6;color:#f1e7d2;padding:10px 12px;border-radius:8px;background:#141210;border:1px solid var(--line)">
           <div>דגם: <b dir="ltr">${c.model}</b></div><div>שם: <b dir="ltr">${c.name || '—'}</b></div><div>כתובת: <b dir="ltr">${c.ip}</b> · גרסה: <b dir="ltr">${c.fw || '—'}</b></div>
           <div>מצב: <b>${c.live ? 'שליטה חיה פעילה' : 'קריאה בלבד'}</b> · נשלחו <b dir="ltr">${this.sent}</b> שינויים</div></div>`}
-        ${NATIVE && !this.linked() && c.found.length > 0 && html`<div style="display:flex;flex-direction:column;gap:6px">
-          <span style="font-size:14px;color:#b8a78a">מיקסרים שנמצאו:</span>
-          ${c.found.map(f => html`<button class="pill" style="height:48px;text-transform:none;display:flex;align-items:center;gap:10px;padding:0 14px" onClick=${() => this.connect(f)}><b dir="ltr">${f.model}</b><span dir="ltr" style="flex:1;text-align:left">${f.name}</span><span dir="ltr" style="font-family:var(--mono);font-size:13px">${f.ip}</span></button>`)}</div>`}
+        ${NATIVE && this.renderFound()}
         ${NATIVE && html`<div style=${row}>
           <input dir="ltr" value=${st.ipText} onInput=${e => this.setState({ ipText: e.target.value })} placeholder="192.168.1.1" inputmode="decimal"
             style="flex:1;height:44px;padding:0 12px;border-radius:8px;border:1px solid #3a342c;background:#100f0d;color:#f1e7d2;font-family:var(--mono);font-size:16px" />
