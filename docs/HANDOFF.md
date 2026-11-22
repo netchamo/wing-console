@@ -315,3 +315,16 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
 - Report: also asks `insert/sel`, `amixlock/X|Y`, LAN/WiFi prefs.
 - 106 checks (new: effect face with all parameters, help, TAP, INSERT, PHASE/LINK, USB source, automix).
 - Still to verify on a real mixer: the insert slot address, `/meters/3` and `/meters/7` layouts, USB L/R on the XR16.
+
+## 15. Air Console 0.7.1 – effect picker with pictures, tab order by signal flow (22 Nov)
+
+- CHANGE EFFECT is a lit brass button (`.fxchange`, slow glow) and opens `renderFxPick`: category chips (`FX_CATS`,
+  `FX_CAT`: reverb, delay, delay + mod, modulation, EQ, dynamics, tone & amp) and a card per device with a small drawn
+  picture (`fxThumb`: the face's panel colour, its knobs/faders/meter and a hint of what it does; A | B on dual types).
+  Choosing asks first (as before), then the slot re-reads its parameters.
+- 3TAP / 4TAP: their "A"/"B" are taps, not sides – the parser no longer treats them as dual effects.
+- Channel tabs follow the X-Air block diagram (manual ch. 12): LOW CUT (Config) → GATE → INSERT → EQ → COMP → sends.
+  The order is fixed on the X-Air – there is no address to move the processors – so no reorder screen. The report also asks
+  `insert/pos` and `dyn/pos` to be sure. All tabs are the same size (84 px) with a thin border.
+- Main screen: channel name tags 42 px high (were 34).
+- 107 checks.

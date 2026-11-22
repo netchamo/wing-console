@@ -18,7 +18,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .navbtn{width:60px;height:46px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:transparent;border:1px solid transparent;border-radius:8px;color:#e9dcc2;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
 .navbtn.hot{background:#2a2014;border-color:#8a6a3a;color:var(--brass-hi);width:66px}
 .strip{flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:6px;padding:6px;background:linear-gradient(180deg,#27241f,#1a1815 60%,#161412);border:1px solid #302b25;border-radius:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-.cname{height:34px;flex:none;border:none;border-radius:4px;padding:0 6px;color:#121110;font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
+.cname{height:42px;flex:none;border:none;border-radius:4px;padding:0 6px;color:#121110;font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;box-shadow:inset 0 -2px 0 rgba(0,0,0,.25)}
 .panmini{position:relative;height:30px;flex:none;padding:0;border:1px solid #34302a;border-radius:15px;background:#100f0d;cursor:ew-resize;touch-action:none}
 .knob{position:absolute;top:50%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6e3b4,#c9a25a 55%,#7a5a26);box-shadow:0 2px 3px rgba(0,0,0,.6)}
 .ms{display:flex;gap:4px;height:32px;flex:none}
@@ -56,8 +56,11 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.tab{height:44px;display:flex;align-items:center;gap:3px;padding:0 9px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.tab{height:44px;width:84px;flex:none;display:flex;align-items:center;justify-content:center;gap:3px;padding:0 4px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .topbar.backR>.backbtn{order:98}.topbar.backR>.wood:last-child{order:99}
+.fxchange{height:60px;flex:none;display:flex;align-items:center;justify-content:center;gap:12px;border-radius:12px;cursor:pointer;color:#1d1406;border:1px solid #ffd99a;background:linear-gradient(180deg,#ffd58f,#e8a33d 55%,#c98a32);box-shadow:0 0 18px rgba(243,194,122,.55),inset 0 1px 0 rgba(255,255,255,.6);font-family:inherit;animation:fxglow 2.6s ease-in-out infinite}
+.fxchange:active{transform:translateY(1px);filter:brightness(1.1)}
+@keyframes fxglow{0%,100%{box-shadow:0 0 12px rgba(243,194,122,.4),inset 0 1px 0 rgba(255,255,255,.6)}50%{box-shadow:0 0 26px rgba(243,194,122,.8),inset 0 1px 0 rgba(255,255,255,.6)}}
 .tab.on{background:#2a2014;color:var(--brass-hi);border-color:var(--brass)}
 .small{height:36px;padding:0 12px;border-radius:6px;border:1px solid #3a342c;background:#151311;color:#e9dcc2;font-weight:600;font-size:15px;letter-spacing:.08em;cursor:pointer}
 .gl{position:absolute;font-family:var(--mono);font-size:11px;color:#8fa3aa;pointer-events:none}
@@ -79,7 +82,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.0';
+const DW = 1180, APP_VER = '0.7.1';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -193,7 +196,7 @@ function dumpPaths() {
   const dyn = b => add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
   const sends = b => r(10).forEach(k => add(`${b}/mix/${pad2(k)}`, ['level', 'pan', 'tap', 'grpon']));
   const core = b => add(b, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'mix/pan', 'mix/lr', 'grp/dca', 'grp/mute']);
-  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'insert/sel', 'automix/group', 'automix/weight']);
+  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'insert/sel', 'insert/pos', 'dyn/pos', 'automix/group', 'automix/weight']);
     add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); dyn(b); eq(b, 4); sends(b); });
   r(18).forEach(n => add('/headamp/' + pad2(n), ['gain', 'phantom']));
   ['/rtn/aux', ...r(4).map(n => '/rtn/' + n)].forEach(b => { core(b); add(b, ['config/rtnsrc', 'preamp/rtnsw', 'preamp/rtntrim']); eq(b, 4); sends(b); });
@@ -266,7 +269,7 @@ const RATIO_N = [1.1, 1.3, 1.5, 2, 2.5, 3, 4, 5, 7, 10, 20, 100];
 const KEY_TYPES = ['LC 6', 'LC 12', 'HC 6', 'HC 12', '1.0', '2.0', '3.0', '5.0', '10.0'];
 const TAPS = [['IN', 'כניסה'], ['PRE EQ', 'לפני האיקיו'], ['POST EQ', 'אחרי האיקיו'], ['PRE', 'לפני הפיידר'], ['POST', 'אחרי הפיידר'], ['GRP', 'גרופ']];
 const BAND_COL = ['#e0513f', '#e6c23e', '#62b85c', '#4a8ee8', '#d868d8', '#45c9cc'];
-const TABS = { ch: ['Home', 'Config', 'Insert', 'EQ', 'Gate', 'Comp', 'Sends'], aux: ['Home', 'Config', 'EQ', 'Sends'], rtn: ['Home', 'Config', 'EQ', 'Sends'], bus: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], lr: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], fxs: ['Config'], dca: ['Config'] };
+const TABS = { ch: ['Home', 'Config', 'Gate', 'Insert', 'EQ', 'Comp', 'Sends'], aux: ['Home', 'Config', 'EQ', 'Sends'], rtn: ['Home', 'Config', 'EQ', 'Sends'], bus: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], lr: ['Home', 'Config', 'Insert', 'EQ', 'Comp'], fxs: ['Config'], dca: ['Config'] };
 const tabsOf = s => TABS[s.kind];
 const SCREEN_OF = { Home: 'home', Config: 'config', Insert: 'insert', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
 /* the analyser: 100 bins from 20 Hz to 20 kHz (meters/4, 1/256 dB). Source index on the mixer (/-stat/rta/source):
@@ -357,9 +360,13 @@ const FX_FACE = k => /^(HALL|AMBI|RPLT|ROOM|CHAM|PLAT|VREV|VRM|GATE|RVRS)$/.test
   : /^(CRS|FLNG|PHAS|DIMC|FILT|ROTA|PAN|SUB)$/.test(k) ? 'mod' : /^(GEQ|GEQ2|TEQ|TEQ2)$/.test(k) ? 'geq' : /^(P1A|P1A2|PQ5|PQ5S)$/.test(k) ? 'peq' : /^DES/.test(k) ? 'des'
   : k === 'WAVD' ? 'wavd' : /^(LIM|CMB|CMB2|FAC|FAC1M|FAC2|LEC|LEC2|ULC|ULC2)$/.test(k) ? 'comp' : 'tone';
 const FX_FAM = k => ({ rev: 'REVERB', dly: 'DELAY', combo: 'DELAY', mod: 'MOD', geq: 'EQ', peq: 'EQ', des: 'EQ', wavd: 'DYN', comp: 'DYN', tone: 'TONE' })[FX_FACE(FX_KEYS[k] || '')] || 'REVERB';
+/* categories for choosing an effect */
+const FX_CAT = k => ({ rev: 'REVERB', dly: 'DELAY', combo: 'COMBO', mod: 'MOD', geq: 'EQ', peq: 'EQ', des: 'DYN', wavd: 'DYN', comp: 'DYN', tone: 'TONE' })[FX_FACE(k)] || 'TONE';
+const FX_CATS = [['ALL', 'ALL'], ['REVERB', 'REVERB'], ['DELAY', 'DELAY'], ['COMBO', 'DELAY + MOD'], ['MOD', 'MODULATION'], ['EQ', 'EQ'], ['DYN', 'DYNAMICS'], ['TONE', 'TONE & AMP']];
+const FX_CATCOL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', COMBO: '#6fd6e8', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
 const FX_COL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
 const FXD = {};
-for (const k in FXD_SRC) FXD[k] = FXD_SRC[k].split(';').map((t, i) => { const p = t.split('|'), lab = p[0], sm = / (A|B)$/.exec(lab);
+for (const k in FXD_SRC) FXD[k] = FXD_SRC[k].split(';').map((t, i) => { const p = t.split('|'), lab = p[0], sm = /^(3TAP|4TAP)$/.test(k) ? null : / (A|B)$/.exec(lab); /* on the tap delays A and B are taps, not sides */
   const o = { i, label: lab, kind: p[1], side: sm ? sm[1] : '', base: sm ? lab.slice(0, -2) : lab };
   if (p[1] === 'e') o.names = p[2].split(','); else if (p[1] !== 't') { o.lo = +p[2]; o.hi = +p[3]; o.n = +p[4] || 101; o.unit = p[5] || ''; }
   return o; });
@@ -1571,6 +1578,85 @@ class App extends Component {
       <div style=${`position:absolute;right:20px;top:16px;width:${gw}px;height:${H - 32}px;border-radius:6px;overflow:hidden;box-shadow:inset 0 0 0 3px #3a2420`}>${this.tonePic(n, side, gw, H - 32)}</div>
       <div style="position:absolute;left:20px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap">${sw.map(p => this.fctl(n, p, 30, { col: '#ff8a6a', lab: '#ffd8d0' }))}</div>`);
   }
+  /* ---------- choosing an effect: categories and a small picture of each device ---------- */
+  /* a thumbnail of the device: its panel colour, its controls and a hint of what it does */
+  fxThumb(k, W, H) {
+    const K = FX_KEYS[k], face = FX_FACE(K), ps = FXD[K] || [], seed = [...K].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) % 997, r = i => ((seed * (i + 3) * 37) % 100) / 100;
+    const knobs = (n, x0, y0, w, R, cap, ind) => Array.from({ length: n }, (_, i) => { const cx = x0 + (i + 0.5) * w / n, a = (-135 + 270 * r(i)) * Math.PI / 180;
+      return html`<circle cx=${cx} cy=${y0} r=${R} fill=${cap} stroke="rgba(0,0,0,.6)"/><line x1=${cx} y1=${y0} x2=${(cx + R * 0.8 * Math.sin(a)).toFixed(1)} y2=${(y0 - R * 0.8 * Math.cos(a)).toFixed(1)} stroke=${ind} stroke-width="1.6" stroke-linecap="round"/>`; });
+    const faders = (n, x0, y0, w, h, slot, capc) => Array.from({ length: n }, (_, i) => { const x = x0 + (i + 0.5) * w / n, t = 0.25 + 0.5 * r(i + 5);
+      return html`<line x1=${x} x2=${x} y1=${y0} y2=${y0 + h} stroke=${slot} stroke-width="1.6"/><rect x=${x - Math.min(4, w / n / 2.4)} y=${y0 + (1 - t) * h - 2} width=${Math.min(8, w / n / 1.2)} height="4" rx="1" fill=${capc}/>`; });
+    const path = (fn, x0, w, y0, h) => { let d = ''; for (let i = 0; i <= 40; i++) { const t = i / 40; d += (i ? 'L' : 'M') + (x0 + t * w).toFixed(1) + ' ' + (y0 + h - fn(t) * h).toFixed(1); } return d; };
+    const nK = Math.min(5, Math.max(2, Math.round(ps.length / 3))), dual = fxDual(K);
+    let bg = '#2a2622', body = null;
+    if (face === 'rev') { bg = 'linear-gradient(180deg,#f4efe2,#d0c8b4)';
+      body = html`<rect x="6" y="6" width=${W * 0.52} height="10" rx="2" fill="#120808"/><text x="9" y="14" font-size="7" fill="#ff3a2a" style="font-family:var(--mono)">${K}</text>
+        ${faders(5, 6, 22, W * 0.52, H - 30, '#2a2620', '#e8e2d2')}
+        <rect x=${W * 0.6} y="6" width=${W * 0.36} height=${H - 12} rx="2" fill="#140a0a"/>
+        <path d=${path(t => t < 0.08 ? t / 0.08 : K === 'RVRS' ? Math.pow(t, 1.5) : K === 'GATE' ? (t < 0.6 ? 0.8 : 0) : Math.exp(-t * (2 + 3 * r(1))), W * 0.6 + 2, W * 0.36 - 4, 10, H - 20)} fill="none" stroke="#ff5a3a" stroke-width="1.6"/>`; }
+    else if (face === 'dly' || face === 'combo') { bg = face === 'dly' ? 'linear-gradient(180deg,#22261f,#121510)' : 'linear-gradient(180deg,#1f2226,#111316)';
+      const col = face === 'dly' ? '#9ff06a' : '#8fd0ff';
+      body = html`${knobs(2, 6, H * 0.36, W * 0.34, 7, '#3a3a3a', '#f3e6cc')}${knobs(3, 6, H * 0.76, W * 0.44, 5, '#2a2a2a', '#f3e6cc')}
+        <rect x=${W * 0.5} y="6" width=${W * 0.46} height=${H - 12} rx="2" fill="#0f1a0c"/>
+        ${Array.from({ length: 6 }, (_, i) => html`<rect x=${W * 0.53 + i * W * 0.068} y=${10 + i * (H - 24) / 9} width="4" height=${(H - 20) - i * (H - 24) / 9} rx="1" fill=${col} opacity=${1 - i * 0.13}/>`)}
+        ${face === 'combo' && html`<path d=${path(t => 0.5 + 0.35 * Math.sin(t * 12), W * 0.5 + 2, W * 0.46 - 4, 8, H - 18)} fill="none" stroke="#c6b0ff" stroke-width="1.2" opacity=".8"/>`}`; }
+    else if (face === 'mod') { bg = 'linear-gradient(180deg,#221c34,#120f1c)'; const c = '#c6b0ff', gx = W * 0.5, gw = W * 0.46;
+      const pic = K === 'ROTA' ? html`<circle cx=${gx + gw / 2} cy=${H / 2} r=${H * 0.32} fill="#1d1730" stroke="#3a2f5a"/><path d=${`M ${gx + gw / 2} ${H / 2} l ${H * 0.3} -6 v 12 z M ${gx + gw / 2} ${H / 2} l ${-H * 0.3} -6 v 12 z`} fill=${c}/>`
+        : K === 'PAN' ? html`<line x1=${gx + 4} x2=${gx + gw - 4} y1=${H / 2} y2=${H / 2} stroke="#3a2f5a" stroke-width="3"/><circle cx=${gx + gw * 0.7} cy=${H / 2} r="7" fill=${c}/>`
+        : K === 'SUB' ? html`${[0.8, 0.55, 0.35].map((h, i) => html`<rect x=${gx + 6 + i * gw / 3.3} y=${H - 8 - h * (H - 16)} width=${gw / 4} height=${h * (H - 16)} rx="2" fill=${c} opacity=${0.5 + i * 0.2}/>`)}`
+        : K === 'FILT' ? html`<path d=${path(t => t < 0.5 ? 0.45 + 0.4 * Math.exp(-Math.pow((t - 0.45) * 12, 2)) : Math.max(0, 0.45 - (t - 0.5) * 2), gx + 2, gw - 4, 8, H - 16)} fill="none" stroke=${c} stroke-width="2"/>`
+        : html`<path d=${path(t => 0.5 + 0.38 * Math.sin(t * Math.PI * (3 + 3 * r(2))), gx + 2, gw - 4, 8, H - 16)} fill="none" stroke="#9fd0ff" stroke-width="1.8"/><path d=${path(t => 0.5 + 0.38 * Math.sin(t * Math.PI * (3 + 3 * r(2)) + 1.6), gx + 2, gw - 4, 8, H - 16)} fill="none" stroke="#ffb38a" stroke-width="1.8"/>`;
+      body = html`${knobs(nK, 6, H * 0.4, W * 0.42, 6, '#4a3f6a', '#ece2ff')}${knobs(2, 6, H * 0.78, W * 0.3, 4.5, '#3a2f5a', '#ece2ff')}<rect x=${gx} y="6" width=${gw} height=${H - 12} rx="2" fill="#120f1c"/>${pic}`; }
+    else if (face === 'geq') { bg = 'linear-gradient(180deg,#2a2a2c,#18181a)';
+      body = html`${faders(dual ? 15 : 16, 6, 10, W - 12, H - 22, '#050505', '#d8d8d8')}<path d=${path(t => 0.5 + 0.25 * Math.sin(t * 7 + r(3) * 4), 6, W - 12, 10, H - 22)} fill="none" stroke="#f3c27a" stroke-width="1.4" opacity=".8"/>
+        <text x="6" y=${H - 3} font-size="7" font-weight="900" font-style="italic" fill="#8a8a8c">${/TEQ/.test(K) ? 'TruEQ' : 'GEQ'}</text>`; }
+    else if (face === 'peq') { bg = 'linear-gradient(180deg,#2c4a42,#1a2e28)';
+      body = html`${knobs(4, 4, H * 0.36, W * 0.52, 6.5, '#d8ccb0', '#1a1408')}${knobs(3, 4, H * 0.75, W * 0.4, 5, '#d8ccb0', '#1a1408')}<rect x=${W * 0.58} y="6" width=${W * 0.38} height=${H - 12} rx="2" fill="#0c1612"/>
+        <path d=${path(t => 0.5 + 0.3 * Math.exp(-Math.pow((t - 0.15) * 6, 2)) - 0.15 * Math.exp(-Math.pow((t - 0.5) * 6, 2)) + 0.25 * Math.exp(-Math.pow((t - 0.85) * 5, 2)), W * 0.58 + 2, W * 0.38 - 4, 8, H - 16)} fill="none" stroke="#e6c23e" stroke-width="1.8"/>`; }
+    else if (face === 'des') { bg = 'linear-gradient(180deg,#e8e8e8,#b8b8b8)';
+      body = html`<rect x="6" y=${H * 0.22} width=${W * 0.5} height=${H * 0.26} rx=${H * 0.13} fill="#1e1e20"/><rect x="6" y=${H * 0.56} width=${W * 0.5} height=${H * 0.26} rx=${H * 0.13} fill="#1e1e20"/>
+        ${knobs(2, 14, H * 0.35, W * 0.36, 5, '#eee', '#111')}${knobs(2, 14, H * 0.69, W * 0.36, 5, '#eee', '#111')}
+        <rect x=${W * 0.6} y="6" width=${W * 0.36} height=${H - 12} rx="2" fill="#0d1014"/><rect x=${W * 0.8} y="8" width=${W * 0.1} height=${H - 16} fill="#e0513f" opacity=".35"/>
+        <path d=${path(t => 0.75 - t * 0.5 + (t > 0.72 && t < 0.88 ? 0.15 : 0), W * 0.6 + 2, W * 0.36 - 4, 8, H - 16)} fill="none" stroke="#9fd0ff" stroke-width="1.6"/>`; }
+    else if (face === 'wavd') { bg = 'linear-gradient(180deg,#5a5e64,#3a3d42)';
+      body = html`<rect x="6" y=${H * 0.2} width=${W * 0.52} height=${H * 0.3} rx="3" fill="#26282c"/><rect x="6" y=${H * 0.56} width=${W * 0.52} height=${H * 0.3} rx="3" fill="#26282c"/>
+        ${knobs(3, 10, H * 0.35, W * 0.46, 5.5, '#151515', '#ff4a2a')}${knobs(3, 10, H * 0.71, W * 0.46, 5.5, '#151515', '#ff4a2a')}
+        <rect x=${W * 0.62} y="6" width=${W * 0.34} height=${H - 12} rx="2" fill="#1a1c1e"/><path d=${path(t => t < 0.06 ? t / 0.06 : 0.45 * Math.exp(-(t - 0.06) * 4) + 0.5 * Math.exp(-(t - 0.06) * 30), W * 0.62 + 2, W * 0.34 - 4, 8, H - 16)} fill="#d23a2a" fill-opacity=".3" stroke="#ff5a3a" stroke-width="1.6"/>`; }
+    else if (face === 'comp') { const fac = /FAC/.test(K), lec = /LEC/.test(K), ulc = /ULC/.test(K), lim = K === 'LIM', cmb = /CMB/.test(K);
+      bg = fac ? 'radial-gradient(ellipse at 30% 20%,#3a4e56,#1e2a30 70%)' : lec ? 'linear-gradient(180deg,#d8d2c2,#b8b0a0)' : ulc ? 'linear-gradient(180deg,#1a1a1a,#0a0a0a)' : lim ? 'linear-gradient(180deg,#f2f2f0,#c8c8c4)' : 'linear-gradient(180deg,#c8ccd0,#8a9096)';
+      const vu = html`<rect x="6" y="8" width=${W * 0.4} height=${H - 16} rx="3" fill="url(#tVu)"/><line x1=${6 + W * 0.2} y1=${H - 10} x2=${6 + W * 0.2 + (H - 24) * Math.sin(-0.5 + r(4))} y2=${H - 10 - (H - 24) * Math.cos(-0.5 + r(4))} stroke="#111" stroke-width="1.4"/>`;
+      body = cmb ? html`${vu}${Array.from({ length: 5 }, (_, i) => html`<rect x=${W * 0.5 + i * W * 0.095} y="8" width=${W * 0.08} height=${H - 16} rx="2" fill="rgba(0,0,0,.25)"/><circle cx=${W * 0.54 + i * W * 0.095} cy=${H * 0.4} r="3.5" fill="#333"/><circle cx=${W * 0.54 + i * W * 0.095} cy=${H * 0.7} r="3.5" fill="#333"/>`)}`
+        : html`${vu}${knobs(Math.min(4, nK + 1), W * 0.46, H * 0.4, W * 0.52, 6.5, ulc ? '#cfcfcf' : '#2a2a2a', ulc ? '#111' : '#f3e6cc')}${knobs(3, W * 0.5, H * 0.76, W * 0.4, 4.5, ulc ? '#9a9a9a' : '#3a3a3a', ulc ? '#111' : '#f3e6cc')}`; }
+    else { bg = 'linear-gradient(180deg,#2e1c1a,#170e0d)'; const gx = W * 0.56, gw = W * 0.4;
+      const pic = /^PIT/.test(K) ? html`<circle cx=${gx + 10} cy=${H / 2} r="4" fill="#f3e6cc"/><line x1=${gx + 10} y1=${H / 2} x2=${gx + gw - 10} y2=${H * 0.25} stroke="#ff8a6a" stroke-dasharray="2 2"/><circle cx=${gx + gw - 10} cy=${H * 0.25} r="5" fill="#ff7a5a"/>`
+        : /^(IMG|EDI)$/.test(K) ? html`${Array.from({ length: 16 }, (_, i) => html`<circle cx=${gx + gw / 2 + Math.cos(i * 2.4) * gw * 0.35 * r(i)} cy=${H / 2 + Math.sin(i * 1.7) * H * 0.32} r="1.6" fill="#ff8a6a"/>`)}`
+        : /^(AMP|DRV)/.test(K) ? html`<path d=${path(t => 0.5 + 0.45 * Math.tanh((t - 0.5) * 7) / Math.tanh(3.5), gx + 2, gw * 0.5, 10, H - 20)} fill="none" stroke="#ff7a5a" stroke-width="1.8"/>${[0.9, 0.5, 0.35, 0.2].map((h, i) => html`<rect x=${gx + gw * 0.58 + i * gw * 0.1} y=${H - 8 - h * (H - 18)} width=${gw * 0.07} height=${h * (H - 18)} fill=${i ? '#ffd36a' : '#f3e6cc'}/>`)}`
+        : html`<path d=${path(t => 0.35 + 0.3 * Math.exp(-Math.pow((t - 0.15) * 6, 2)) + 0.4 * Math.exp(-Math.pow((t - 0.8) * 5, 2)), gx + 2, gw - 4, 8, H - 16)} fill="none" stroke="#ff7a5a" stroke-width="1.8"/>`;
+      body = html`${knobs(nK, 4, H * 0.38, W * 0.5, 6, '#5a3a34', '#fff0ea')}${knobs(3, 4, H * 0.76, W * 0.4, 4.5, '#4a2a26', '#fff0ea')}<rect x=${gx} y="6" width=${gw} height=${H - 12} rx="2" fill="#1a0f0e"/>${pic}`; }
+    return html`<div style=${`width:${W}px;height:${H}px;border-radius:6px;background:${bg};box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 2px 6px rgba(0,0,0,.5);flex:none`}>
+      <svg width=${W} height=${H} viewBox=${`0 0 ${W} ${H}`} aria-hidden="true" style="display:block">
+      <defs><radialGradient id="tVu" cx="50%" cy="100%" r="100%"><stop offset="0" stop-color="#fff2c0"/><stop offset="1" stop-color="#d9a84a"/></radialGradient></defs>
+      ${body}${dual && html`<text x=${W - 6} y=${H - 4} text-anchor="end" font-size="8" font-weight="900" fill="#f3c27a" stroke="#000" stroke-width=".4">A | B</text>`}</svg></div>`;
+  }
+  renderFxPick(Hd) {
+    const n = this.state.fxPick, cur = this.fxT(n), cat = this.state.fxCat || 'ALL', close = () => this.setState({ fxPick: null });
+    const list = FX_KEYS.map((k, i) => i).filter(i => cat === 'ALL' || FX_CAT(FX_KEYS[i]) === cat), W = 1120, cols = 6, TW = Math.floor((W - 36 - (cols - 1) * 10) / cols) - 20, TH = Math.round(TW * 0.5);
+    return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
+      <div class="pop" data-fxpick=${n} style=${`z-index:7;left:${(DW - W) / 2}px;top:8px;width:${W}px;height:${Hd - 16}px;padding:14px 16px;gap:10px`}>
+        <div style="display:flex;align-items:center;gap:10px;flex:none"><span style="font-size:20px;font-weight:800;letter-spacing:.08em;color:var(--brass-hi)">FX ${n} · CHOOSE AN EFFECT</span><span style="flex:1"></span><button class="small" onClick=${close}>CLOSE</button></div>
+        <div style="display:flex;gap:6px;flex:none;flex-wrap:wrap">${FX_CATS.map(([c, lab]) => { const col = c === 'ALL' ? '#e9dcc2' : FX_CATCOL[c], on = c === cat;
+          return html`<button data-fxcat=${c} aria-pressed=${String(on)} onClick=${() => this.setState({ fxCat: c })}
+            style=${`height:40px;padding:0 12px;border-radius:20px;cursor:pointer;font-size:12.5px;font-weight:800;letter-spacing:.1em;display:flex;align-items:center;gap:7px;${on ? `background:${col};color:#12100c;border:1px solid ${col}` : `background:#16130f;color:${col};border:1px solid ${col}66`}`}>
+            ${c !== 'ALL' && html`<i style=${`width:9px;height:9px;border-radius:50%;background:${on ? '#12100c' : col}`}></i>`}${lab}<span style="font-family:var(--mono);font-weight:600;opacity:.7">${c === 'ALL' ? FX_KEYS.length : FX_KEYS.filter(k => FX_CAT(k) === c).length}</span></button>`; })}</div>
+        <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-content:start;padding:2px">
+          ${list.map(i => { const c = FX_CATCOL[FX_CAT(FX_KEYS[i])], on = i === cur;
+            return html`<button data-fxpick-type=${i} aria-pressed=${String(on)} onClick=${() => i === cur ? close() : this.setState({ fxPick: null, ask: { text: FX_ASK(n), path: `/fx/${n}/type`, value: i } })}
+              style=${`padding:6px 6px 8px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;${on ? `background:${c}26;border:2px solid ${c};box-shadow:0 0 14px ${c}66` : 'background:#151310;border:1px solid #2c2721'}`}>
+              ${this.fxThumb(i, TW, TH)}
+              <span style="font-size:13px;font-weight:700;color:#f1e7d2;text-align:center;line-height:1.2;min-height:31px;display:flex;align-items:center">${FX_NAMES[i]}</span>
+              <span style=${`font-size:10px;font-weight:800;letter-spacing:.12em;color:${c}`}>${FX_CATS.find(x => x[0] === FX_CAT(FX_KEYS[i]))[1]}${on ? ' · NOW' : ''}</span></button>`; })}
+        </div></div>`;
+  }
   /* the help window: what the effect is for, and a line for each control */
   renderFxInfo(Hd) {
     const fi = this.state.fxInfo, K = this.fxK(fi.n), t = this.fxT(fi.n), close = () => this.setState({ fxInfo: null }); if (!K) return null;
@@ -1615,7 +1701,9 @@ class App extends Component {
         <div style="width:220px;flex:none;display:flex;flex-direction:column;gap:6px">${[1, 2, 3, 4].map(slot)}
           ${ins !== 1 ? html`${this.pbox('SEND ' + (this.nm(a) || n), a.fader, LF, '#4fc9b7')}${this.pbox('RETURN ' + (this.nm(r) || n), r.fader, LF, '#a993d9')}`
             : html`<div dir="rtl" style=${`${HEB};padding:8px;border-radius:8px;background:#141210;border:1px solid #2c2721;font-size:13px;line-height:1.45;color:#b8a78a`}>${insWho.length ? 'משובץ ב: ' : 'הסלוט באינסרט אבל אף ערוץ לא משתמש בו.'}<b dir="ltr">${insWho.join(', ')}</b></div>`}
-          <button class="pill" data-fxtype="1" style="height:44px;flex:none" onClick=${() => this.setState({ keyPick: { path: `/fx/${n}/type`, title: 'FX ' + n + ' · EFFECT', labels: FX_NAMES, cols: 5, h: 38, w: 1060, ph: 560, ask: FX_ASK(n) } })}>CHANGE EFFECT</button>
+          <button class="fxchange" data-fxtype="1" onClick=${() => this.setState({ fxPick: n, fxCat: t >= 0 ? FX_CAT(K) : 'ALL' })}>
+            <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="2" fill="currentColor"/><rect x="15" y="2" width="9" height="9" rx="2" fill="currentColor" opacity=".7"/><rect x="2" y="15" width="9" height="9" rx="2" fill="currentColor" opacity=".7"/><rect x="15" y="15" width="9" height="9" rx="2" fill="currentColor"/></svg>
+            <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.1"><b style="font-size:16px;letter-spacing:.1em">CHANGE EFFECT</b><span style="font-size:11px;font-weight:700;letter-spacing:.06em;opacity:.75">61 devices · by category</span></span></button>
         </div>
         <section class="sec" style=${`flex:1;min-width:0;gap:8px;padding:10px 12px;border-color:${FX_COL[t >= 0 ? FX_FAM(t) : 'REVERB']}66`}>
           ${this.fxBar(n, side, true)}
@@ -1626,6 +1714,7 @@ class App extends Component {
         </section>
       </div>
       ${st.fxInfo && this.renderFxInfo(Hd)}
+      ${st.fxPick && this.renderFxPick(Hd)}
       ${this.chanPopsLite(Hd)}`;
   }
   /* which strips use a slot as an insert (and on which side) */
@@ -1840,7 +1929,7 @@ class App extends Component {
 
   renderMain(Hd) {
     const st = this.state, L = this.L(), bank = L.banks[st.bank] || L.banks[0];
-    const SU = !!st.prefs.soloUnder, FH = Math.round(Hd - 236 - (SU ? 36 : 0)), T = FH - 44;
+    const SU = !!st.prefs.soloUnder, FH = Math.round(Hd - 244 - (SU ? 36 : 0)), T = FH - 44;
     const marks = [[1, '+10'], [0.875, '+5'], [0.75, '0'], [0.625, '-5'], [0.5, '-10'], [0.375, '-20'], [0.25, '-30'], [0.125, '-50'], [0, '-∞']]
       .map(m => { const c = Math.round((1 - m[0]) * T + 22); return { label: m[1], top: c - 7, tick: c }; });
     const SO = st.sofOn, D = SO ? L.dests[st.sof] : null, tcol = D ? D.col : '', cmp = Hd < 600;
