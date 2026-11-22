@@ -328,3 +328,15 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   `insert/pos` and `dyn/pos` to be sure. All tabs are the same size (84 px) with a thin border.
 - Main screen: channel name tags 42 px high (were 34).
 - 107 checks.
+
+## 16. Air Console 0.7.2 – one-list effect picker, an analyser that points at problems (22 Nov)
+
+- The effect picker is one scrolling list (the user does not want to page between categories): a bold heading
+  (English + Hebrew + count, light text on a tinted bar) before each of the 7 groups, then that group's cards. It opens
+  scrolled to the effect that is in the slot now. No category chips.
+- Analyser (`rtaSmooth`, `rtaLayers`): the live curve is smoothed over neighbouring bins and rises quickly but falls slowly;
+  a slow average (`rtaL`, about 1.5 s) is drawn as a light line; held peaks (`rtaP`) as a dotted line; "hot spots"
+  (`rtaHot`, up to 3): local peaks of the average that stand 3.5 dB or more above the ±1 octave around them, marked with an
+  orange dot, a glow and a label (frequency, how much above). A legend on the EQ screen. The marks never take a touch, so the
+  EQ handles work as before. Demo: calmer noise and two resonances per channel so the marks can be seen and an EQ cut on
+  them makes them go away.

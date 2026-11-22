@@ -82,7 +82,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.1';
+const DW = 1180, APP_VER = '0.7.2';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -362,7 +362,7 @@ const FX_FACE = k => /^(HALL|AMBI|RPLT|ROOM|CHAM|PLAT|VREV|VRM|GATE|RVRS)$/.test
 const FX_FAM = k => ({ rev: 'REVERB', dly: 'DELAY', combo: 'DELAY', mod: 'MOD', geq: 'EQ', peq: 'EQ', des: 'EQ', wavd: 'DYN', comp: 'DYN', tone: 'TONE' })[FX_FACE(FX_KEYS[k] || '')] || 'REVERB';
 /* categories for choosing an effect */
 const FX_CAT = k => ({ rev: 'REVERB', dly: 'DELAY', combo: 'COMBO', mod: 'MOD', geq: 'EQ', peq: 'EQ', des: 'DYN', wavd: 'DYN', comp: 'DYN', tone: 'TONE' })[FX_FACE(k)] || 'TONE';
-const FX_CATS = [['ALL', 'ALL'], ['REVERB', 'REVERB'], ['DELAY', 'DELAY'], ['COMBO', 'DELAY + MOD'], ['MOD', 'MODULATION'], ['EQ', 'EQ'], ['DYN', 'DYNAMICS'], ['TONE', 'TONE & AMP']];
+const FX_CATS = [['ALL', 'ALL', 'הכל'], ['REVERB', 'REVERB', 'ריוורב'], ['DELAY', 'DELAY', 'דיליי'], ['COMBO', 'DELAY + MOD', 'דיליי ומודולציה יחד'], ['MOD', 'MODULATION', 'מודולציה'], ['EQ', 'EQ', 'אקולייזרים'], ['DYN', 'DYNAMICS', 'דינמיקה'], ['TONE', 'TONE & AMP', 'צבע, מגברים וגובה צליל']];
 const FX_CATCOL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', COMBO: '#6fd6e8', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
 const FX_COL = { REVERB: '#7aa7e0', DELAY: '#4fc9b7', MOD: '#a993d9', EQ: '#e6c23e', DYN: '#f0a24a', TONE: '#e0513f' };
 const FXD = {};
@@ -772,7 +772,22 @@ class App extends Component {
     this.rtaAt = Date.now(); this.rtaSmooth(this.rtaR);
   }
   /* rises at once, falls back gently, so the picture reads like an analyser and not like noise */
-  rtaSmooth(R) { const S = this.rtaS; for (let i = 0; i < RTA_N; i++) S[i] = R[i] > S[i] ? R[i] : S[i] * 0.72 + R[i] * 0.28; const sc = this.state.screen; if (sc === 'eq' || sc === 'home') this.bump(); }
+  /* three pictures of one spectrum: the live curve (smoothed over neighbours, quick up, slow down), a slow average that shows
+     where the sound keeps piling up, and a peak that holds for a moment. From the average, "hot spots": narrow regions that
+     stand clearly above the spectrum around them – the places an EQ cut usually helps. */
+  rtaSmooth(R) {
+    const S = this.rtaS, L = this.rtaL || (this.rtaL = new Float32Array(RTA_N).fill(-90)), P = this.rtaP || (this.rtaP = new Float32Array(RTA_N).fill(-90)), Pt = this.rtaPt || (this.rtaPt = new Float64Array(RTA_N)), now = Date.now();
+    if (this.rtaKey !== this.rtaDemo + '|' + this.desk['/-stat/rta/source']) { this.rtaKey = this.rtaDemo + '|' + this.desk['/-stat/rta/source']; L.fill(-90); P.fill(-90); this.rtaN0 = 0; }
+    this.rtaN0 = (this.rtaN0 || 0) + 1; const la = this.rtaN0 < 20 ? 0.25 : 0.035;
+    for (let i = 0; i < RTA_N; i++) { const r = (R[Math.max(0, i - 1)] + 2 * R[i] + R[Math.min(RTA_N - 1, i + 1)]) / 4;
+      S[i] = r > S[i] ? S[i] * 0.4 + r * 0.6 : S[i] * 0.86 + r * 0.14; L[i] = L[i] * (1 - la) + S[i] * la;
+      if (S[i] >= P[i]) { P[i] = S[i]; Pt[i] = now; } else if (now - Pt[i] > 1400) P[i] = Math.max(S[i], P[i] - 0.8); }
+    if (now - (this.rtaHotAt || 0) > 250) { this.rtaHotAt = now; const hot = [];
+      for (let k = 4; k < RTA_N - 4; k++) { let a = 0, c = 0; for (let j = Math.max(0, k - 12); j <= Math.min(RTA_N - 1, k + 12); j++) if (Math.abs(j - k) > 2) { a += L[j]; c++; }
+        const ex = L[k] - a / c, f = rtaHz(k); if (ex > 3.5 && L[k] > -62 && f > 35 && f < 16000 && L[k] >= L[k - 1] && L[k] >= L[k + 1]) hot.push({ k, f, ex }); }
+      this.rtaHot = hot.sort((a, b) => b.ex - a.ex).slice(0, 3); }
+    const sc = this.state.screen; if (sc === 'eq' || sc === 'home') this.bump();
+  }
   /* the strip whose spectrum is wanted now: the EQ and HOME screens of a strip that has an EQ */
   rtaWant() { const st = this.state; if (st.prefs.rta === false || (st.screen !== 'eq' && st.screen !== 'home')) return -1; const s = this.L().byId[st.sheet]; return s && tabsOf(s).includes('EQ') ? rtaIdx(s) : -1; }
   /* the spectrum of a strip, or null when the mixer analyses another one */
@@ -797,10 +812,10 @@ class App extends Component {
   /* demo: pink noise shaped by the strip's own EQ, moving with its level */
   rtaDemoTick() {
     const st = this.state; if (this.linked() || this.rtaWant() < 0) return; const s = this.L().byId[st.sheet];
-    if (this.rtaDemo !== s.id) { this.rtaS.fill(-90); this.rtaDemo = s.id; }
+    if (this.rtaDemo !== s.id) { this.rtaS.fill(-90); this.rtaDemo = s.id; } const ph = s.n || 1, r1 = 180 + (ph * 67) % 260, r2 = 2200 + (ph * 410) % 2600;
     const E = this.eqData(s), lv = s.mt.length ? Math.max(...s.mt.map(i => this.mt[i])) : -30, t = Date.now() / 1000;
     for (let k = 0; k < RTA_N; k++) { const f = rtaHz(k), o = Math.log2(f / 1000);
-      this.rtaR[k] = clamp(lv - 14 - 3.2 * o - (f < 60 ? (60 - f) / 3 : 0) - (f > 12000 ? (f - 12000) / 900 : 0) + 4 * Math.sin(o * 3.1 + t * 1.7) + 7 * (Math.random() - 0.6) + this.eqDb(E, f), -90, 0); }
+      this.rtaR[k] = clamp(lv - 14 - 3.2 * o - (f < 60 ? (60 - f) / 3 : 0) - (f > 12000 ? (f - 12000) / 900 : 0) + 3 * Math.sin(o * 3.1 + t * 0.9) + 2.5 * (Math.random() - 0.5) + (7 + 2 * Math.sin(t * 0.7)) * Math.exp(-Math.pow(Math.log2(f / r1) * 5, 2)) + 5 * Math.exp(-Math.pow(Math.log2(f / r2) * 6, 2)) + this.eqDb(E, f), -90, 0); }
     this.rtaSmooth(this.rtaR);
   }
   onGr(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(39, d.getInt32(0, true), (b.length - 4) >> 1); for (let i = 0; i < n; i++) this.gr[i] = d.getInt16(4 + 2 * i, true) / 256; this.grAt = Date.now(); }
@@ -1639,22 +1654,26 @@ class App extends Component {
       ${body}${dual && html`<text x=${W - 6} y=${H - 4} text-anchor="end" font-size="8" font-weight="900" fill="#f3c27a" stroke="#000" stroke-width=".4">A | B</text>`}</svg></div>`;
   }
   renderFxPick(Hd) {
-    const n = this.state.fxPick, cur = this.fxT(n), cat = this.state.fxCat || 'ALL', close = () => this.setState({ fxPick: null });
-    const list = FX_KEYS.map((k, i) => i).filter(i => cat === 'ALL' || FX_CAT(FX_KEYS[i]) === cat), W = 1120, cols = 6, TW = Math.floor((W - 36 - (cols - 1) * 10) / cols) - 20, TH = Math.round(TW * 0.5);
+    const n = this.state.fxPick, cur = this.fxT(n), close = () => { this.fxPickOpen = null; this.setState({ fxPick: null }); };
+    const W = 1120, cols = 6, TW = Math.floor((W - 36 - (cols - 1) * 10) / cols) - 20, TH = Math.round(TW * 0.5);
+    /* one list, top to bottom, a heading before each group; it opens scrolled to the effect in the slot now */
+    if (this.fxPickOpen !== n) { this.fxPickOpen = n; setTimeout(() => { const e = document.querySelector(`[data-fxpick-type="${cur}"]`); if (e) e.scrollIntoView({ block: 'center' }); }, 30); }
+    const card = i => { const c = FX_CATCOL[FX_CAT(FX_KEYS[i])], on = i === cur;
+      return html`<button data-fxpick-type=${i} aria-pressed=${String(on)} onClick=${() => i === cur ? close() : (this.fxPickOpen = null, this.setState({ fxPick: null, ask: { text: FX_ASK(n), path: `/fx/${n}/type`, value: i } }))}
+        style=${`padding:6px 6px 8px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;${on ? `background:${c}26;border:2px solid ${c};box-shadow:0 0 14px ${c}66` : 'background:#151310;border:1px solid #2c2721'}`}>
+        ${this.fxThumb(i, TW, TH)}
+        <span style="font-size:13.5px;font-weight:700;color:#f6ecd8;text-align:center;line-height:1.2;min-height:32px;display:flex;align-items:center">${FX_NAMES[i]}</span>
+        ${on && html`<span style="font-size:11px;font-weight:900;letter-spacing:.14em;color:#f6ecd8;background:${c};color:#12100c;padding:1px 8px;border-radius:8px">NOW IN FX ${n}</span>`}</button>`; };
     return html`<button class="scrim" style="z-index:6" aria-label="Close" onClick=${close}></button>
       <div class="pop" data-fxpick=${n} style=${`z-index:7;left:${(DW - W) / 2}px;top:8px;width:${W}px;height:${Hd - 16}px;padding:14px 16px;gap:10px`}>
         <div style="display:flex;align-items:center;gap:10px;flex:none"><span style="font-size:20px;font-weight:800;letter-spacing:.08em;color:var(--brass-hi)">FX ${n} · CHOOSE AN EFFECT</span><span style="flex:1"></span><button class="small" onClick=${close}>CLOSE</button></div>
-        <div style="display:flex;gap:6px;flex:none;flex-wrap:wrap">${FX_CATS.map(([c, lab]) => { const col = c === 'ALL' ? '#e9dcc2' : FX_CATCOL[c], on = c === cat;
-          return html`<button data-fxcat=${c} aria-pressed=${String(on)} onClick=${() => this.setState({ fxCat: c })}
-            style=${`height:40px;padding:0 12px;border-radius:20px;cursor:pointer;font-size:12.5px;font-weight:800;letter-spacing:.1em;display:flex;align-items:center;gap:7px;${on ? `background:${col};color:#12100c;border:1px solid ${col}` : `background:#16130f;color:${col};border:1px solid ${col}66`}`}>
-            ${c !== 'ALL' && html`<i style=${`width:9px;height:9px;border-radius:50%;background:${on ? '#12100c' : col}`}></i>`}${lab}<span style="font-family:var(--mono);font-weight:600;opacity:.7">${c === 'ALL' ? FX_KEYS.length : FX_KEYS.filter(k => FX_CAT(k) === c).length}</span></button>`; })}</div>
-        <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-content:start;padding:2px">
-          ${list.map(i => { const c = FX_CATCOL[FX_CAT(FX_KEYS[i])], on = i === cur;
-            return html`<button data-fxpick-type=${i} aria-pressed=${String(on)} onClick=${() => i === cur ? close() : this.setState({ fxPick: null, ask: { text: FX_ASK(n), path: `/fx/${n}/type`, value: i } })}
-              style=${`padding:6px 6px 8px;border-radius:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;${on ? `background:${c}26;border:2px solid ${c};box-shadow:0 0 14px ${c}66` : 'background:#151310;border:1px solid #2c2721'}`}>
-              ${this.fxThumb(i, TW, TH)}
-              <span style="font-size:13px;font-weight:700;color:#f1e7d2;text-align:center;line-height:1.2;min-height:31px;display:flex;align-items:center">${FX_NAMES[i]}</span>
-              <span style=${`font-size:10px;font-weight:800;letter-spacing:.12em;color:${c}`}>${FX_CATS.find(x => x[0] === FX_CAT(FX_KEYS[i]))[1]}${on ? ' · NOW' : ''}</span></button>`; })}
+        <div data-fxlist="1" style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;align-content:start;padding:2px 2px 12px">
+          ${FX_CATS.filter(x => x[0] !== 'ALL').map(([c, lab, heb]) => { const ids = FX_KEYS.map((k, i) => i).filter(i => FX_CAT(FX_KEYS[i]) === c), col = FX_CATCOL[c];
+            return html`<div data-fxhead=${c} style=${`grid-column:1/-1;display:flex;align-items:center;gap:12px;margin-top:10px;padding:8px 14px;border-radius:9px;background:linear-gradient(90deg,${col}33,transparent 70%);border-left:6px solid ${col}`}>
+                <span style="font-size:22px;font-weight:900;letter-spacing:.1em;color:#fbf3e2">${lab}</span>
+                <span dir="rtl" style=${`${HEB};font-size:17px;font-weight:700;color:#fbf3e2;opacity:.85`}>${heb}</span>
+                <span style="flex:1"></span><span style="font-family:var(--mono);font-size:14px;color:#e9dcc2">${ids.length}</span></div>
+              ${ids.map(card)}`; })}
         </div></div>`;
   }
   /* the help window: what the effect is for, and a line for each control */
@@ -1701,7 +1720,7 @@ class App extends Component {
         <div style="width:220px;flex:none;display:flex;flex-direction:column;gap:6px">${[1, 2, 3, 4].map(slot)}
           ${ins !== 1 ? html`${this.pbox('SEND ' + (this.nm(a) || n), a.fader, LF, '#4fc9b7')}${this.pbox('RETURN ' + (this.nm(r) || n), r.fader, LF, '#a993d9')}`
             : html`<div dir="rtl" style=${`${HEB};padding:8px;border-radius:8px;background:#141210;border:1px solid #2c2721;font-size:13px;line-height:1.45;color:#b8a78a`}>${insWho.length ? 'משובץ ב: ' : 'הסלוט באינסרט אבל אף ערוץ לא משתמש בו.'}<b dir="ltr">${insWho.join(', ')}</b></div>`}
-          <button class="fxchange" data-fxtype="1" onClick=${() => this.setState({ fxPick: n, fxCat: t >= 0 ? FX_CAT(K) : 'ALL' })}>
+          <button class="fxchange" data-fxtype="1" onClick=${() => this.setState({ fxPick: n })}>
             <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="2" y="2" width="9" height="9" rx="2" fill="currentColor"/><rect x="15" y="2" width="9" height="9" rx="2" fill="currentColor" opacity=".7"/><rect x="2" y="15" width="9" height="9" rx="2" fill="currentColor" opacity=".7"/><rect x="15" y="15" width="9" height="9" rx="2" fill="currentColor"/></svg>
             <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.1"><b style="font-size:16px;letter-spacing:.1em">CHANGE EFFECT</b><span style="font-size:11px;font-weight:700;letter-spacing:.06em;opacity:.75">61 devices · by category</span></span></button>
         </div>
@@ -2690,13 +2709,29 @@ class App extends Component {
   }
   eqDb(E, f) { let db = 0; if (E.eqOn !== 0) for (const B of E.bands) if (!B.bad) db += bandDb(B.t, B.f, B.t === 0 || B.t === 5 ? 0 : B.g, B.q, f); if (E.lc && E.lc.on) db += bandDb(0, E.lc.f, 0, 0.7, f); return db; }
   /* the analyser as an area under the curve, as in the WING app */
+  rtaLine(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = H - clamp((R[k] + 66) / 60, 0.02, 1) * (H - top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d; }
+  /* live fill, slow average line, held peaks, and the hot spots marked where they are */
+  rtaLayers(W, H, top, big) {
+    const L = this.rtaL, P = this.rtaP, hot = this.rtaHot || [], X = f => Math.log10(f / 20) / 3 * W, Yv = v => H - clamp((v + 66) / 60, 0.02, 1) * (H - top);
+    return html`<g data-rta=${big ? 'eq' : 'mini'} style="pointer-events:none">
+      <defs><linearGradient id=${'hotg' + (big ? 1 : 0)} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a3a" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a3a" stop-opacity="0"/></linearGradient></defs>
+      ${hot.map(h => { const x0 = X(h.f / 1.12), x1 = X(h.f * 1.12), y = Yv(L[h.k]); return html`<rect x=${x0.toFixed(1)} y=${(y - 6).toFixed(1)} width=${(x1 - x0).toFixed(1)} height=${Math.min(H - y + 6, big ? 70 : 24).toFixed(1)} rx="4" fill=${`url(#hotg${big ? 1 : 0})`}/>`; })}
+      <path d=${this.rtaPath(this.rtaS, W, H, top)} fill="#5e8796" fill-opacity=${big ? 0.2 : 0.24} stroke="#7fa6b4" stroke-opacity=".45" stroke-width="1"/>
+      ${P && big && html`<path d=${this.rtaLine(P, W, H, top)} fill="none" stroke="#9fc4d0" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>`}
+      ${L && html`<path d=${this.rtaLine(L, W, H, top)} fill="none" stroke="#d6f0f8" stroke-width=${big ? 2 : 1.4} opacity=".85"/>`}
+      ${hot.map(h => { const x = X(h.f), y = Yv(L[h.k]); return big ? html`<g><circle cx=${x.toFixed(1)} cy=${y.toFixed(1)} r="6" fill="#ff8a3a" stroke="#1a0f06" stroke-width="2"/>
+          <rect x=${(clamp(x - 60, 2, W - 122)).toFixed(1)} y=${(Math.max(top + 4, y - 34)).toFixed(1)} width="120" height="22" rx="11" fill="#2a1608" stroke="#ff8a3a"/>
+          <text x=${(clamp(x - 60, 2, W - 122) + 60).toFixed(1)} y=${(Math.max(top + 4, y - 34) + 15.5).toFixed(1)} text-anchor="middle" font-size="12.5" font-weight="800" fill="#ffd0a8" font-family="monospace">${hzT(h.f)} +${h.ex.toFixed(0)} dB</text></g>`
+        : html`<circle cx=${x.toFixed(1)} cy=${y.toFixed(1)} r="3.5" fill="#ff8a3a"/>`; })}
+    </g>`;
+  }
   rtaPath(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = H - clamp((R[k] + 66) / 60, 0.02, 1) * (H - top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d + `L ${W} ${H} L 0 ${H} Z`; }
   miniEq(s, W, H) {
     const E = this.eqData(s), Y = d => clamp(H / 2 - d / 18 * H / 2, 2, H - 2), R = this.rtaFor(s); let d = '';
     for (let i = 0; i <= 80; i++) d += (i ? 'L' : 'M') + (i / 80 * W).toFixed(1) + ' ' + Y(this.eqDb(E, 20 * Math.pow(1000, i / 80))).toFixed(1);
     const grid = [100, 1000, 10000].map(f => `M ${(W * Math.log10(f / 20) / 3).toFixed(1)} 0 V ${H}`).join(' ');
     return html`<svg width="100%" height=${H} viewBox=${`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true" style="display:block">
-      ${R && html`<path data-rta="mini" d=${this.rtaPath(R, W, H, 4)} fill="#5e8796" fill-opacity=".26" stroke="#7fa6b4" stroke-opacity=".6" stroke-width="1"/>`}
+      ${R && this.rtaLayers(W, H, 4, false)}
       <path d=${grid} stroke="#1c2a30" stroke-width="1" fill="none"/><path d=${`M 0 ${H / 2} H ${W}`} stroke="#35484f" stroke-width="1" fill="none"/>
       <path d=${d} stroke="#f6b45e" stroke-width="2.2" fill="none" opacity=${E.eqOn === 0 ? 0.35 : 1}/>
       ${E.lc && html`<rect x=${clamp(Math.log10(E.lc.f / 20) / 3 * W, 1, W) - 1} y="2" width="3" height=${H - 4} fill="#8fd0e0" opacity=${E.lc.on ? 0.8 : 0.25}/>`}
@@ -2718,7 +2753,7 @@ class App extends Component {
       <div style=${`position:relative;width:${GW}px;height:${GH}px;flex:none`}>
       <svg class="eqg" viewBox=${`0 0 ${GW} ${GH}`} style=${`width:${GW}px;height:${GH}px;display:block;background:#0d0c0b;border:1px solid var(--line);border-radius:8px;touch-action:none;overflow:hidden;opacity:${E.eqOn === 0 ? 0.55 : 1}`}
         onPointerDown=${e => this.eqPtr(e, s)} onPointerMove=${e => this.eqMove(e)} onPointerUp=${e => this.eqEnd(e)} onPointerCancel=${e => this.eqEnd(e)} onWheel=${e => this.eqWheel(e, s)}>
-        ${R && html`<path data-rta="eq" d=${this.rtaPath(R, GW, GH, 8)} fill="#5e8796" fill-opacity=".22" stroke="#7fa6b4" stroke-opacity=".55" stroke-width="1"/>`}
+        ${R && this.rtaLayers(GW, GH, 8, true)}
         ${[50, 100, 200, 500, 1000, 2000, 5000, 10000].map(f => html`<line x1=${X(f)} x2=${X(f)} y1="0" y2=${GH} stroke="#26221d" stroke-width="1"/><text x=${X(f) + 4} y=${GH - 5} fill="#6f6656" font-size="11" font-family="monospace">${f >= 1000 ? f / 1000 + 'k' : f}</text>`)}
         ${[0, ...lines].map(g => html`<line x1="0" x2=${GW} y1=${Y(g)} y2=${Y(g)} stroke=${g ? '#26221d' : '#4a4339'} stroke-width="1"/><text x="4" y=${Y(g) - 3} fill="#6f6656" font-size="11" font-family="monospace">${g > 0 ? '+' + g : g}</text>`)}
         <path d=${d} fill="none" stroke="#f3c27a" stroke-width="2.5" stroke-linejoin="round"/>
@@ -2734,6 +2769,8 @@ class App extends Component {
       </svg>
       <div style="position:absolute;right:8px;top:8px;display:flex;gap:6px;align-items:center">
         ${this.linked() && this.state.prefs.rta !== false && !R && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:6px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2f4a52;color:#8fa3aa`}>${src !== undefined && src !== rtaIdx(s) ? 'האנלייזר של המיקסר על ערוץ אחר. הדלק LIVE והוא יעבור לכאן' : 'ממתין לאנלייזר מהמיקסר…'}</span>`}
+        ${R && html`<span dir="rtl" data-rtalegend="1" style=${`${HEB};font-size:12.5px;padding:5px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2c2721;color:#b8c8cc;display:flex;gap:10px;align-items:center`}>
+          <span><i style="display:inline-block;width:16px;height:2px;background:#d6f0f8;vertical-align:middle"></i> ממוצע</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff8a3a;vertical-align:middle"></i> הצטברות – כדאי לבדוק חיתוך</span></span>`}
         <button class="small" data-rtab="1" aria-pressed=${String(this.state.prefs.rta !== false)} style=${`height:36px;border-color:${this.state.prefs.rta !== false ? '#7fa6b4' : '#3a342c'};${this.state.prefs.rta !== false ? 'color:#cfe0e5' : ''}`} onClick=${() => this.setPref({ rta: this.state.prefs.rta === false })}>${this.state.prefs.rta !== false ? 'RTA ON' : 'RTA OFF'}</button>
         ${this.linked() && this.state.prefs.rta !== false && html`<button class="small" data-rtapos="1" style="height:36px" onClick=${() => this.pick('/-stat/rta/pos', pos === 1 ? 0 : 1)}>${pos === 1 ? 'POST EQ' : pos === 0 ? 'PRE EQ' : 'RTA ···'}</button>`}
         <button class="small" data-eqr=${ER} style="height:36px;font-family:var(--mono);font-size:13px;color:#cbbd9f" onClick=${() => this.setPref({ eqR: EQ_R[(EQ_R.indexOf(ER) + 1) % EQ_R.length] })}>±${ER} dB</button>
