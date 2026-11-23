@@ -82,7 +82,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.4';
+const DW = 1180, APP_VER = '0.7.5';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -274,7 +274,7 @@ const tabsOf = s => TABS[s.kind];
 const SCREEN_OF = { Home: 'home', Config: 'config', Insert: 'insert', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
 /* the analyser: 100 bins from 20 Hz to 20 kHz (meters/4, 1/256 dB). Source index on the mixer (/-stat/rta/source):
    ch 0–15, aux 16, FX returns 17–20, buses 21–26, FX sends 27–30, main LR 31 */
-const RTA_SPAN = 48;   /* dB shown under the loudest part of the spectrum */
+const RTA_SPAN = 54;   /* dB shown under the loudest part of the spectrum */
 const RTA_N = 100, rtaHz = k => 20 * Math.pow(1000, k / (RTA_N - 1));
 const rtaIdx = s => s.kind === 'ch' ? s.n - 1 : s.kind === 'aux' ? 16 : s.kind === 'rtn' ? 16 + s.n : s.kind === 'bus' ? 20 + s.n : s.kind === 'fxs' ? 26 + s.n : s.kind === 'lr' ? 31 : -1;
 const EQ_R = [18, 12, 6, 3], EQ_STEP = { 18: 6, 12: 3, 6: 2, 3: 1 };
@@ -802,28 +802,49 @@ class App extends Component {
   onRta(b) {
     if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(RTA_N, (b.length - 4) >> 1);
     for (let i = 0; i < n; i++) this.rtaR[i] = d.getInt16(4 + 2 * i, true) / 256;
-    this.rtaAt = Date.now(); this.rtaSmooth(this.rtaR);
+    this.rtaAt = Date.now(); if (this.rtaCap) this.rtaCap.rows.push((this.rtaAt - this.rtaCap.t0) + ',' + Array.from(this.rtaR.subarray(0, n)).map(v => Math.round(v)).join(','));
   }
   /* rises at once, falls back gently, so the picture reads like an analyser and not like noise */
   /* three pictures of one spectrum: the live curve (smoothed over neighbours, quick up, slow down), a slow average that shows
      where the sound keeps piling up, and a peak that holds for a moment. From the average, "hot spots": narrow regions that
      stand clearly above the spectrum around them – the places an EQ cut usually helps. */
-  rtaSmooth(R) {
+  /* The picture is drawn on a steady clock (every 50 ms), never per packet: packets from the mixer come in uneven bursts,
+     and smoothing per packet made the curve jump. Ballistics in real time, like a hardware analyser:
+     each bin is first smoothed with its neighbours (about 1/3 octave), rises with a 60 ms time constant and falls at most
+     15 dB per second. A slow average (2.5 s) shows where the sound keeps piling up; peaks hold 1.5 s, then fall 10 dB/s.
+     The window moves slowly (4 s) after the average, never after a single peak. */
+  rtaSmooth(R, dt) {
+    dt = clamp(dt || 0.05, 0.01, 0.25);
     const S = this.rtaS, L = this.rtaL || (this.rtaL = new Float32Array(RTA_N).fill(-90)), P = this.rtaP || (this.rtaP = new Float32Array(RTA_N).fill(-90)), Pt = this.rtaPt || (this.rtaPt = new Float64Array(RTA_N)), now = Date.now();
-    if (this.rtaKey !== this.rtaDemo + '|' + this.desk['/-stat/rta/source']) { this.rtaKey = this.rtaDemo + '|' + this.desk['/-stat/rta/source']; L.fill(-90); P.fill(-90); this.rtaN0 = 0; this.rtaTop = undefined; }
-    this.rtaN0 = (this.rtaN0 || 0) + 1; const la = this.rtaN0 < 20 ? 0.25 : 0.035;
-    for (let i = 0; i < RTA_N; i++) { const r = (R[Math.max(0, i - 1)] + 2 * R[i] + R[Math.min(RTA_N - 1, i + 1)]) / 4;
-      S[i] = r > S[i] ? S[i] * 0.4 + r * 0.6 : S[i] * 0.86 + r * 0.14; L[i] = L[i] * (1 - la) + S[i] * la;
-      if (S[i] >= P[i]) { P[i] = S[i]; Pt[i] = now; } else if (now - Pt[i] > 1400) P[i] = Math.max(S[i], P[i] - 0.8); }
-    /* the window follows the sound: the loudest part sits near the top and 48 dB are shown under it, so a quiet channel
-       still fills the picture (a bin of a 1/9 octave analyser is much lower than the channel's own level) */
-    let mx = -128; for (let i = 0; i < RTA_N; i++) if (S[i] > mx) mx = S[i]; this.rtaQuiet = mx < -100;
-    const tgt = clamp(mx + 5, -70, 6), T0 = this.rtaTop === undefined ? tgt : this.rtaTop; this.rtaTop = this.rtaQuiet ? T0 : T0 + (tgt - T0) * (tgt > T0 ? 0.35 : 0.012);
-    if (now - (this.rtaHotAt || 0) > 250) { this.rtaHotAt = now; const hot = [];
+    if (this.rtaKey !== this.rtaDemo + '|' + this.desk['/-stat/rta/source']) { this.rtaKey = this.rtaDemo + '|' + this.desk['/-stat/rta/source']; S.fill(-90); L.fill(-90); P.fill(-90); this.rtaN0 = 0; this.rtaTop = undefined; }
+    this.rtaN0 = (this.rtaN0 || 0) + 1; const first = this.rtaN0 < 15, up = 1 - Math.exp(-dt / 0.06), la = first ? 0.3 : 1 - Math.exp(-dt / 2.5), fall = 15 * dt;
+    const W = [1, 2, 3, 2, 1];
+    for (let i = 0; i < RTA_N; i++) { let a = 0, w = 0; for (let j = -2; j <= 2; j++) { const k = i + j; if (k < 0 || k >= RTA_N) continue; a += Math.pow(10, R[k] / 10) * W[j + 2]; w += W[j + 2]; }
+      const r = 10 * Math.log10(Math.max(1e-13, a / w));   /* neighbours averaged as power, not as dB */
+      S[i] = r > S[i] ? S[i] + (r - S[i]) * (first ? 1 : up) : Math.max(r, S[i] - fall); L[i] = L[i] + (S[i] - L[i]) * la;
+      if (S[i] >= P[i]) { P[i] = S[i]; Pt[i] = now; } else if (now - Pt[i] > 1500) P[i] = Math.max(S[i], P[i] - 10 * dt); }
+    let mx = -128, sx = -128; for (let i = 0; i < RTA_N; i++) { if (L[i] > mx) mx = L[i]; if (S[i] > sx) sx = S[i]; } this.rtaQuiet = sx < -100;
+    const tgt = clamp(mx + 12, -66, 6), T0 = this.rtaTop === undefined ? tgt : this.rtaTop;
+    this.rtaTop = this.rtaQuiet ? T0 : first ? tgt : T0 + (tgt - T0) * (1 - Math.exp(-dt / 4));
+    if (now - (this.rtaHotAt || 0) > 400 && !first) { this.rtaHotAt = now; const hot = [];
       for (let k = 4; k < RTA_N - 4; k++) { let a = 0, c = 0; for (let j = Math.max(0, k - 12); j <= Math.min(RTA_N - 1, k + 12); j++) if (Math.abs(j - k) > 2) { a += L[j]; c++; }
         const ex = L[k] - a / c, f = rtaHz(k); if (ex > 3.5 && L[k] > this.rtaTop - 36 && f > 35 && f < 16000 && L[k] >= L[k - 1] && L[k] >= L[k + 1]) hot.push({ k, f, ex }); }
-      this.rtaHot = hot.sort((a, b) => b.ex - a.ex).slice(0, 3); }
+      /* a mark stays put unless the new one is clearly elsewhere, so the labels do not dance */
+      const old = this.rtaHot || []; this.rtaHot = hot.sort((a, b) => b.ex - a.ex).slice(0, 3).map(h => { const o = old.find(x => Math.abs(x.k - h.k) <= 2); return o ? { ...h, k: o.k, f: o.f } : h; }); }
     const sc = this.state.screen; if (sc === 'eq' || sc === 'home') this.bump();
+  }
+  /* the 50 ms clock for the mixer's analyser: one smoothing step with the newest frame */
+  rtaTick() {
+    if (!this.linked() || this.rtaWant() < 0) return; const now = Date.now();
+    if (now - (this.rtaAt || 0) > 1500) return;
+    const dt = (now - (this.rtaTk || now - 50)) / 1000; this.rtaTk = now; this.rtaSmooth(this.rtaR, dt);
+  }
+  /* a short recording of what the mixer sends (8 s of raw frames), to tune the picture on real sound */
+  rtaRecord() {
+    if (!this.linked() || this.rtaCap) return; this.rtaCap = { t0: Date.now(), rows: [] }; this.toast('מקליט 8 שניות של האנלייזר…');
+    setTimeout(() => { const c = this.rtaCap; this.rtaCap = null; if (!c) return; const s = this.L().byId[this.state.sheet];
+      const head = `AIR CONSOLE ${APP_VER} RTA capture | ${this.state.conn.model} fw ${this.state.conn.fw} | source ${this.desk['/-stat/rta/source']} (${s ? this.nm(s) || s.def : ''}) | rta/decay ${this.desk['/-prefs/rta/decay']} rta/det ${this.desk['/-prefs/rta/det']} | frames ${c.rows.length}`;
+      this.copyText([head, 't_ms,100 bins (dB)', ...c.rows].join('\n'), `הוקלטו ${c.rows.length} פריימים והועתקו – הדבק בצ'אט`); }, 8000);
   }
   /* the strip whose spectrum is wanted now: the EQ and HOME screens of a strip that has an EQ */
   rtaWant() { const st = this.state; if (st.prefs.rta === false || (st.screen !== 'eq' && st.screen !== 'home')) return -1; const s = this.L().byId[st.sheet]; return s && tabsOf(s).includes('EQ') ? rtaIdx(s) : -1; }
@@ -854,7 +875,7 @@ class App extends Component {
     const E = this.eqData(s), lv = s.mt.length ? Math.max(...s.mt.map(i => this.mt[i])) : -30, t = Date.now() / 1000;
     for (let k = 0; k < RTA_N; k++) { const f = rtaHz(k), o = Math.log2(f / 1000);
       this.rtaR[k] = clamp(lv - 14 - 3.2 * o - (f < 60 ? (60 - f) / 3 : 0) - (f > 12000 ? (f - 12000) / 900 : 0) + 3 * Math.sin(o * 3.1 + t * 0.9) + 2.5 * (Math.random() - 0.5) + (7 + 2 * Math.sin(t * 0.7)) * Math.exp(-Math.pow(Math.log2(f / r1) * 5, 2)) + 5 * Math.exp(-Math.pow(Math.log2(f / r2) * 6, 2)) + this.eqDb(E, f), -90, 0); }
-    this.rtaSmooth(this.rtaR);
+    this.rtaSmooth(this.rtaR, 0.05);
   }
   onGr(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), n = Math.min(39, d.getInt32(0, true), (b.length - 4) >> 1); for (let i = 0; i < n; i++) this.gr[i] = d.getInt16(4 + 2 * i, true) / 256; this.grAt = Date.now(); }
   paintSoon() { if (this.pq) return; this.pq = true; requestAnimationFrame(() => { this.pq = false; this.paint(); }); }
@@ -938,7 +959,7 @@ class App extends Component {
     const ua = e => { if (e.isTrusted !== false) this.uAct = Date.now(); };
     ['pointerdown', 'pointermove', 'click', 'keydown', 'input'].forEach(t => document.addEventListener(t, ua, true));
     this.dv = setInterval(() => this.demoTick(), 90);
-    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} try { this.rtaDemoTick(); } catch (e) {} try { this.fxTick(); } catch (e) {} }, 50);
+    this.dy = setInterval(() => { try { this.dynTick(); } catch (e) {} try { this.rtaDemoTick(); } catch (e) {} try { this.rtaTick(); } catch (e) {} try { this.fxTick(); } catch (e) {} }, 50);
     if (NATIVE) {
       window.__xairNative = list => this.onNative(list);
       try { NATIVE.ready(); } catch (e) {}
@@ -2809,10 +2830,11 @@ class App extends Component {
       </svg>
       <div style="position:absolute;right:8px;top:8px;display:flex;gap:6px;align-items:center">
         ${this.linked() && this.state.prefs.rta !== false && !R && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:6px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2f4a52;color:#8fa3aa`}>${src !== undefined && src !== rtaIdx(s) ? 'האנלייזר של המיקסר על ערוץ אחר. הדלק LIVE והוא יעבור לכאן' : 'ממתין לאנלייזר מהמיקסר…'}</span>`}
-        ${(() => { if (this.state.prefs.rta === false) return null; const m = R ? (this.rtaQuiet ? 'אין אות בערוץ – האנלייזר מחכה לסאונד' : '') : !this.linked() ? '' : !this.state.conn.live && this.val('/-stat/rta/source') !== rtaIdx(s) ? 'האנלייזר של המיקסר מכוון לערוץ אחר. הדלק LIVE והוא יעבור לערוץ הזה.' : Date.now() - this.rtaAt > 1500 ? 'ממתין לאנלייזר מהמיקסר…' : 'מעביר את האנלייזר לערוץ הזה…';
+        ${(() => { if (this.state.prefs.rta === false) return null; const m = R ? (this.rtaQuiet ? 'אין אות בערוץ – האנלייזר מחכה לסאונד' : '') : !this.linked() || this.val('/-stat/rta/source') !== rtaIdx(s) ? '' : 'ממתין לאנלייזר מהמיקסר…';   /* another source: the note that was already there says it */
           return m && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:5px 10px;border-radius:7px;background:rgba(42,29,16,.9);border:1px solid #8a5a2a;color:#ffc98f`}>${m}</span>`; })()}
         ${R && html`<span dir="rtl" data-rtalegend="1" style=${`${HEB};font-size:12.5px;padding:5px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2c2721;color:#b8c8cc;display:flex;gap:10px;align-items:center`}>
           <span><i style="display:inline-block;width:16px;height:2px;background:#d6f0f8;vertical-align:middle"></i> ממוצע</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff8a3a;vertical-align:middle"></i> הצטברות – כדאי לבדוק חיתוך</span></span>`}
+        ${this.linked() && this.state.prefs.rta !== false && html`<button class="small" data-rtarec="1" style="height:36px;font-size:12px" onClick=${() => this.rtaRecord()}>${this.rtaCap ? 'REC…' : 'REC 8s'}</button>`}
         <button class="small" data-rtab="1" aria-pressed=${String(this.state.prefs.rta !== false)} style=${`height:36px;border-color:${this.state.prefs.rta !== false ? '#7fa6b4' : '#3a342c'};${this.state.prefs.rta !== false ? 'color:#cfe0e5' : ''}`} onClick=${() => this.setPref({ rta: this.state.prefs.rta === false })}>${this.state.prefs.rta !== false ? 'RTA ON' : 'RTA OFF'}</button>
         ${this.linked() && this.state.prefs.rta !== false && html`<button class="small" data-rtapos="1" style="height:36px" onClick=${() => this.pick('/-stat/rta/pos', pos === 1 ? 0 : 1)}>${pos === 1 ? 'POST EQ' : pos === 0 ? 'PRE EQ' : 'RTA ···'}</button>`}
         <button class="small" data-eqr=${ER} style="height:36px;font-family:var(--mono);font-size:13px;color:#cbbd9f" onClick=${() => this.setPref({ eqR: EQ_R[(EQ_R.indexOf(ER) + 1) % EQ_R.length] })}>±${ER} dB</button>

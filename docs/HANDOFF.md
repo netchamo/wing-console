@@ -379,3 +379,18 @@ Analyser:
 - When no spectrum is shown in the EQ screen there is now a reason on screen (another source and LIVE off, waiting, no
   signal). The source change after opening the screen may happen up to 4 s after the tap (the mixer may report the current
   source late), with retries at 0.25/0.9/2.2/3.6 s, and again when LIVE is switched on.
+
+## 19. Air Console 0.7.5 – a calm analyser, and a way to tune it on real sound (23 Nov)
+
+- The user saw the analyser jump too high and unevenly. Causes: smoothing ran once per received packet (the mixer's packets
+  come in uneven bursts), and the window followed every peak (the whole picture rescaled).
+- Now `rtaTick` smooths on a steady 50 ms clock with real-time ballistics (`rtaSmooth(R, dt)`): neighbours averaged as power
+  (about 1/3 octave), rise τ 60 ms, fall ≤ 15 dB/s, average τ 2.5 s, peaks hold 1.5 s then fall 10 dB/s. The window follows
+  the average (loudest average + 12 dB at the top, `RTA_SPAN` 54 dB) with τ 4 s. Hot-spot marks are re-picked every 0.4 s
+  and keep their place unless clearly elsewhere.
+- REC 8s (EQ screen, connected): copies 8 s of raw `/meters/4` frames (time, 100 bins) with the source and the mixer's
+  `rta/decay`/`rta/det` – paste it in the chat.
+- `dev/xair-tests/rta-replay.mjs capture.txt` replays such a capture through the app and the fake mixer
+  (`fake.rtaReplay`), prints how much the curve and the window move per frame, and saves frames to /tmp/rta-replay.
+  Synthetic uneven input: the window moved 4.6 dB in 4 s before, 0.2–0.8 dB now; the largest single-frame jump fell from 5.1
+  to 3.7 dB.

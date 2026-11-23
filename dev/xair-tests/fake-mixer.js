@@ -81,7 +81,11 @@ Object.assign(store, { '/-stat/rta/source': ['i', 8], '/-stat/rta/pos': ['i', 0]
     const L = /^\/ch\/(\d+)(\/.+)$/.exec(m.addr);
     if (L && !/\/pan$/.test(m.addr)) { const n = +L[1], lo = n % 2 ? n : n - 1, o = n % 2 ? n + 1 : n - 1, pr = `/ch/${pad2(o)}${L[2]}`; if ((store[`/config/chlink/${lo}-${lo + 1}`] || [])[1] === 1 && store[pr]) store[pr] = [m.types[0], m.args[0]]; }
   }
-  setInterval(() => { if (!fake.subs.has('/meters/4') || fake.silent) return; const b = new Uint8Array(4 + 200), d = new DataView(b.buffer); d.setInt32(0, 100, true); for (let i = 0; i < 100; i++) d.setInt16(4 + 2 * i, Math.round((-30 - i * 0.2 + 6 * Math.random()) * 256), true); push('/meters/4', [['b', b]]); }, 60);
+  /* replay of a real capture: fake.rtaReplay = [[t_ms, ...100 dB values], ...] is sent at its own times, looped */
+  const rtaSend = vals => { const b = new Uint8Array(4 + 200), d = new DataView(b.buffer); d.setInt32(0, 100, true); for (let i = 0; i < 100; i++) d.setInt16(4 + 2 * i, Math.round(vals[i] * 256), true); push('/meters/4', [['b', b]]); };
+  (function rp() { const R = fake.rtaReplay; if (!R || !R.length) { setTimeout(rp, 200); return; } let i = 0; const t0 = performance.now(), T = R[R.length - 1][0] + 50;
+    const step = () => { if (fake.rtaReplay !== R) { rp(); return; } const now = (performance.now() - t0) % T; while (i < R.length && R[i][0] <= now) { if (fake.subs.has('/meters/4')) rtaSend(R[i].slice(1)); i++; } if (now < (R[i - 1] || [0])[0]) i = 0; setTimeout(step, 5); }; step(); })();
+  setInterval(() => { if (fake.rtaReplay) return; if (!fake.subs.has('/meters/4') || fake.silent) return; const b = new Uint8Array(4 + 200), d = new DataView(b.buffer); d.setInt32(0, 100, true); for (let i = 0; i < 100; i++) d.setInt16(4 + 2 * i, Math.round((-30 - i * 0.2 + 6 * Math.random()) * 256), true); push('/meters/4', [['b', b]]); }, 60);
   setInterval(() => { if (!fake.meters || fake.silent) return; const b = new Uint8Array(4 + 80), d = new DataView(b.buffer); d.setInt32(0, 40, true); for (let i = 0; i < 40; i++) d.setInt16(4 + 2 * i, Math.round((-40 + 30 * Math.random()) * 256), true); push('/meters/1', [['b', b]]); }, 100);
   window.XAirNative = { ready() {}, version() { return 'test'; }, wifi() { return true; }, wifiAddress() { return '192.168.1.50/24'; }, netInfo() { return '[]'; },
     setLive(on) { fake.live = !!on; window.calls.push(['setLive', !!on]); },
