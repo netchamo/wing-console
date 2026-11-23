@@ -359,3 +359,23 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
   read only. Disconnect keeps looking but never reconnects on its own.
 - No change to the Android code: everything goes through `discover` and `send`.
 - Fake mixer: `?ip=` moves the mixer, `?ghost=1` adds an XR18 that answers only direct questions. 114 checks.
+
+## 18. Air Console 0.7.4 – what the 0.7.3 report confirmed, analyser that is easy to read (23 Nov)
+
+From the user's XR16 (fw 1.19) report:
+- Insert slot = `…/insert/sel` (0 OFF, 1 FX1A … 8 FX4B) on ch, bus and main. `insert/fxslot`, `insert/pos`, `dyn/pos` do not
+  answer: the processing order is fixed. On that mixer FX2 = Dual Pultec (P1A2) in insert mode, on ch 5 (A) and ch 1 (B);
+  FX4 = Dual Leveling Amp (LEC2) on ch 4 (A) and ch 6 (B). Parameter counts and int/float types of PLAT, 3TAP, P1A2, LEC2
+  match `FXD` exactly.
+- Send pan exists only on sends 1, 3, 5 (bus pairs). Main has no mix/lr, grp, dyn/keysrc. Phantom only on inputs 1–16.
+  `/-prefs/remote/*` do not exist. The report no longer asks these.
+- `/-prefs/lan/addr|mask|gateway` come as four ints: shown joined ("192.168.1.10"). clockrate 1 shown as 48 kHz (VERIFY).
+- `config/rtnsrc` on the XR16 defaults to n−1 per channel (0–15), like the XR18; the player L/R as 0/1 stays VERIFY.
+- The report now also catches `/meters/3` and `/meters/7` (count, bytes, values) to confirm their layout.
+Analyser:
+- The picture's window follows the sound (`rtaTop`, `RTA_SPAN` 48 dB): the loudest part sits near the top, quickly up and
+  slowly down. A 1/9-octave bin is far below the channel level, so the old fixed −66…−6 dB window left real channels at
+  the bottom edge or invisible. Hot-spot threshold is relative to the window.
+- When no spectrum is shown in the EQ screen there is now a reason on screen (another source and LIVE off, waiting, no
+  signal). The source change after opening the screen may happen up to 4 s after the tap (the mixer may report the current
+  source late), with retries at 0.25/0.9/2.2/3.6 s, and again when LIVE is switched on.

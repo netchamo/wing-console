@@ -82,7 +82,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.3';
+const DW = 1180, APP_VER = '0.7.4';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -194,21 +194,21 @@ function dumpPaths() {
   const P = [], r = n => Array.from({ length: n }, (_, i) => i + 1), add = (b, xs) => xs.forEach(x => P.push(b + '/' + x));
   const eq = (b, n) => { r(n).forEach(k => add(`${b}/eq/${k}`, ['type', 'f', 'g', 'q'])); P.push(b + '/eq/on'); };
   const dyn = b => add(b + '/dyn', ['on', 'mode', 'det', 'env', 'thr', 'ratio', 'knee', 'mgain', 'attack', 'hold', 'release', 'mix', 'auto', 'keysrc', 'filter/on', 'filter/type', 'filter/f']);
-  const sends = b => r(10).forEach(k => add(`${b}/mix/${pad2(k)}`, ['level', 'pan', 'tap', 'grpon']));
+  const sends = b => r(10).forEach(k => add(`${b}/mix/${pad2(k)}`, k <= 5 && k % 2 ? ['level', 'pan', 'tap', 'grpon'] : ['level', 'tap', 'grpon']));   /* pan only on the odd bus sends (report 0.7.3) */
   const core = b => add(b, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'mix/pan', 'mix/lr', 'grp/dca', 'grp/mute']);
-  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/fxslot', 'insert/sel', 'insert/pos', 'dyn/pos', 'automix/group', 'automix/weight']);
+  r(16).forEach(n => { const b = '/ch/' + pad2(n); core(b); add(b, ['config/insrc', 'config/rtnsrc', 'preamp/hpf', 'preamp/hpon', 'preamp/invert', 'preamp/rtnsw', 'preamp/rtntrim', 'insert/on', 'insert/sel', 'automix/group', 'automix/weight']);
     add(b + '/gate', ['on', 'mode', 'thr', 'range', 'attack', 'hold', 'release', 'keysrc', 'filter/on', 'filter/type', 'filter/f']); dyn(b); eq(b, 4); sends(b); });
-  r(18).forEach(n => add('/headamp/' + pad2(n), ['gain', 'phantom']));
+  r(18).forEach(n => add('/headamp/' + pad2(n), n <= 16 ? ['gain', 'phantom'] : ['gain']));
   ['/rtn/aux', ...r(4).map(n => '/rtn/' + n)].forEach(b => { core(b); add(b, ['config/rtnsrc', 'preamp/rtnsw', 'preamp/rtntrim']); eq(b, 4); sends(b); });
-  r(6).forEach(n => { const b = '/bus/' + n; core(b); dyn(b); eq(b, 6); add(b, ['eq/mode', 'insert/on', 'insert/fxslot', 'insert/sel']); });
-  core('/lr'); dyn('/lr'); eq('/lr', 6); add('/lr', ['eq/mode', 'insert/on', 'insert/fxslot', 'insert/sel']);
+  r(6).forEach(n => { const b = '/bus/' + n; core(b); dyn(b); eq(b, 6); add(b, ['eq/mode', 'insert/on', 'insert/sel']); });
+  add('/lr', ['config/name', 'config/color', 'mix/fader', 'mix/on', 'mix/pan']); dyn('/lr'); P.splice(P.indexOf('/lr/dyn/keysrc'), 1); eq('/lr', 6); add('/lr', ['eq/mode', 'insert/on', 'insert/sel']);
   r(4).forEach(n => { add('/fxsend/' + n, ['config/name', 'config/color', 'mix/fader', 'mix/on', 'grp/dca', 'grp/mute']); add('/dca/' + n, ['config/name', 'config/color', 'fader', 'on']);
     add('/fx/' + n, ['type', 'insert', ...r(32).map(k => 'par/' + pad2(k))]); add('/config/mute', [String(n)]); });
   add('/config', ['chlink/1-2', 'chlink/3-4', 'chlink/5-6', 'chlink/7-8', 'chlink/9-10', 'chlink/11-12', 'chlink/13-14', 'chlink/15-16', 'buslink/1-2', 'buslink/3-4', 'buslink/5-6', 'linkcfg/preamp', 'linkcfg/eq', 'linkcfg/dyn', 'linkcfg/fdrmute',
     'solo/level', 'solo/source', 'solo/sourcetrim', 'solo/chmode', 'solo/busmode', 'solo/dim', 'solo/dimatt', 'solo/dimpfl', 'solo/mono', 'solo/mute', 'amixenable/X', 'amixenable/Y', 'amixlock/X', 'amixlock/Y']);
   r(6).forEach(n => add('/routing/aux/' + pad2(n), ['src', 'pos'])); add('/routing/main', ['01', '02']); r(18).forEach(n => add('/routing/usb/' + pad2(n), ['src', 'pos']));
   add('/-stat', ['solo', 'usbmounted', 'tape/state', 'tape/file', 'tape/etime', 'tape/rtime', 'usb/path', 'usb/count', 'usb/001/name', 'usb/001/type', 'usb/002/name', 'usb/002/type', 'rta/source', 'rta/pos', 'autosave', 'keysolo', ...r(54).map(k => 'solosw/' + pad2(k))]);
-  add('/-prefs', ['name', 'clockrate', 'playnext', 'usbifcmode', 'hardmute', 'dcamute', 'ponmute', 'rta/decay', 'rta/det', 'lan/mode', 'lan/addr', 'lan/mask', 'lan/gateway', 'ap/ssid', 'ap/channel', 'ap/security', 'is/mode', 'is/ssid', 'remote/enable', 'remote/protocol', 'remote/ioenable']); add('/-snap', ['index', 'name', '01/name']);
+  add('/-prefs', ['name', 'clockrate', 'playnext', 'usbifcmode', 'hardmute', 'dcamute', 'ponmute', 'rta/decay', 'rta/det', 'lan/mode', 'lan/addr', 'lan/mask', 'lan/gateway', 'ap/ssid', 'ap/channel', 'ap/security', 'is/mode', 'is/ssid']); add('/-snap', ['index', 'name', '01/name']);
   return P;
 }
 
@@ -274,6 +274,7 @@ const tabsOf = s => TABS[s.kind];
 const SCREEN_OF = { Home: 'home', Config: 'config', Insert: 'insert', EQ: 'eq', Gate: 'gate', Comp: 'comp', Sends: 'sends' }, CH_SCREENS = Object.values(SCREEN_OF);
 /* the analyser: 100 bins from 20 Hz to 20 kHz (meters/4, 1/256 dB). Source index on the mixer (/-stat/rta/source):
    ch 0–15, aux 16, FX returns 17–20, buses 21–26, FX sends 27–30, main LR 31 */
+const RTA_SPAN = 48;   /* dB shown under the loudest part of the spectrum */
 const RTA_N = 100, rtaHz = k => 20 * Math.pow(1000, k / (RTA_N - 1));
 const rtaIdx = s => s.kind === 'ch' ? s.n - 1 : s.kind === 'aux' ? 16 : s.kind === 'rtn' ? 16 + s.n : s.kind === 'bus' ? 20 + s.n : s.kind === 'fxs' ? 26 + s.n : s.kind === 'lr' ? 31 : -1;
 const EQ_R = [18, 12, 6, 3], EQ_STEP = { 18: 6, 12: 3, 6: 2, 3: 1 };
@@ -499,7 +500,7 @@ const ROUT_POS = ['AIN', 'AIN+M', 'IN', 'IN+M', 'PRE EQ', 'PRE EQ+M', 'POST EQ',
 const AUX_OUTS = { XR18: 6, XR16: 4, XR12: 2 };
 const LINK_ASK = 'לקשר את שני הערוצים לסטריאו? המיקסר מעתיק את ההגדרות מהערוץ האי־זוגי לזוגי.';
 /* inserts: strips that have one, and the candidate addresses of the slot choice (0 OFF, 1 FX1A, 2 FX1B … 8 FX4B) */
-const INS_KINDS = ['ch', 'bus', 'lr'], INS_SEL = ['fxslot', 'sel'];
+const INS_KINDS = ['ch', 'bus', 'lr'], INS_SEL = ['sel'];   /* report 0.7.3: insert/sel answers (0 OFF, 1 FX1A … 8 FX4B); insert/fxslot does not */
 const FX_INS_ASK = n => `להעביר את FX${n} למצב אינסרט? הסלוט יפסיק לעבוד כשליחה, והאפקט ישמע רק בערוצים שבהם הוא משובץ.`;
 const FX_ASK = n => `להחליף את האפקט בסלוט ${n}? ההגדרות של האפקט הנוכחי יוחלפו בברירת המחדל של החדש.`;
 const PH_ASK = 'להפעיל מתח פנטום 48V בכניסה הזו? אל תפעיל על מיקרופון סרט או על ציוד שלא מיועד לזה.';
@@ -564,7 +565,7 @@ class App extends Component {
     L.ch.forEach(c => { D[c.base + '/preamp/rtnsw'] = 0; D[c.base + '/config/rtnsrc'] = c.n - 1; });
     [0, 5, 10, 37].forEach((t, i) => { D[`/fx/${i + 1}/type`] = t; D[`/fx/${i + 1}/insert`] = i === 3 ? 1 : 0; this.fxDefaults(D, i + 1, t); });
     /* inserts: the Wave Designer in slot 4 is split – side A on the kick (ch 1), side B on the snare (ch 2) */
-    [...L.ch, ...L.bus, L.lr].forEach(x => { D[x.base + '/insert/on'] = x.kind === 'ch' && x.n <= 2 ? 1 : 0; D[x.base + '/insert/fxslot'] = x.kind === 'ch' && x.n <= 2 ? 6 + x.n : 0; });
+    [...L.ch, ...L.bus, L.lr].forEach(x => { D[x.base + '/insert/on'] = x.kind === 'ch' && x.n <= 2 ? 1 : 0; D[x.base + '/insert/sel'] = x.kind === 'ch' && x.n <= 2 ? 6 + x.n : 0; });
     /* automix: the speech mics 9–12 in group X */
     L.ch.forEach(c => { D[c.base + '/automix/group'] = c.n >= 9 && c.n <= 12 ? 1 : 0; D[c.base + '/automix/weight'] = c.n === 9 ? q(0.625, 49) : 0.5; });
     Object.assign(D, { '/config/amixenable/X': 1, '/config/amixenable/Y': 0, '/config/amixlock/X': 0, '/config/amixlock/Y': 0 });
@@ -582,7 +583,7 @@ class App extends Component {
     if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
     if (!(path in this.desk)) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return false; }
     if (!c.live) { this.toastRO('קריאה בלבד: הדלק LIVE כדי לשנות את המיקסר'); return false; }
-    if (Date.now() - (this.uAct || 0) > 1500) { this.log('sys', 'blocked, no hand action: ' + path); return false; }
+    if (Date.now() - (this.uAct || 0) > (path === '/-stat/rta/source' ? 4000 : 1500)) { this.log('sys', 'blocked, no hand action: ' + path); return false; }   /* the analyser follows the tap that opened the screen, even if the mixer answered a little late */
     if (same(this.desk[path], value)) return true;
     this.desk[path] = value; this.hold[path] = Date.now();
     this.outq.set(path, [this.dtype[path] === 'i' || this.dtype[path] === 'f' || this.dtype[path] === 's' ? this.dtype[path] : type, value]);
@@ -679,7 +680,7 @@ class App extends Component {
     this.lastRx = Date.now();
     if (m.addr.startsWith('/meters/')) { if (m.addr === '/meters/1' && m.args[0] instanceof Uint8Array) this.onMeters(m.args[0]); else if (m.addr === '/meters/6' && m.args[0] instanceof Uint8Array) this.onGr(m.args[0]); else if (m.addr === '/meters/4' && m.args[0] instanceof Uint8Array) this.onRta(m.args[0]); else if (m.addr === '/meters/3' && m.args[0] instanceof Uint8Array) this.onFxm(m.args[0]); else if (m.addr === '/meters/7' && m.args[0] instanceof Uint8Array) this.onAmx(m.args[0]); return; }
     if (!m.args.length) return;
-    const v = m.args[0];
+    const v = /^\/-prefs\/lan\/(addr|mask|gateway)$/.test(m.addr) && m.args.length >= 4 ? m.args.slice(0, 4).join('.') : m.args[0];   /* an address comes as four numbers */
     this.pend.delete(m.addr); this.missing.delete(m.addr); this.dtype[m.addr] = m.types[0];
     if (Date.now() - (this.hold[m.addr] || 0) < 600) return;   /* a late answer must not pull back a control the hand is moving */
     if (this.desk[m.addr] !== v) { this.desk[m.addr] = v; this.bump(); }
@@ -755,7 +756,7 @@ class App extends Component {
     if (!this.linked()) return;
     this.tx('/xremote'); this.tx('/meters', [['s', '/meters/1'], ['i', 0]]); this.tx('/meters', [['s', '/meters/6'], ['i', 0]]); this.tx('/xinfo');
     if (this.rtaWant() >= 0) this.tx('/meters', [['s', '/meters/4'], ['i', 0]]);
-    const sc = this.state.screen; if (sc === 'fx' || sc === 'insert') this.tx('/meters', [['s', '/meters/3'], ['i', 0]]); if (sc === 'automix') this.tx('/meters', [['s', '/meters/7'], ['i', 0]]);
+    const sc = this.state.screen; if (sc === 'fx' || sc === 'insert' || this.dumpRun) this.tx('/meters', [['s', '/meters/3'], ['i', 0]]); if (sc === 'automix' || this.dumpRun) this.tx('/meters', [['s', '/meters/7'], ['i', 0]]);
   }
   /* once a second: link health, retries, searching */
   watch() {
@@ -809,14 +810,18 @@ class App extends Component {
      stand clearly above the spectrum around them – the places an EQ cut usually helps. */
   rtaSmooth(R) {
     const S = this.rtaS, L = this.rtaL || (this.rtaL = new Float32Array(RTA_N).fill(-90)), P = this.rtaP || (this.rtaP = new Float32Array(RTA_N).fill(-90)), Pt = this.rtaPt || (this.rtaPt = new Float64Array(RTA_N)), now = Date.now();
-    if (this.rtaKey !== this.rtaDemo + '|' + this.desk['/-stat/rta/source']) { this.rtaKey = this.rtaDemo + '|' + this.desk['/-stat/rta/source']; L.fill(-90); P.fill(-90); this.rtaN0 = 0; }
+    if (this.rtaKey !== this.rtaDemo + '|' + this.desk['/-stat/rta/source']) { this.rtaKey = this.rtaDemo + '|' + this.desk['/-stat/rta/source']; L.fill(-90); P.fill(-90); this.rtaN0 = 0; this.rtaTop = undefined; }
     this.rtaN0 = (this.rtaN0 || 0) + 1; const la = this.rtaN0 < 20 ? 0.25 : 0.035;
     for (let i = 0; i < RTA_N; i++) { const r = (R[Math.max(0, i - 1)] + 2 * R[i] + R[Math.min(RTA_N - 1, i + 1)]) / 4;
       S[i] = r > S[i] ? S[i] * 0.4 + r * 0.6 : S[i] * 0.86 + r * 0.14; L[i] = L[i] * (1 - la) + S[i] * la;
       if (S[i] >= P[i]) { P[i] = S[i]; Pt[i] = now; } else if (now - Pt[i] > 1400) P[i] = Math.max(S[i], P[i] - 0.8); }
+    /* the window follows the sound: the loudest part sits near the top and 48 dB are shown under it, so a quiet channel
+       still fills the picture (a bin of a 1/9 octave analyser is much lower than the channel's own level) */
+    let mx = -128; for (let i = 0; i < RTA_N; i++) if (S[i] > mx) mx = S[i]; this.rtaQuiet = mx < -100;
+    const tgt = clamp(mx + 5, -70, 6), T0 = this.rtaTop === undefined ? tgt : this.rtaTop; this.rtaTop = this.rtaQuiet ? T0 : T0 + (tgt - T0) * (tgt > T0 ? 0.35 : 0.012);
     if (now - (this.rtaHotAt || 0) > 250) { this.rtaHotAt = now; const hot = [];
       for (let k = 4; k < RTA_N - 4; k++) { let a = 0, c = 0; for (let j = Math.max(0, k - 12); j <= Math.min(RTA_N - 1, k + 12); j++) if (Math.abs(j - k) > 2) { a += L[j]; c++; }
-        const ex = L[k] - a / c, f = rtaHz(k); if (ex > 3.5 && L[k] > -62 && f > 35 && f < 16000 && L[k] >= L[k - 1] && L[k] >= L[k + 1]) hot.push({ k, f, ex }); }
+        const ex = L[k] - a / c, f = rtaHz(k); if (ex > 3.5 && L[k] > this.rtaTop - 36 && f > 35 && f < 16000 && L[k] >= L[k - 1] && L[k] >= L[k + 1]) hot.push({ k, f, ex }); }
       this.rtaHot = hot.sort((a, b) => b.ex - a.ex).slice(0, 3); }
     const sc = this.state.screen; if (sc === 'eq' || sc === 'home') this.bump();
   }
@@ -833,6 +838,7 @@ class App extends Component {
     if (!this.linked()) return; const want = this.rtaWant(), src = '/-stat/rta/source', cur = this.desk[src];
     if (want >= 0) {
       this.tx('/meters', [['s', '/meters/4'], ['i', 0]]);
+      if (cur === undefined) this.need(['/-stat/rta/source'], true);
       if (!this.state.conn.live || cur === undefined || cur === want) return;
       if (this.rtaPrev === undefined) this.rtaPrev = cur;
       if (this.set(src, 'i', want)) this.log('sys', 'RTA source ' + cur + ' → ' + want);
@@ -892,7 +898,7 @@ class App extends Component {
   /* ---------- mixer report (reads only) ---------- */
   dumpStart() {
     if (this.state.conn.status !== 'connected') { this.toast('הדוח נקרא מהמיקסר: צריך להיות מחובר'); return; }
-    const P = dumpPaths(); this.dumpRun = { P, t0: Date.now() }; this.dumpText = '';
+    const P = dumpPaths(); this.dumpRun = { P, t0: Date.now() }; this.dumpText = ''; this.pulse();
     this.need(P, true); this.setState({ dump: { n: 0, total: P.length, done: false } }); this.log('sys', 'mixer report: asking ' + P.length + ' values');
   }
   dumpStep() {
@@ -907,7 +913,7 @@ class App extends Component {
     /* the short answers first, the sixteen channels after them; cut into parts a chat can take */
     const body = ['xinfo ' + JSON.stringify(c.raw || []), `asked ${R.P.length}, answered ${R.P.length - miss.length}`,
       'rta source ' + this.desk['/-stat/rta/source'] + ' pos ' + this.desk['/-stat/rta/pos'] + ' meters4 ' + (this.rtaAt ? Array.from(this.rtaR).map(v => +v.toFixed(1)).join(',') : 'none'),
-      'meters6 ' + (this.grAt ? Array.from(this.gr).map(v => +v.toFixed(1)).join(',') : 'none'), 'meters1 ' + Array.from(this.mt).map(v => +v.toFixed(1)).join(','),
+      'meters6 ' + (this.grAt ? Array.from(this.gr).map(v => +v.toFixed(1)).join(',') : 'none'), 'meters3 ' + (this.fxmAt ? `count ${this.fxmN} bytes ${this.fxmLen}: ` + Array.from(this.fxm.slice(0, Math.min(56, this.fxmN || 56))).map(v => +v.toFixed(1)).join(',') : 'none'), 'meters7 ' + (this.amxAt ? `count ${this.amxN} bytes ${this.amxLen}: ` + Array.from(this.amx).map(v => +v.toFixed(1)).join(',') : 'none'), 'meters1 ' + Array.from(this.mt).map(v => +v.toFixed(1)).join(','),
       'strips with no fader answer: ' + (miss.filter(p => /\/fader$/.test(p)).join(' ') || 'none'),
       'no answer (N = a number): ' + (Object.keys(fold).map(k => k + ' x' + fold[k]).join(' ') || 'none'),
       ...keys.filter(b => !b.startsWith('/ch/')).map(line), ...keys.filter(b => b.startsWith('/ch/')).map(line), '--- log', ...this.logs.slice(-40)];
@@ -948,7 +954,8 @@ class App extends Component {
     if (st.sofOn !== ps.sofOn || st.sof !== ps.sof || st.sheet !== ps.sheet || st.bank !== ps.bank || st.screen !== ps.screen || st.sendsWin !== ps.sendsWin || st.mgPop !== ps.mgPop || st.fxSlot !== ps.fxSlot || st.rtab !== ps.rtab) { this.readView(st.screen !== ps.screen && st.screen !== 'main'); this.paintSoon(); }
     if (CH_SCREENS.includes(st.screen) || ['tape', 'fx', 'routing', 'automix', 'settings'].includes(st.screen) || st.mgPop || st.srcPick) this.readView();
     if (st.connPop && !ps.connPop) this.burst();
-    if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); }
+    if (st.screen !== ps.screen || st.sheet !== ps.sheet || st.prefs.rta !== ps.prefs.rta) { clearTimeout(this.rfT); clearTimeout(this.rfT2); clearTimeout(this.rfT3); clearTimeout(this.rfT4); this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 900); this.rfT3 = setTimeout(() => this.rtaFollow(), 2200); this.rfT4 = setTimeout(() => this.rtaFollow(), 3600); }
+    if (st.conn.live !== ps.conn.live && st.conn.live) { this.rfT = setTimeout(() => this.rtaFollow(), 250); this.rfT2 = setTimeout(() => this.rtaFollow(), 1200); }
     if (st.conn.status !== ps.conn.status || st.prefs.demoModel !== ps.prefs.demoModel) { this.mt.fill(-128); this.pk.fill(-128); this.paintSoon(); }
   }
   topCls() { return 'topbar' + (this.state.prefs.navSwap ? '' : ' backR'); }
@@ -1258,7 +1265,7 @@ class App extends Component {
   }
   fctl(n, p, D, st = {}) { if (!p) return null; if (p.kind === 't') return this.fsw(n, p, st); if (p.kind === 'e' && p.names.length <= 4 && !st.knob) return this.fsel(n, p, st); return this.fknob(n, p, D, st); }
   /* the effect's level going in and out, from the mixer (meters/3), as on the X-Air Edit faces */
-  onFxm(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(56, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.fxm[i] = d.getInt16(4 + 2 * i, true) / 256; this.fxmAt = Date.now(); }
+  onFxm(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(56, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.fxm[i] = d.getInt16(4 + 2 * i, true) / 256; this.fxmAt = Date.now(); this.fxmN = d.getInt32(0, true); this.fxmLen = b.length; }
   fxLv(n, side, what) { const b = (n - 1) * 14 + (what === 'out' ? 12 : 0), a = this.fxm[b], c = this.fxm[b + 1]; return side === 'A' ? a : side === 'B' ? c : Math.max(a, c); }
   fxMeter(n, side, H) {
     const lv = what => clamp((this.fxLv(n, side, what) + 60) / 60, 0, 1), bar = (v, lab) => html`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
@@ -1772,8 +1779,7 @@ class App extends Component {
   /* which strips use a slot as an insert (and on which side) */
   insUsers(n) { const L = this.L(), out = []; [...L.ch, ...L.bus, L.lr].forEach(s => { const p = this.insSel(s); if (!p || this.val(s.base + '/insert/on') !== 1) return; const v = this.val(p);
     if (fin(v) && v > 0 && Math.ceil(v / 2) === n) out.push((this.nm(s) || s.def) + (fxDual(this.fxK(n)) ? ' ' + (v % 2 ? 'A' : 'B') : '')); }); return out; }
-  /* the address that holds a strip's insert slot: the command list names /insert/fxslot, but the XR16 did not answer it – whichever
-     candidate the mixer answers is used (VERIFY on the report). In the demo it is fxslot. */
+  /* the address that holds a strip's insert slot: /insert/sel (confirmed on the XR16, fw 1.19) – used only once the mixer has reported it */
   insSel(s) { if (!INS_KINDS.includes(s.kind)) return null; for (const c of INS_SEL) { const p = s.base + '/insert/' + c; if (this.val(p) !== undefined) return p; } return null; }
 
   /* ---------- INSERT: put one of the four effects into this strip, and edit it right here ---------- */
@@ -1877,7 +1883,7 @@ class App extends Component {
     const mem = this.L().ch.filter(cc => this.val(cc.base + '/automix/group') === g), sum = mem.reduce((a, cc) => a + lvl(cc), 0) || 1;
     return clamp(10 * Math.log10(Math.max(1e-6, lvl(c) / sum)), -40, 0);
   }
-  onAmx(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(16, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.amx[i] = d.getInt16(4 + 2 * i, true) / 256; this.amxAt = Date.now(); }
+  onAmx(b) { if (b.length < 4) return; const d = new DataView(b.buffer, b.byteOffset, b.byteLength), m = Math.min(16, (b.length - 4) >> 1); for (let i = 0; i < m; i++) this.amx[i] = d.getInt16(4 + 2 * i, true) / 256; this.amxAt = Date.now(); this.amxN = d.getInt32(0, true); this.amxLen = b.length; }
   renderAmxInfo(Hd) {
     const close = () => this.setState({ amxInfo: false }), p = 'font-size:15.5px;line-height:1.65;color:#e9dcc2';
     return html`<button class="scrim" style="z-index:8" aria-label="Close" onClick=${close}></button>
@@ -2742,14 +2748,15 @@ class App extends Component {
   }
   eqDb(E, f) { let db = 0; if (E.eqOn !== 0) for (const B of E.bands) if (!B.bad) db += bandDb(B.t, B.f, B.t === 0 || B.t === 5 ? 0 : B.g, B.q, f); if (E.lc && E.lc.on) db += bandDb(0, E.lc.f, 0, 0.7, f); return db; }
   /* the analyser as an area under the curve, as in the WING app */
-  rtaLine(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = H - clamp((R[k] + 66) / 60, 0.02, 1) * (H - top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d; }
+  rtaY(v, H, top) { const T = this.rtaTop === undefined ? -6 : this.rtaTop; return H - clamp((v - (T - RTA_SPAN)) / RTA_SPAN, 0.01, 1) * (H - top); }
+  rtaLine(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = this.rtaY(R[k], H, top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d; }
   /* live fill, slow average line, held peaks, and the hot spots marked where they are */
   rtaLayers(W, H, top, big) {
-    const L = this.rtaL, P = this.rtaP, hot = this.rtaHot || [], X = f => Math.log10(f / 20) / 3 * W, Yv = v => H - clamp((v + 66) / 60, 0.02, 1) * (H - top);
+    const L = this.rtaL, P = this.rtaP, hot = this.rtaHot || [], X = f => Math.log10(f / 20) / 3 * W, Yv = v => this.rtaY(v, H, top);
     return html`<g data-rta=${big ? 'eq' : 'mini'} style="pointer-events:none">
       <defs><linearGradient id=${'hotg' + (big ? 1 : 0)} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a3a" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a3a" stop-opacity="0"/></linearGradient></defs>
       ${hot.map(h => { const x0 = X(h.f / 1.12), x1 = X(h.f * 1.12), y = Yv(L[h.k]); return html`<rect x=${x0.toFixed(1)} y=${(y - 6).toFixed(1)} width=${(x1 - x0).toFixed(1)} height=${Math.min(H - y + 6, big ? 70 : 24).toFixed(1)} rx="4" fill=${`url(#hotg${big ? 1 : 0})`}/>`; })}
-      <path d=${this.rtaPath(this.rtaS, W, H, top)} fill="#5e8796" fill-opacity=${big ? 0.2 : 0.24} stroke="#7fa6b4" stroke-opacity=".45" stroke-width="1"/>
+      <path d=${this.rtaPath(this.rtaS, W, H, top)} fill="#6a9aab" fill-opacity=${big ? 0.3 : 0.32} stroke="#9cc6d4" stroke-opacity=".7" stroke-width="1.2"/>
       ${P && big && html`<path d=${this.rtaLine(P, W, H, top)} fill="none" stroke="#9fc4d0" stroke-width="1" stroke-dasharray="2 3" opacity=".55"/>`}
       ${L && html`<path d=${this.rtaLine(L, W, H, top)} fill="none" stroke="#d6f0f8" stroke-width=${big ? 2 : 1.4} opacity=".85"/>`}
       ${hot.map(h => { const x = X(h.f), y = Yv(L[h.k]); return big ? html`<g><circle cx=${x.toFixed(1)} cy=${y.toFixed(1)} r="6" fill="#ff8a3a" stroke="#1a0f06" stroke-width="2"/>
@@ -2758,7 +2765,7 @@ class App extends Component {
         : html`<circle cx=${x.toFixed(1)} cy=${y.toFixed(1)} r="3.5" fill="#ff8a3a"/>`; })}
     </g>`;
   }
-  rtaPath(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = H - clamp((R[k] + 66) / 60, 0.02, 1) * (H - top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d + `L ${W} ${H} L 0 ${H} Z`; }
+  rtaPath(R, W, H, top) { let d = ''; for (let k = 0; k < RTA_N; k++) { const x = Math.log10(rtaHz(k) / 20) / 3 * W, y = this.rtaY(R[k], H, top); d += (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1); } return d + `L ${W} ${H} L 0 ${H} Z`; }
   miniEq(s, W, H) {
     const E = this.eqData(s), Y = d => clamp(H / 2 - d / 18 * H / 2, 2, H - 2), R = this.rtaFor(s); let d = '';
     for (let i = 0; i <= 80; i++) d += (i ? 'L' : 'M') + (i / 80 * W).toFixed(1) + ' ' + Y(this.eqDb(E, 20 * Math.pow(1000, i / 80))).toFixed(1);
@@ -2802,6 +2809,8 @@ class App extends Component {
       </svg>
       <div style="position:absolute;right:8px;top:8px;display:flex;gap:6px;align-items:center">
         ${this.linked() && this.state.prefs.rta !== false && !R && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:6px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2f4a52;color:#8fa3aa`}>${src !== undefined && src !== rtaIdx(s) ? 'האנלייזר של המיקסר על ערוץ אחר. הדלק LIVE והוא יעבור לכאן' : 'ממתין לאנלייזר מהמיקסר…'}</span>`}
+        ${(() => { if (this.state.prefs.rta === false) return null; const m = R ? (this.rtaQuiet ? 'אין אות בערוץ – האנלייזר מחכה לסאונד' : '') : !this.linked() ? '' : !this.state.conn.live && this.val('/-stat/rta/source') !== rtaIdx(s) ? 'האנלייזר של המיקסר מכוון לערוץ אחר. הדלק LIVE והוא יעבור לערוץ הזה.' : Date.now() - this.rtaAt > 1500 ? 'ממתין לאנלייזר מהמיקסר…' : 'מעביר את האנלייזר לערוץ הזה…';
+          return m && html`<span dir="rtl" data-rtanote="1" style=${`${HEB};font-size:13px;padding:5px 10px;border-radius:7px;background:rgba(42,29,16,.9);border:1px solid #8a5a2a;color:#ffc98f`}>${m}</span>`; })()}
         ${R && html`<span dir="rtl" data-rtalegend="1" style=${`${HEB};font-size:12.5px;padding:5px 10px;border-radius:7px;background:rgba(14,13,11,.85);border:1px solid #2c2721;color:#b8c8cc;display:flex;gap:10px;align-items:center`}>
           <span><i style="display:inline-block;width:16px;height:2px;background:#d6f0f8;vertical-align:middle"></i> ממוצע</span><span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ff8a3a;vertical-align:middle"></i> הצטברות – כדאי לבדוק חיתוך</span></span>`}
         <button class="small" data-rtab="1" aria-pressed=${String(this.state.prefs.rta !== false)} style=${`height:36px;border-color:${this.state.prefs.rta !== false ? '#7fa6b4' : '#3a342c'};${this.state.prefs.rta !== false ? 'color:#cfe0e5' : ''}`} onClick=${() => this.setPref({ rta: this.state.prefs.rta === false })}>${this.state.prefs.rta !== false ? 'RTA ON' : 'RTA OFF'}</button>
@@ -2955,7 +2964,7 @@ class App extends Component {
     const lanM = v('/-prefs/lan/mode'), rows = [['דגם', c.model], ['שם ברשת', v('/-prefs/name') || c.name], ['קושחה', c.fw], ['כתובת IP', c.ip],
       ['כתובת קבועה', v('/-prefs/lan/addr')], ['מסכה', v('/-prefs/lan/mask')], ['שער', v('/-prefs/lan/gateway')], ['רשת LAN', fin(lanM) ? LAN[lanM] || lanM : ''],
       ['WiFi', fin(v('/-prefs/is/mode')) ? IS[v('/-prefs/is/mode')] || v('/-prefs/is/mode') : ''], ['רשת WiFi', v('/-prefs/ap/ssid') || v('/-prefs/is/ssid')], ['ערוץ WiFi', v('/-prefs/ap/channel')],
-      ['קצב דגימה', fin(v('/-prefs/clockrate')) ? ['48 kHz', '44.1 kHz'][v('/-prefs/clockrate')] || v('/-prefs/clockrate') : '']].filter(r => r[1] !== undefined && r[1] !== '' && r[1] !== null);
+      ['קצב דגימה', fin(v('/-prefs/clockrate')) ? ['44.1 kHz', '48 kHz'][v('/-prefs/clockrate')] || v('/-prefs/clockrate') : '']].filter(r => r[1] !== undefined && r[1] !== '' && r[1] !== null);
     return html`<div data-facts="1" style="display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:8px 10px;border-radius:8px;background:#100f0d;border:1px solid #2c2721">
       ${rows.map(([k, val]) => html`<span style="font-size:13px;color:#9b927f">${k}</span><span dir="ltr" style="font-family:var(--mono);font-size:13px;color:#e9dcc2;text-align:right">${String(val)}</span>`)}</div>`;
   }
