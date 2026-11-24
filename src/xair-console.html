@@ -57,7 +57,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .box.big b{font-size:15px}.box.big em{font-size:21px}
 .box s{position:absolute;left:0;bottom:0;height:3px;text-decoration:none}
 .sec{min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line)}
-.tab{height:44px;width:84px;flex:none;display:flex;align-items:center;justify-content:center;gap:3px;padding:0 4px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
+.tab{height:44px;width:80px;flex:none;display:flex;align-items:center;justify-content:center;gap:3px;padding:0 4px;border-radius:7px;border:1px solid var(--line);background:linear-gradient(180deg,#1e1b18,#141210);color:#d9cdb3;font-weight:700;font-size:15px;letter-spacing:.03em;text-transform:uppercase;cursor:pointer}
 .topbar.backR>.backbtn{order:98}.topbar.backR>.wood:last-child{order:99}
 .fxchange{height:60px;flex:none;display:flex;align-items:center;justify-content:center;gap:12px;border-radius:12px;cursor:pointer;color:#1d1406;border:1px solid #ffd99a;background:linear-gradient(180deg,#ffd58f,#e8a33d 55%,#c98a32);box-shadow:0 0 18px rgba(243,194,122,.55),inset 0 1px 0 rgba(255,255,255,.6);font-family:inherit;animation:fxglow 2.6s ease-in-out infinite}
 .fxchange:active{transform:translateY(1px);filter:brightness(1.1)}
@@ -608,13 +608,13 @@ class App extends Component {
     const U = this.undo || []; const e = U.pop(); if (!e) return; this.undoing = true; const ok = this.set(e.path, e.type, e.old); this.undoing = false;
     if (ok) { this.toast('בוטל: ' + this.undoLabel(e.path)); this.log('sys', 'undo ' + e.path); } else U.push(e); this.undoAt = Date.now(); this.bump();
   }
+  /* a compact UNDO button in every top bar, for 25 s after a change; the name of what it will undo is on it */
   undoPill() {
     const U = this.undo || [], e = U[U.length - 1]; if (!e || Date.now() - (this.undoAt || 0) > 25000) return null;
-    return html`<button data-undo="1" onClick=${() => this.doUndo()} aria-label="Undo the last change"
-      style="position:absolute;left:50%;transform:translateX(-50%);bottom:10px;z-index:5;height:42px;padding:0 16px 0 12px;border-radius:21px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(26,22,18,.94);border:1px solid #8a6a3a;color:#f3e2c4;box-shadow:0 6px 20px rgba(0,0,0,.6)">
-      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12h-3" fill="none" stroke="#f3c27a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <b style="font-size:14px;letter-spacing:.12em">UNDO</b><span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this.undoLabel(e.path)}</span>
-      ${U.length > 1 && html`<span style="font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:8px;background:#3a2c18;color:#f3c27a">${U.length}</span>`}</button>`;
+    return html`<button data-undo="1" onClick=${() => this.doUndo()} aria-label=${'Undo ' + this.undoLabel(e.path)} title=${this.undoLabel(e.path)}
+      style="height:40px;flex:none;padding:0 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px;background:#2a2014;border:1px solid #8a6a3a;color:#f3e2c4">
+      <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12h-3" fill="none" stroke="#f3c27a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.05"><b style="font-size:12px;letter-spacing:.12em">UNDO${U.length > 1 ? ' ' + U.length : ''}</b><span style="font-family:var(--mono);font-size:9.5px;color:#cbbd9f;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this.undoLabel(e.path).replace(/^.* · /, '')}</span></span></button>`;
   }
   flushOut() {
     clearTimeout(this.outT); this.outT = 0;
@@ -2027,8 +2027,9 @@ class App extends Component {
     return { dot: '#e8a33d', fg: '#ffd9a0', border: '#8a6a3a', text: c.wifi ? 'DEMO · SEARCHING' : 'DEMO · NO WI-FI' };
   }
   connPill() {
-    const L = this.connLook(), c = this.state.conn, B = 'height:40px;padding:0 12px;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;white-space:nowrap;flex:none;';
+    const L = this.connLook(), c = this.state.conn, U = this.undoPill(), B = 'height:40px;padding:0 12px;border-radius:8px;font-family:inherit;font-weight:700;font-size:13px;letter-spacing:.1em;cursor:pointer;white-space:nowrap;flex:none;';
     return html`
+      ${U}
       ${NATIVE && c.apk && html`<button onClick=${() => this.apkUpdate()} style=${B + 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c'}>${c.dl >= 0 && c.dl < 100 ? 'DOWNLOADING ' + c.dl + '%' : 'UPDATE APP'}</button>`}
       ${NATIVE && c.update && !c.apk && html`<button onClick=${() => NATIVE.reload()} style=${B + 'background:#1d2a19;color:#a6e39c;border:1px solid #62b85c'}>NEW VERSION</button>`}
       ${this.linked() && html`<button onClick=${() => this.askLive(!c.live)} aria-pressed=${String(c.live)}
@@ -3131,7 +3132,6 @@ class App extends Component {
             </div>
           </div>`}
         ${st.started && portrait && html`<div class="overlay" dir="rtl" style="z-index:25"><div class="card"><h1 style="font-size:30px">⟲</h1><p>סובב את המכשיר לרוחב</p></div></div>`}
-        ${this.undoPill()}
         ${st.toast && html`<div class="toast" role="status">${st.toast}</div>`}
       </div>`;
   }

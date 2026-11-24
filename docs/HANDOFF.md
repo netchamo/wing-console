@@ -325,7 +325,7 @@ Done for chapter 9 (stages 1–4 of the plan the user approved):
 - 3TAP / 4TAP: their "A"/"B" are taps, not sides – the parser no longer treats them as dual effects.
 - Channel tabs follow the X-Air block diagram (manual ch. 12): LOW CUT (Config) → GATE → INSERT → EQ → COMP → sends.
   The order is fixed on the X-Air – there is no address to move the processors – so no reorder screen. The report also asks
-  `insert/pos` and `dyn/pos` to be sure. All tabs are the same size (84 px) with a thin border.
+  `insert/pos` and `dyn/pos` to be sure. All tabs are the same size (80 px) with a thin border.
 - Main screen: channel name tags 42 px high (were 34).
 - 107 checks.
 
@@ -410,3 +410,4 @@ New:
   mixer's GR meters (/meters/6: ch comp 16–31, bus 32–37, main 38) or worked out in the demo.
 - Effect faces: double tap on a knob/fader = back to its default.
 - 120 checks.
+- UNDO lives in every top bar (inside `connPill`), not floating – a floating pill covered the EQ gain slider.
