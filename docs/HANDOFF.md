@@ -394,3 +394,19 @@ Analyser:
   (`fake.rtaReplay`), prints how much the curve and the window move per frame, and saves frames to /tmp/rta-replay.
   Synthetic uneven input: the window moved 4.6 dB in 4 s before, 0.2–0.8 dB now; the largest single-frame jump fell from 5.1
   to 3.7 dB.
+
+## 20. Air Console 0.8.0 – review pass (24 Nov)
+
+Every screen was photographed in the demo (640 high) and on the fake mixer (520 high, the shortest phone). Found and fixed:
+- CONFIG (automix row) and SETTINGS (last buttons) were cut off on short screens – they scroll now; the AUTOMIX list scrolls.
+- HOME of a return: "POST EQ" wrapped onto the value in the small sends list – short labels (P.EQ / PR.EQ), no wrap.
+- A DCA's HOME was empty – it now lists the strips the DCA controls (`renderDcaHome`): live meter, level, mute, tap to
+  open; a red line when the DCA itself is muted; a Hebrew line on what a DCA does.
+New:
+- UNDO (`remember`, `doUndo`, `undoPill`): every hand change keeps the value it replaced (a drag on one control is one
+  step, 40 steps). A pill at the bottom names the last change ("KICK · EQ 2 GAIN") for 25 s; a tap puts the old value back
+  through `set()` – same rules (LIVE, reported value, a hand action). Not for `/-stat` and `/-prefs`.
+- Compressor reduction on every strip meter (`.mgr`, `grIdx`): an orange bar hanging from the top of the meter, from the
+  mixer's GR meters (/meters/6: ch comp 16–31, bus 32–37, main 38) or worked out in the demo.
+- Effect faces: double tap on a knob/fader = back to its default.
+- 120 checks.

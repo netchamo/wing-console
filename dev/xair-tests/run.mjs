@@ -280,4 +280,18 @@ for (const seed of [1, 2, 3]) { const p = await open('index.html?model=XR18'); a
   ok('the list shows the other mixer ready to switch back', await p.evaluate(() => !!document.querySelector('[data-mixer="192.168.1.1"]')));
   ok('no page errors (two mixers)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
 
+
+{ const p = await open('demo.html'); await p.evaluate(() => __app.setState({ started: true }));
+  const f0 = await p.evaluate(() => __app.val(__app.L().ch[0].fader));
+  await p.evaluate(() => { __app.uAct = Date.now(); __app.set(__app.L().ch[0].fader, 'f', 0.3); }); await p.waitForTimeout(150);
+  ok('UNDO appears after a change and names it', await p.evaluate(() => /UNDO/.test(document.querySelector('[data-undo]')?.textContent || '') && /FADER/.test(document.querySelector('[data-undo]').textContent)));
+  await click(p, '[data-undo]'); await p.waitForTimeout(150);
+  ok('UNDO puts the old value back', await p.evaluate(f0 => Math.abs(__app.val(__app.L().ch[0].fader) - f0) < 1e-6, f0));
+  await p.evaluate(() => __app.setState({ screen: 'home', sheet: __app.L().dca[0].id })); await p.waitForTimeout(400);
+  ok('a DCA HOME lists the strips it controls (DRUMS: 7)', await p.evaluate(() => document.querySelectorAll('[data-dcamem]').length === 7));
+  await click(p, '[data-dcamem]'); await p.waitForTimeout(300); ok('tapping a member opens it', await p.evaluate(() => __app.L().byId[__app.state.sheet].kind === 'ch'));
+  await p.evaluate(() => __app.setState({ screen: 'main', sheet: null })); await p.waitForTimeout(600);
+  ok('every channel meter carries a compressor reduction bar', await p.evaluate(() => document.querySelectorAll('.strip .mgr[data-gr]').length >= 8));
+  ok('no page errors (undo, DCA, GR)', p.errs.length === 0, p.errs.join(' | ')); await p.close(); }
+
 console.log(`\n${n - fails} of ${n} passed`); await B.close(); srv.close(); process.exit(fails ? 1 : 0);

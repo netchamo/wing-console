@@ -33,6 +33,7 @@ button:focus-visible{outline:2px solid var(--brass-hi);outline-offset:2px}
 .mfill{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#3f9e4c 0,#7fd36b 72%,#e6c23e 80%,#f0a24a 92%,#ff4a3a 95%,#ff4a3a 100%);background-position:bottom;background-repeat:no-repeat}
 .mcol::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,#0b0a09 2px 3px);pointer-events:none;z-index:2}
 .mpk{position:absolute;left:0;right:0;height:2px;z-index:3}
+.mgr{position:absolute;top:0;right:-6px;width:4px;height:0;border-radius:0 0 2px 2px;background:linear-gradient(180deg,#ffb35a,#e0713a);box-shadow:0 0 6px rgba(240,140,60,.6);z-index:4;transition:height .08s linear}
 .box em{white-space:nowrap}
 .tab{white-space:nowrap}
 .topbar .tag{white-space:nowrap;flex:none}
@@ -82,7 +83,7 @@ import { html, render, Component } from 'https://cdn.jsdelivr.net/npm/htm@3.1.1/
    Safety model: values live in two separate stores – `demo` (never leaves the page) and `desk` (only what the
    mixer reported). The single write path is set()/act(); it needs LIVE on, a value the mixer already reported,
    and a hand gesture in the last 1.5 s. Nothing is ever derived and written back. */
-const DW = 1180, APP_VER = '0.7.5';
+const DW = 1180, APP_VER = '0.8.0';
 const NATIVE = window.XAirNative || null;
 const APK_URL = 'https://github.com/netchamo/wing-console/releases/download/xair-latest/air-console.apk';
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -578,17 +579,42 @@ class App extends Component {
   set(path, type, value) {
     const fm = /^\/fx\/(\d)\/type$/.exec(path);
     if (fm) { if (!this.linked()) this.fxDefaults(this.demo, +fm[1], value); else this.fxReread(+fm[1]); }
-    if (!this.linked()) { this.demo[path] = value; this.bump(); return true; }
+    if (!this.linked()) { if (!same(this.demo[path], value)) this.remember(path, type, this.demo[path]); this.demo[path] = value; this.bump(); return true; }
     const c = this.state.conn;
     if (c.status !== 'connected') { this.toastRO('אין תשובה מהמיקסר כרגע'); return false; }
     if (!(path in this.desk)) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return false; }
     if (!c.live) { this.toastRO('קריאה בלבד: הדלק LIVE כדי לשנות את המיקסר'); return false; }
     if (Date.now() - (this.uAct || 0) > (path === '/-stat/rta/source' ? 4000 : 1500)) { this.log('sys', 'blocked, no hand action: ' + path); return false; }   /* the analyser follows the tap that opened the screen, even if the mixer answered a little late */
     if (same(this.desk[path], value)) return true;
+    this.remember(path, this.dtype[path] || type, this.desk[path]);
     this.desk[path] = value; this.hold[path] = Date.now();
     this.outq.set(path, [this.dtype[path] === 'i' || this.dtype[path] === 'f' || this.dtype[path] === 's' ? this.dtype[path] : type, value]);
     if (type === 'f') { if (!this.outT) this.outT = setTimeout(() => this.flushOut(), 30); } else this.flushOut();
     this.bump(); return true;
+  }
+  /* UNDO: every hand change keeps the value it replaced; a drag on one control is one step */
+  remember(path, type, old) {
+    if (this.undoing || old === undefined || /^\/-(stat|prefs)\//.test(path)) return; const U = this.undo || (this.undo = []), now = Date.now(), top = U[U.length - 1];
+    if (top && top.path === path && now - top.t < 2000) top.t = now; else { U.push({ path, type, old, t: now }); if (U.length > 40) U.shift(); }
+    this.undoAt = now;
+  }
+  undoLabel(path) {
+    const L = this.L(), s = L.all.find(x => path.startsWith(x.base + '/')), rest = s ? path.slice(s.base.length + 1) : path.replace(/^\//, '');
+    const nice = rest.replace(/^mix\/fader$/, 'FADER').replace(/^mix\/on$/, 'MUTE').replace(/^mix\/pan$/, 'PAN').replace(/^mix\/(\d\d)\/level$/, 'SEND $1').replace(/^eq\/(\d)\/g$/, 'EQ $1 GAIN').replace(/^eq\/(\d)\/f$/, 'EQ $1 FREQ').replace(/^eq\/(\d)\/q$/, 'EQ $1 Q')
+      .replace(/^dyn\/thr$/, 'COMP THR').replace(/^gate\/thr$/, 'GATE THR').replace(/^fader$/, 'FADER').replace(/^on$/, 'MUTE').replace(/\//g, ' ').toUpperCase();
+    return (s ? (this.nm(s) || s.def) + ' · ' : '') + nice;
+  }
+  doUndo() {
+    const U = this.undo || []; const e = U.pop(); if (!e) return; this.undoing = true; const ok = this.set(e.path, e.type, e.old); this.undoing = false;
+    if (ok) { this.toast('בוטל: ' + this.undoLabel(e.path)); this.log('sys', 'undo ' + e.path); } else U.push(e); this.undoAt = Date.now(); this.bump();
+  }
+  undoPill() {
+    const U = this.undo || [], e = U[U.length - 1]; if (!e || Date.now() - (this.undoAt || 0) > 25000) return null;
+    return html`<button data-undo="1" onClick=${() => this.doUndo()} aria-label="Undo the last change"
+      style="position:absolute;left:50%;transform:translateX(-50%);bottom:10px;z-index:5;height:42px;padding:0 16px 0 12px;border-radius:21px;cursor:pointer;display:flex;align-items:center;gap:10px;background:rgba(26,22,18,.94);border:1px solid #8a6a3a;color:#f3e2c4;box-shadow:0 6px 20px rgba(0,0,0,.6)">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5 4 10l5 5M4 10h10a6 6 0 0 1 0 12h-3" fill="none" stroke="#f3c27a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <b style="font-size:14px;letter-spacing:.12em">UNDO</b><span style="font-family:var(--mono);font-size:12px;color:#cbbd9f;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${this.undoLabel(e.path)}</span>
+      ${U.length > 1 && html`<span style="font-family:var(--mono);font-size:11px;padding:1px 6px;border-radius:8px;background:#3a2c18;color:#f3c27a">${U.length}</span>`}</button>`;
   }
   flushOut() {
     clearTimeout(this.outT); this.outT = 0;
@@ -651,6 +677,7 @@ class App extends Component {
     if (st.screen === 'automix') { L.ch.forEach(c => P.push(c.name, c.color, c.base + '/automix/group', c.base + '/automix/weight')); ['X', 'Y'].forEach(g => P.push('/config/amixenable/' + g, '/config/amixlock/' + g)); }
     if (st.srcPick || (st.screen === 'config' && sh && sh.kind === 'ch')) { const c = L.byId[st.srcPick] || sh; if (c && c.kind === 'ch') P.push(c.base + '/preamp/rtnsw', c.base + '/config/rtnsrc', c.base + '/config/insrc'); }
     if (st.screen === 'settings') P.push('/-prefs/name', '/-prefs/clockrate', '/-prefs/lan/mode', '/-prefs/lan/addr', '/-prefs/lan/mask', '/-prefs/lan/gateway', '/-prefs/ap/ssid', '/-prefs/ap/channel', '/-prefs/is/mode', '/-prefs/is/ssid', '/-prefs/usbifcmode', '/-stat/autosave');
+    if (st.screen === 'home' && sh && sh.kind === 'dca') L.all.forEach(x => { if (x.kind !== 'lr' && x.kind !== 'dca') P.push(x.base + '/grp/dca', x.name, x.color, x.fader, x.on); });
     if (st.screen === 'home' && sh && sh.kind === 'ch') { const lo = sh.n % 2 ? sh.n : sh.n - 1; P.push(`/config/chlink/${lo}-${lo + 1}`); }
     if (st.screen === 'tape') { P.push(...TAPE_PATHS); const n = this.desk['/-stat/usb/count']; if (fin(n)) for (let k = 1; k <= Math.min(n, 40); k++) P.push(`/-stat/usb/${String(k).padStart(3, '0')}/name`, `/-stat/usb/${String(k).padStart(3, '0')}/type`); }
     this.need(P, force);
@@ -760,6 +787,7 @@ class App extends Component {
   }
   /* once a second: link health, retries, searching */
   watch() {
+    if (this.undoAt && Date.now() - this.undoAt < 27000 && Date.now() - this.undoAt > 24000) this.bump();
     const now = Date.now(), c = this.state.conn; this.wn = (this.wn || 0) + 1;
     if (!NATIVE) return;
     const fresh = c.found.filter(f => now - (f.seen || 0) < 12000 || f.ip === c.ip); if (fresh.length !== c.found.length) this.setState(s => ({ conn: { ...s.conn, found: s.conn.found.filter(f => now - (f.seen || 0) < 12000 || f.ip === s.conn.ip) } }));
@@ -888,8 +916,14 @@ class App extends Component {
       f.style.height = (lv * 100).toFixed(1) + '%';
       k.style.bottom = (p * 100).toFixed(1) + '%'; k.style.opacity = p > 0.02 ? 1 : 0; k.style.background = p > 0.95 ? '#ff5a45' : p > 0.8 ? '#f0b04a' : '#9be08f';
     }
+    const ge = this.stage ? this.stage.querySelectorAll('.mgr[data-gr]') : [], real = this.linked() && now - (this.grAt || 0) < 1500, L = this.L();
+    for (const el of ge) { let g = 0; const i = +el.dataset.gr;
+      if (real) g = Math.abs(this.gr[i]) || 0;
+      else if (!this.linked()) { const x = L.byId[el.dataset.gs]; if (x) { const C = this.cvC(x); if (C.on) { const lv = x.mt.length ? Math.max(...x.mt.map(j => this.mt[j])) : -90; g = Math.max(0, lv - C.thr) * (1 - 1 / (C.ratio || 3)); } } }
+      el.style.height = (clamp(g / 20, 0, 1) * 50).toFixed(1) + '%'; el.title = g > 0.3 ? 'GR ' + g.toFixed(1) + ' dB' : ''; }
     if (this.state.sendsWin) this.paintSends(now);
   }
+  cvC(x) { const c = this.cvCache || (this.cvCache = {}), e = c[x.id], now = Date.now(); if (e && now - e.t < 500) return e.v; const v = this.cv(x); c[x.id] = { t: now, v }; return v; }
   /* a send's level: the strip's meter + the send, + the fader when it is taken after the fader. The mixer has no send meters, so this is worked out. */
   sendLv(sp) {
     const lv = sp.mt.length ? Math.max(...sp.mt.map(i => this.mt[i])) : -128, sv = this.val(sp.send), tap = this.val(sp.tap), fv = this.val(sp.fader);
@@ -1076,7 +1110,7 @@ class App extends Component {
           <span style="font-family:var(--mono);font-size:12px;color:var(--brass-hi)">${dbText(v)}</span>
           <button class="fader" data-f=${s.fader} style=${`height:${FH}px;width:84px`} aria-label=${'Fader ' + dbText(v)}
             onPointerDown=${e => this.faderDown({ path: s.fader, steps: STEPS.fader }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
-            <span class="slot"></span>${this.meter(s.mt, T)}
+            <span class="slot"></span>${this.meter(s.mt, T, s)}
             ${fin(v) && html`<span class="cap" style=${'top:' + Math.round((1 - clamp(v, 0, 1)) * T) + 'px'}></span>`}
           </button>
           <span style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#9b927f">FADER</span>
@@ -1233,6 +1267,7 @@ class App extends Component {
     return {
       onPointerDown: e => { e.stopPropagation(); capture(e); const r = this.val(path); if (r === undefined) { this.toastRO('המיקסר עוד לא דיווח על הערך הזה'); return; }
         if (p.kind === 't') { this.tog(path); return; }
+        if (this.dbl('fx' + path)) { const D = {}; this.fxDefaults(D, n, this.fxT(n)); const d = D[path]; if (d !== undefined) this.set(path, p.kind === 'e' ? 'i' : 'f', p.kind === 'e' ? d : q(d, p.n)); return; }   /* double tap: back to the middle */
         this.kd = { path, x: e.clientX, y: e.clientY, r0: r, moved: false }; this.setState({ fxHot: p.label }); },
       onPointerMove: e => { const d = this.kd; if (!d || d.path !== path) return; const dd = (d.y - e.clientY) + (e.clientX - d.x);
         if (!d.moved && Math.abs(dd) > 4) d.moved = true; if (!d.moved) return;
@@ -1891,7 +1926,7 @@ class App extends Component {
         <div style="display:flex;gap:10px">${gcard('X')}${gcard('Y')}
           <div dir="rtl" class="sec" style=${`flex:1.4;padding:8px 12px;${HEB};font-size:13.5px;line-height:1.5;color:#cbbd9f`}>אוטומיקס מחלק את ההגבר בין המיקרופונים של הקבוצה: מי שמדבר עולה, השאר יורדים, והסכום נשאר קבוע. לפאנלים, כנסים ודיבור – לא למוזיקה.</div></div>
         <span style=${sm}>CHANNELS · GROUP · WEIGHT · GAIN NOW</span>
-        <div style="flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:6px 12px;align-content:start">${ch.map(row)}</div>
+        <div style="flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;gap:6px 12px;align-content:start">${ch.map(row)}</div>
       </div>
       ${st.amxInfo && this.renderAmxInfo(Hd)}
       ${this.chanPopsLite(Hd)}`;
@@ -1976,10 +2011,13 @@ class App extends Component {
   }
 
   /* ---------- drawing ---------- */
-  meter(mt, T) {
-    if (!mt.length) return null;
+  /* the strip's own compressor reduction, as a small orange bar hanging from the top of its meter (from the mixer's GR
+     meters when connected, worked out from the level and the settings in the demo) */
+  grIdx(s) { return s.kind === 'ch' ? 15 + s.n : s.kind === 'bus' ? 31 + s.n : s.kind === 'lr' ? 38 : -1; }
+  meter(mt, T, s) {
+    if (!mt.length) return null; const gi = s ? this.grIdx(s) : -1;
     const col = i => html`<span class="mcol" data-m=${i}><span class="mfill" style=${`height:0%;background-size:100% ${T}px`}></span><span class="mpk" style="bottom:0;opacity:0"></span></span>`;
-    return html`<span class="meter" style=${`height:${T}px`}>${col(mt[0])}${col(mt.length > 1 ? mt[1] : mt[0])}</span>`;
+    return html`<span class="meter" style=${`height:${T}px`}>${col(mt[0])}${col(mt.length > 1 ? mt[1] : mt[0])}${gi >= 0 && html`<span class="mgr" data-gr=${gi} data-gs=${s.id}></span>`}</span>`;
   }
   connLook() {
     const c = this.state.conn;
@@ -2034,7 +2072,7 @@ class App extends Component {
           onPointerDown=${e => this.faderDown({ path: fp, steps: snd ? STEPS.level : STEPS.fader, tap: () => this.openStrip(s.id), long: s.sends && !snd ? () => this.setState({ sendsWin: { id: s.id } }) : null }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
           ${marks.map(m => html`<span class="mk" style=${'top:' + m.top + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.tick + 'px'}></span>`)}
           <span class="slot"></span>
-          ${this.meter(s.mt, T)}
+          ${this.meter(s.mt, T, s)}
           ${v !== undefined && html`<span class="cap" style=${'top:' + Math.round((1 - v) * T) + 'px'}></span>`}
         </button>
       </div>`; };
@@ -2275,7 +2313,7 @@ class App extends Component {
           onPointerDown=${e => this.faderDown({ path: s.fader, steps: STEPS.fader }, e, T, FH)} onPointerMove=${e => this.faderMove(e)} onPointerUp=${() => this.faderUp()} onPointerCancel=${() => this.faderUp()}>
           ${marks.map(m => html`<span class="mk" style=${'top:' + (m.c - 7) + 'px'}>${m.label}</span><span class="tk" style=${'top:' + m.c + 'px'}></span>`)}
           <span class="slot"></span>
-          ${this.meter(s.mt, T)}
+          ${this.meter(s.mt, T, s)}
           ${fin(v) && html`<span class="cap" style=${'top:' + Math.round((1 - clamp(v, 0, 1)) * T) + 'px'}></span>`}
         </button>
       </div>`;
@@ -2552,6 +2590,7 @@ class App extends Component {
 
   /* ---------- HOME: the strip at a glance, every tile opens its screen ---------- */
   renderHome(Hd) {
+    if (this.L().byId[this.state.sheet]?.kind === 'dca') return this.renderDcaHome(Hd);
     const st = this.state, L = this.L(), s = L.byId[st.sheet], T = tabsOf(s), isCh = s.kind === 'ch', ha = this.headamp(s);
     const bodyH = Math.round(Hd - 72), h1 = Math.round((bodyH - 10) * (T.includes('Sends') ? 0.66 : 0.72)), h2 = bodyH - 10 - h1, mH = Math.max(30, h1 - 78 - 84);
     const tile = (label, sub, badge, onClick, body, extra, foot) => foot ? html`<div style=${`min-width:0;display:flex;flex-direction:column;gap:6px;padding:5px;border-radius:13px;border:1px solid #3a342c;background:#12100e;${extra || ''}`}>${tile(label, sub, badge, onClick, body, 'flex:1;min-height:0')}${foot}</div>` : html`
@@ -2628,7 +2667,7 @@ class App extends Component {
                 ${L.dests.map(d => { const v = this.val(sendPath(s, d)), tap = this.val(s.base + '/mix/' + pad2(d.k) + '/tap'); return html`<span style="min-height:0;display:flex;align-items:center;gap:8px">
                   <span style=${`width:96px;flex:none;font-size:13px;color:${v > 0 ? '#e9dcc2' : '#6f675a'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis`}>${this.nm(d.strip) || d.label}</span>
                   <span style="flex:1;height:6px;border-radius:3px;background:#0c0b0a;overflow:hidden"><span style=${`display:block;height:100%;width:${fin(v) ? Math.round(clamp(v, 0, 1) * 100) : 0}%;background:${d.col}`}></span></span>
-                  <span style="width:38px;font-size:10px;font-weight:700;letter-spacing:.06em;color:#8a7d66">${fin(tap) && TAPS[tap] ? TAPS[tap][0] : ''}</span>
+                  <span style="width:42px;flex:none;font-size:9.5px;font-weight:700;letter-spacing:0;white-space:nowrap;color:#8a7d66">${fin(tap) && TAPS[tap] ? TAPS[tap][0].replace('POST EQ', 'P.EQ').replace('PRE EQ', 'PR.EQ') : ''}</span>
                   <span style="width:44px;text-align:right;font-family:var(--mono);font-size:12px;color:#9b927f">${dbText(v)}</span></span>`; })}
               </span>`, 'flex:1')}
             ${tile('CONFIG', '', null, () => this.goTab('Config'), html`
@@ -2640,6 +2679,34 @@ class App extends Component {
               </span>`, T.includes('Sends') ? 'width:300px;flex:none' : 'flex:1')}
           </div>
         </div>
+        ${this.chanStrip(Hd, s)}
+      </div>
+      ${this.chanPops(Hd, s)}`;
+  }
+  /* a DCA's HOME: the strips it controls – level, mute, a live meter – tap one to open it */
+  renderDcaHome(Hd) {
+    const st = this.state, L = this.L(), s = L.byId[st.sheet], k = s.n - 1, bodyH = Math.round(Hd - 72);
+    const mem = L.all.filter(x => x.kind !== 'lr' && x.kind !== 'dca' && Number.isInteger(this.val(x.base + '/grp/dca')) && (this.val(x.base + '/grp/dca') >> k) & 1);
+    const mg = this.val(s.on) === 0, cols = mem.length > 12 ? 6 : 4, RH = 64;
+    const card = x => { const v = this.val(x.fader), off = this.val(x.on) === 0, col = this.val(x.color);
+      return html`<button data-dcamem=${x.id} onClick=${() => this.setState({ sheet: x.id, screen: 'home' })}
+        style=${`height:${RH}px;display:flex;align-items:center;gap:10px;padding:0 12px;border-radius:10px;cursor:pointer;text-align:left;background:${off || mg ? '#1c1110' : '#15130f'};border:1px solid ${off ? '#6a2a22' : '#2c2721'}`}>
+        <span style="position:relative;display:flex;gap:2px;width:12px;height:44px;flex:none">${(x.mt.length ? [x.mt[0], x.mt[x.mt.length > 1 ? 1 : 0]] : []).map(i => html`<span class="mcol" data-m=${i}><span class="mfill" style="height:0%;background-size:100% 44px"></span><span class="mpk" style="bottom:0;opacity:0"></span></span>`)}</span>
+        <span style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:0">
+          <span class="tag" style=${nameLook(col) + ';height:24px;font-size:13px;justify-content:center;overflow:hidden;white-space:nowrap'}>${this.nm(x) || x.def}</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="flex:1;height:5px;border-radius:3px;background:#0c0b0a;position:relative;overflow:hidden"><span style=${`position:absolute;left:0;top:0;bottom:0;width:${fin(v) ? clamp(v, 0, 1) * 100 : 0}%;background:${off ? '#6a3a34' : '#b8a78a'}`}></span></span>
+            <span style="font-family:var(--mono);font-size:12px;color:#e9dcc2;width:44px;text-align:right">${dbText(v)}</span></span></span>
+        ${off && html`<span style="font-size:11px;font-weight:900;color:#ff8a78">MUTE</span>`}</button>`; };
+    return html`
+      ${this.chanHeader('Home', s)}
+      <div style="flex:1;min-height:0;display:flex;gap:10px;padding:10px 14px">
+        <section class="sec" style="flex:1;min-width:0;padding:10px 12px;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;font-weight:800;letter-spacing:.16em;color:#b8a78a">${this.nm(s) || s.def} CONTROLS ${mem.length} ${mem.length === 1 ? 'STRIP' : 'STRIPS'}</span><span style="flex:1"></span>
+            ${mg && html`<span style="padding:3px 10px;border-radius:6px;background:#d0392b;color:#fff6ee;font-size:12px;font-weight:800">DCA MUTED – ALL OF THEM ARE SILENT</span>`}</div>
+          ${mem.length ? html`<div style=${`flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:8px;align-content:start`}>${mem.map(card)}</div>`
+            : html`<div dir="rtl" style=${`${HEB};flex:1;display:flex;align-items:center;justify-content:center;color:#9b927f;font-size:16px;text-align:center;line-height:1.6`}>אין ערוצים ב־DCA הזה.<br/>משייכים ערוץ ל־DCA במסך CONFIG של הערוץ.</div>`}
+          <span dir="rtl" style=${`${HEB};font-size:12.5px;color:#8c8272`}>הפיידר של ה־DCA מזיז את כל הערוצים האלה יחד בלי לשנות את הפיידרים שלהם. מיוט של ה־DCA משתיק את כולם.</span>
+        </section>
         ${this.chanStrip(Hd, s)}
       </div>
       ${this.chanPops(Hd, s)}`;
@@ -2684,7 +2751,7 @@ class App extends Component {
             </div>
           </div>
         </section>`}
-        <section class="sec" style="flex:1;min-width:0;gap:12px;padding:10px 14px;overflow:hidden">
+        <section class="sec" style=${`flex:1;min-width:0;gap:${Hd < 600 ? 8 : 12}px;padding:10px 14px;overflow-y:auto;overflow-x:hidden`}>
           <button data-name="1" onClick=${() => this.setState({ nameEdit: this.nm(s) })} aria-label="Edit name and colour"
             style="height:64px;flex:none;display:flex;align-items:center;gap:14px;padding:0 14px;border-radius:10px;border:1px solid #3a342c;background:#100f0d;cursor:pointer;text-align:left">
             <span class="tag" style=${nameLook(col) + ';height:40px;font-size:21px;min-width:150px;justify-content:center'}>${this.nm(s) || s.def}</span>
@@ -2991,7 +3058,7 @@ class App extends Component {
       ${rows.map(([k, val]) => html`<span style="font-size:13px;color:#9b927f">${k}</span><span dir="ltr" style="font-family:var(--mono);font-size:13px;color:#e9dcc2;text-align:right">${String(val)}</span>`)}</div>`;
   }
   renderSettings(Hd) {
-    const st = this.state, c = st.conn, d = st.dump, sec = 'flex:1;min-width:0;gap:10px;' + HEB, h = 'font-size:18px;font-weight:700;color:var(--brass-hi)', p = 'font-size:14.5px;line-height:1.55;color:#d9cdb3';
+    const st = this.state, c = st.conn, d = st.dump, sec = 'flex:1;min-width:0;gap:10px;overflow-y:auto;' + HEB, h = 'font-size:18px;font-weight:700;color:var(--brass-hi)', p = 'font-size:14.5px;line-height:1.55;color:#d9cdb3';
     return html`
       <header class=${this.topCls()} style="height:52px;gap:10px">
         <div class="wood" style="width:18px;align-self:stretch"></div>
@@ -3064,6 +3131,7 @@ class App extends Component {
             </div>
           </div>`}
         ${st.started && portrait && html`<div class="overlay" dir="rtl" style="z-index:25"><div class="card"><h1 style="font-size:30px">⟲</h1><p>סובב את המכשיר לרוחב</p></div></div>`}
+        ${this.undoPill()}
         ${st.toast && html`<div class="toast" role="status">${st.toast}</div>`}
       </div>`;
   }
